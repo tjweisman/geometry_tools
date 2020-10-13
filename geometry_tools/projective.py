@@ -4,13 +4,14 @@ class ProjectivizationException(Exception):
     pass
 
 def hyperplane_coordinate_transform(normal):
-    """find an matrix taking the the affine chart "x . normal != 0" to the
-    standard affine chart "x_0 != 0"""
+    """find an orthogonal matrix taking the the affine chart "x . normal
+    != 0" to the standard affine chart "x_0 != 0
+
+    """
 
     return np.linalg.inv(orthogonal_transform(normal)).T
 
 def orthogonal_transform(v1, v2=None):
-
     """find an orthogonal matrix taking v1 to v2. If v2 is not specified,
     take v1 to the first standard basis vector (1, 0, ... 0).
 
@@ -23,9 +24,16 @@ def orthogonal_transform(v1, v2=None):
             np.column_stack([v1.reshape((v1.size, 1)),
                        np.identity(v1.size)])
         )
-        return np.linalg.inv(Q)
+        sign = R[0,0] / np.abs(R[0,0])
+        return np.linalg.inv(Q * sign)
 
 def affine_coords(points, chart_index = None):
+    """get affine coordinates for an array of points in porjective space
+    in one of the standard affine charts.
+
+    points is an nxd array, where n is the number of points and d is
+    the dimension of the underlying vector space.
+    """
     apoints = np.array(points)
 
     _chart_index = chart_index
@@ -96,7 +104,7 @@ class ProjectiveSpace:
         self.add_linear_transform(transform)
 
     def set_coordinate_matrix(self, coordinate_matrix):
-        self.coordinates = coordinates
+        self.coordinates = coordinate_matrix
 
     def affine_coordinates(self, point_list):
         pts = (np.matmul(self.coordinates, np.column_stack(point_list))).T
