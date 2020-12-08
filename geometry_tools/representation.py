@@ -44,7 +44,7 @@ class Representation:
         if len(generator) == 1:
             return self.generators[generator[0]]
         elif len(generator) > 1:
-            return self[generator[0]] * self[generator[1:]]
+            return self[generator[0]] @ self[generator[1:]]
         else:
             return np.identity(self._dim)
 

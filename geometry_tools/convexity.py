@@ -1,6 +1,6 @@
-import numpy as np
-
 from collections import defaultdict
+
+import numpy as np
 from scipy.spatial import ConvexHull
 
 def make_cycle(simplices):

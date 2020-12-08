@@ -24,6 +24,9 @@ def orthogonal_transform(v1, v2=None):
             np.column_stack([v1.reshape((v1.size, 1)),
                        np.identity(v1.size)])
         )
+        if R[0,0] == 0:
+            return np.identity(v1.size)
+
         sign = R[0,0] / np.abs(R[0,0])
         return np.linalg.inv(Q * sign)
 
@@ -106,8 +109,12 @@ class ProjectiveSpace:
     def set_coordinate_matrix(self, coordinate_matrix):
         self.coordinates = coordinate_matrix
 
-    def affine_coordinates(self, point_list):
-        pts = (np.matmul(self.coordinates, np.column_stack(point_list))).T
+    def affine_coordinates(self, point_list, type="pointlist"):
+        if type == "pointlist":
+            pts = (np.matmul(self.coordinates, np.column_stack(point_list))).T
+        else:
+            pts = (self.coordinates @ point_list).T
+
         return affine_coords(pts, 0)
 
     def affine_to_projective(self, point_list):

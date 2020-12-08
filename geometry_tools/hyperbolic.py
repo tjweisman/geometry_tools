@@ -1,15 +1,36 @@
 import numpy as np
+from scipy.optimize import fsolve
+
 from geometry_tools import projective
+
 
 def bilinear_form(matrix, v1, v2):
     w, h = matrix.shape
     v1 = v1.reshape((1, w))
     v2 = v2.reshape((h, 1))
 
-    return (v1 @ matrix @ v2).flatten()[0]
+    return (v1 @ matrix @ v2)[0,0]
 
 def hyp_to_affine_dist(r):
-    return (1 - np.exp(2 * r)) / (1 + np.exp(2 * r))
+    return (np.exp(2 * r) - 1) / (1 + np.exp(2 * r))
+
+def rotation_matrix(angle):
+    return np.array([[np.cos(angle), -1*np.sin(angle)],
+                     [np.sin(angle), np.cos(angle)]])
+
+def block_diagonal(matrices):
+    mats = [np.matrix(matrix) for matrix in matrices]
+    n = len(mats)
+    arr = [[None] * n for i in range(n)]
+    for i, matrix_i in enumerate(mats):
+        for j, matrix_j in enumerate(mats):
+            if i == j:
+                arr[i][j] = matrix_i
+            else:
+                h, _ = matrix_i.shape
+                _, w = matrix_j.shape
+                arr[i][j] = np.zeros((h, w))
+    return np.block(arr)
 
 class HyperbolicPoint:
     def __init__(self, space, point, coords="kleinian"):
@@ -98,6 +119,31 @@ class HyperbolicTangentVector:
 
         return self.translation_to_origin().inv().apply(basept)
 
+    def angle(self, other):
+        return self.space.hyperbolic_angle(self.point.coords,
+                                           self.vector,
+                                           other.vector)
+
+class HyperbolicPoints:
+    def __init__(self, space, points, type="pointlist"):
+        self.space = space
+        if type == "pointlist":
+            self.points = np.column_stack(
+                [HyperbolicPoint(self.space, point).coords for point in points]
+            )
+        else:
+            self.points = points
+
+    def kleinian_coordinates(self):
+        return self.space.projective.affine_coordinates(self.points, type=None)
+
+    def kleinian_xy_coordinates(self):
+        klein_pts = self.kleinian_coordinates()
+        return (klein_pts[:, 0], klein_pts[:, 1])
+
+    def __getitem__(self, n):
+        return HyperbolicPoint(self.space, self.points[:, n],
+                               coords="projective")
 
 class HyperbolicIsometry:
     def __init__(self, space, matrix):
@@ -111,9 +157,18 @@ class HyperbolicIsometry:
                                            self.apply(point),
                                            self.matrix @ vector)
         except AttributeError:
+            pass
+        try:
             return HyperbolicPoint(self.space,
                                    self.matrix @ hyp_obj.coords,
                                    coords="projective")
+        except AttributeError:
+            pass
+
+        return HyperbolicPoints(self.space,
+                                self.matrix @ hyp_obj.points,
+                                type="pointlist")
+
 
     def inv(self):
         return HyperbolicIsometry(self.space, np.linalg.inv(self.matrix))
@@ -140,8 +195,7 @@ class HyperbolicSpace:
         return vector / np.sqrt(norm2)
 
     def get_elliptic(self, block_elliptic):
-        mat = np.block([[1.0, np.zeros((1, self.dimension))],
-                        [np.zeros((self.dimension, 1)), block_elliptic]])
+        mat = block_diagonal([1.0, block_elliptic])
 
         return HyperbolicIsometry(self, mat)
 
@@ -169,6 +223,9 @@ class HyperbolicSpace:
 
         return np.arccos(prod / np.abs(np.sqrt(norm1 * norm2)))
 
+    def get_origin(self):
+        return self.get_point([0., 0.])
+
     def get_point(self, point, coords="kleinian"):
         return HyperbolicPoint(self, point, coords)
 
@@ -177,9 +234,7 @@ class HyperbolicSpace:
             [1.0, 1.0],
             [1.0, -1.0]
         ])
-        return np.block([[basis_change, np.zeros((2, self.dimension - 1))],
-                         [np.zeros((self.dimension - 1, 2)),
-                          np.identity(self.dimension - 1)]])
+        return block_diagonal([basis_change, np.identity(self.dimension - 1)])
 
     def get_standard_loxodromic(self, parameter):
         basis_change = self.loxodromic_basis_change()
@@ -192,14 +247,36 @@ class HyperbolicSpace:
             basis_change @ diagonal_loxodromic @ np.linalg.inv(basis_change)
         )
 
+    def get_standard_rotation(self, angle):
+        affine = block_diagonal([rotation_matrix(angle),
+                                 np.identity(self.dimension - 2)])
+        return self.get_elliptic(affine)
+
+    def regular_polygon(self, n, hyp_radius):
+        origin = self.get_point([0., 0.])
+        tangent = HyperbolicTangentVector(self, origin, np.array([0.0, 1.0, 0.0]))
+        tangent.normalize()
+
+        start_vertex = tangent.point_along(hyp_radius)
+        rotation = self.get_standard_rotation(2 * np.pi / n)
+
+        vertices = [start_vertex]
+        for i in range(n - 1):
+            vertices.append(rotation.apply(vertices[-1]))
+
+        return HyperbolicPoints(self, vertices)
+
+    def polygon_interior_angle(self, n, hyp_radius):
+        polygon = self.regular_polygon(n, hyp_radius)
+        tv1 = polygon[0].unit_tangent_towards(polygon[-1])
+        tv2 = polygon[0].unit_tangent_towards(polygon[1])
+
+        return tv1.angle(tv2)
+
 class HyperbolicPlane(HyperbolicSpace):
     def __init__(self):
         self.projective = projective.ProjectivePlane()
         self.dimension = 2
-
-    def get_rotation(self, angle):
-        return self.get_elliptic(np.array([[np.cos(angle), -1*np.sin(angle)],
-                                           [np.sin(angle), np.cos(angle)]]))
 
     def get_boundary_point(self, theta):
         return np.array([1.0, np.cos(theta), np.sin(theta)])
