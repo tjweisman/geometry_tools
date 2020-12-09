@@ -3,16 +3,9 @@ from collections import defaultdict
 import numpy as np
 
 from geometry_tools.representation import Representation
+from geometry_tools import utils
 
 GENERATOR_NAMES = "abcdefghijklmnopqrstuvwxyz"
-
-def permutation_matrix(permutation):
-    n = len(permutation)
-    p_mat = np.zeros((n, n))
-    for i,j in enumerate(permutation):
-        p_mat[i,j] = 1.
-
-    return p_mat
 
 class CoxeterGroup:
     def __init__(self, diagram):
@@ -62,7 +55,7 @@ class CoxeterGroup:
         perm = np.identity(len(self.generators))
 
         if order_eigenvalues and order_eigenvalues == "signed":
-            perm = permutation_matrix(np.argsort(eigs))
+            perm = utils.permutation_matrix(np.argsort(eigs))
 
         W = U @ D @ np.linalg.inv(perm)
 

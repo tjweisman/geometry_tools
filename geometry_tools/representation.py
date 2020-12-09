@@ -40,13 +40,16 @@ class Representation:
 
         self._dim = None
 
-    def __getitem__(self, generator):
-        if len(generator) == 1:
-            return self.generators[generator[0]]
-        elif len(generator) > 1:
-            return self[generator[0]] @ self[generator[1:]]
+    def _word_value(self, word):
+        if len(word) == 1:
+            return self.generators[word[0]]
+        elif len(word) > 1:
+            return self.generators[word[0]] @ self._word_value(word[1:])
         else:
             return np.identity(self._dim)
+
+    def __getitem__(self, word):
+        return self._word_value(word)
 
     def __setitem__(self, generator, matrix):
         shape = matrix.shape

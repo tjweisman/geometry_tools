@@ -1,8 +1,10 @@
+from copy import copy
+
 import numpy as np
+import scipy
 from scipy.optimize import fsolve
 
-from geometry_tools import projective
-
+from geometry_tools import projective, representation, utils
 
 def bilinear_form(matrix, v1, v2):
     w, h = matrix.shape
@@ -35,6 +37,9 @@ def block_diagonal(matrices):
 class HyperbolicPoint:
     def __init__(self, space, point, coords="kleinian"):
         self.space = space
+        self.set(point, coords)
+
+    def set(self, point, coords="kleinian"):
         try:
             self.hyperboloid_coords(point.coords)
         except AttributeError:
@@ -86,10 +91,92 @@ class HyperbolicPoint:
 
         return elliptic.inv() @ self.space.get_standard_loxodromic(param) @ elliptic
 
+    def multiply(self, matrices):
+        point_coords = (matrices @ self.coords.T)[0]
+        return HyperbolicPoints(
+            self.space, point_coords, type="array"
+        )
+
+class IdealPoint:
+    def __init__(self, space, point, coords="projective"):
+        self.space = space
+        self.set(point, coords)
+
+    def set(self, point, coords="projective"):
+        try:
+            self.coords = point.coords
+        except AttributeError:
+            if coords == "kleinian":
+                self.coords = self.space.projective.affine_to_projective([point])
+            elif coords == "projective":
+                self.coords = point
+
+class HyperbolicHyperplane:
+    def __init__(self, space, complement):
+        self.space = space
+        self.complement = complement
+        self.compute_ideal_basis()
+
+    def set(self, points, type=None):
+        self.points = points
+        self.complement = self.points[:,0].reshape(self.space.dimension + 1, 1)
+        self.ideal_basis = self.points[:,1:]
+
+    def compute_ideal_basis(self):
+        n = self.space.dimension + 1
+        transform = self.space.origin_to(self.complement)
+
+        standard_ideal_basis = np.vstack(
+            [np.ones((1, n-1)), np.eye(n - 1, n - 1, -1)]
+        )
+        standard_ideal_basis[n-1, n-2] = -1.
+
+        self.ideal_basis = transform.apply(standard_ideal_basis).points
+        self.points = np.column_stack([self.complement, self.ideal_basis])
+
+    def from_reflection(space, reflection):
+        try:
+            matrix = reflection.matrix
+        except AttributeError:
+            matrix = reflection
+
+        evals, evecs = np.linalg.eig(matrix)
+        reflected = np.argmin(evals)
+
+        return HyperbolicHyperplane(space, evecs[:,reflected])
+
+    def multiply(self, matrices):
+        return HyperbolicHyperplanes(
+            self.space, matrices @ self.points
+        )
+
+class HyperbolicHyperplanes:
+    def __init__(self, space, points):
+        self.space = space
+        self.set(points)
+
+    def set(self, points):
+        self.points = points
+
+    def get_kleinian_coords(self):
+        ideal_arr = np.transpose(self.points, (2, 1, 0))[1:]
+
+        kcoords = np.array([
+            HyperbolicPoints(self.space, pts, type="array").kleinian_coordinates()
+            for pts in ideal_arr
+        ])
+
+        return np.transpose(kcoords, (1, 0, 2))
+
+
 class HyperbolicTangentVector:
     def __init__(self, space, point, vector):
-        self.point = HyperbolicPoint(space, point)
         self.space = space
+        self.set(point, vector)
+
+
+    def set(self, point, vector):
+        self.point = HyperbolicPoint(self.space, point)
         self.vector = self.space.project_to_hyperboloid(
             self.point.coords,
             vector
@@ -127,6 +214,9 @@ class HyperbolicTangentVector:
 class HyperbolicPoints:
     def __init__(self, space, points, type="pointlist"):
         self.space = space
+        self.set(points, type)
+
+    def set(self, points, type="pointlist"):
         if type == "pointlist":
             self.points = np.column_stack(
                 [HyperbolicPoint(self.space, point).coords for point in points]
@@ -148,34 +238,93 @@ class HyperbolicPoints:
 class HyperbolicIsometry:
     def __init__(self, space, matrix):
         self.space = space
+        self.set(matrix)
+
+    def set(self, matrix):
         self.matrix = matrix #in PO(d, 1)
 
     def apply(self, hyp_obj):
+        new_obj = copy(hyp_obj)
+
         try:
+            #looks like an isometry
+            new_obj.set(self.matrix @ new_obj.matrix)
+        except AttributeError:
+            pass
+
+        try:
+            #looks like a tangent vector
             point, vector = hyp_obj.point, hyp_obj.vector
-            return HyperbolicTangentVector(self.space,
-                                           self.apply(point),
-                                           self.matrix @ vector)
+            new_obj.set(self.apply(point), self.matrix @ vector)
+            return new_obj
         except AttributeError:
             pass
+
         try:
-            return HyperbolicPoint(self.space,
-                                   self.matrix @ hyp_obj.coords,
-                                   coords="projective")
+            #looks like a point
+            new_obj.set(self.matrix @ hyp_obj.coords,
+                        coords="projective")
+            return new_obj
         except AttributeError:
             pass
 
+        try:
+            #looks like a point collection
+            new_obj.set(self.matrix @ hyp_obj.points, type="array")
+            return new_obj
+        except AttributeError:
+            pass
+
+        #otherwise, just assume it's an array of points
         return HyperbolicPoints(self.space,
-                                self.matrix @ hyp_obj.points,
-                                type="pointlist")
-
-
+                                self.matrix @ hyp_obj,
+                                type="array")
     def inv(self):
         return HyperbolicIsometry(self.space, np.linalg.inv(self.matrix))
 
     def __matmul__(self, other):
-        return HyperbolicIsometry(self.space, self.matrix @ other.matrix)
+        return self.apply(other)
 
+class HyperbolicIsometries:
+    def __init__(self, space, matrix_sequence):
+        self.space = space
+        self.matrices = np.array(matrix_sequence)
+
+    def apply(self, hyp_obj):
+        return hyp_obj.multiply(self.matrices)
+
+    def elements(self):
+        for elt in self.matrices:
+            yield HyperbolicIsometry(self.space, elt)
+
+class HyperbolicRepresentation(representation.Representation):
+    def __init__(self, space, generator_names=[]):
+        self.space = space
+        representation.Representation.__init__(self, generator_names)
+
+    def __getitem__(self, word):
+        matrix = self._word_value(word)
+        return HyperbolicIsometry(self.space, matrix)
+
+    def __setitem__(self, generator, isometry):
+        try:
+            super().__setitem__(generator, isometry.matrix)
+            return
+        except AttributeError:
+            super().__setitem__(generator, isometry)
+
+    def from_matrix_rep(space, rep):
+        hyp_rep = HyperbolicRepresentation(space)
+        for g, matrix in rep.generators.items():
+            hyp_rep[g] = matrix
+
+        return hyp_rep
+
+    def isometries(self, words):
+        return HyperbolicIsometries(
+            self.space,
+            [representation.Representation.__getitem__(self, word) for word in words]
+        )
 
 class HyperbolicSpace:
     """Class to work with the projective model for hyperbolic space,
@@ -224,7 +373,7 @@ class HyperbolicSpace:
         return np.arccos(prod / np.abs(np.sqrt(norm1 * norm2)))
 
     def get_origin(self):
-        return self.get_point([0., 0.])
+        return self.get_point(np.zeros(self.dimension))
 
     def get_point(self, point, coords="kleinian"):
         return HyperbolicPoint(self, point, coords)
@@ -273,6 +422,36 @@ class HyperbolicSpace:
 
         return tv1.angle(tv2)
 
+    def origin_to(self, v):
+        """if v is timelike, "origin" is the vector (1,0,...). Otherwise
+        "origin" is the spacelike vector (0,1,0,...)
+        """
+        vector = v.reshape(self.dimension + 1, 1)
+        length = vector.T @ self.minkowski() @ vector
+
+        #find the orthogonal complement (and an orthonormal basis)
+        plane_vectors = scipy.linalg.null_space(vector.T @ self.minkowski())
+        basis_vectors = np.column_stack([vector, plane_vectors])
+        transform = utils.indefinite_orthogonalize(self.minkowski(), basis_vectors)
+
+        if length < 0:
+            return HyperbolicIsometry(self, transform)
+
+        #if original vector is spacelike, find the unique timelike basis vector
+        lengths = np.diagonal(transform.T @ self.minkowski() @ transform)
+        t_index = np.argmin(lengths)
+
+        #then apply a permutation so that the minkowski basis maps isometrically to our basis
+        permutation = list(range(self.dimension + 1))
+        permutation[0] = t_index
+        permutation[t_index] = 1
+        permutation[1] = 0
+
+        pmat = utils.permutation_matrix(permutation)
+        transform = transform @ np.linalg.inv(pmat)
+
+        return HyperbolicIsometry(self, transform)
+
 class HyperbolicPlane(HyperbolicSpace):
     def __init__(self):
         self.projective = projective.ProjectivePlane()
@@ -288,9 +467,6 @@ class HyperbolicPlane(HyperbolicSpace):
             [0.0, 0.0, 1.0]
         ])
         return basis_change
-
-    def center_point(self):
-        return np.array([1.0, 0.0, 0.0]).T
 
     def get_standard_reflection(self):
         basis_change = self.basis_change
