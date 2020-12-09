@@ -1,6 +1,14 @@
 import numpy as np
 import scipy
 
+def dimension_to_axis(array, dimension, axis):
+    dim_index = axis
+    if array.shape[axis] != dimension:
+        dim_index = self.shape.index(dimension)
+        return array.swapaxes(axis, dim_index), dim_index
+
+    return array, axis
+
 def permutation_matrix(permutation):
     n = len(permutation)
     p_mat = np.zeros((n, n))

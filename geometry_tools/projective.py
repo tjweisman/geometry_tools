@@ -31,19 +31,21 @@ def orthogonal_transform(v1, v2=None):
         return np.linalg.inv(Q * sign)
 
 def affine_coords(points, chart_index = None):
-    """get affine coordinates for an array of points in porjective space
+    """get affine coordinates for an array of points in projective space
     in one of the standard affine charts.
 
-    points is an nxd array, where n is the number of points and d is
-    the dimension of the underlying vector space.
+    the last dimension of points is assumed to be the same as the
+    dimension of the underlying vector space.
     """
     apoints = np.array(points)
 
     _chart_index = chart_index
     if chart_index is None:
-        _chart_index = np.argmax(np.amin(np.absolute(points), axis=0))
+        _chart_index = np.argmax(
+            np.min(np.abs(apoints), axis=tuple(range(len(apoints.shape) - 1)))
+        )
 
-    if (apoints[:,_chart_index] == 0).any():
+    if (apoints.T[_chart_index] == 0).any():
         if chart_index is not None:
             raise ProjectivizationException(
                 "points don't lie in the specified affine chart"
@@ -53,11 +55,10 @@ def affine_coords(points, chart_index = None):
                 "points don't lie in any standard affine chart"
             )
 
-    normalized = (apoints / apoints[:,_chart_index][:,None]).T
-
-    affine = np.concatenate(
-        [normalized[:_chart_index], normalized[_chart_index + 1:]]).T
-
+    affine = np.delete(
+        (apoints.T / apoints.T[_chart_index]).T,
+        _chart_index, axis=-1
+    )
 
     if chart_index is None:
         return (affine, _chart_index)
@@ -109,20 +110,41 @@ class ProjectiveSpace:
     def set_coordinate_matrix(self, coordinate_matrix):
         self.coordinates = coordinate_matrix
 
-    def affine_coordinates(self, point_list, type="pointlist"):
-        if type == "pointlist":
-            pts = (np.matmul(self.coordinates, np.column_stack(point_list))).T
-        else:
-            pts = (self.coordinates @ point_list).T
+    def affine_coordinates(self, point_list, type="rows", chart=0):
+        coords = np.array(point_list)
+        if type == "rows":
+            #last index is the dimension
+            pts = coords @ self.coordinates.T
+            return affine_coords(pts, chart)
+        elif type == "columns":
+            #second-to-last index is the dimension
+            pts = (self.coordinates @ coords).swapaxes(-1, -2)
+            return affine_coords(pts, chart).swapaxes(-1, -2)
 
-        return affine_coords(pts, 0)
+        #guess the dimension axis from the array
+        pts, dim_index = utils.dimension_to_axis(coords, self.dim, -1)
+        pts = pts @ self.coordinates.T
+        return affine_coords(pts, chart).swapaxes(dim_index, -1)
 
-    def affine_to_projective(self, point_list):
-        pts = np.column_stack(point_list)
-        _, num_pts = pts.shape
-        return np.matmul(np.linalg.inv(self.coordinates),
-                         np.block([[np.ones((1, num_pts))],
-                                   [pts]]))
+    def affine_to_projective(self, point_list, type="rows"):
+        coords = np.array(point_list)
+
+        one_shape = list(coords.shape)
+        if type == "rows":
+            dim_index = -1
+        elif type == "columns":
+            dim_index = -2
+
+        one_shape[dim_index] = 1
+        ones = np.ones(one_shape)
+
+        projective = np.concatenate([ones, coords], axis=dim_index)
+
+        if type == "rows":
+            return projective @ self.coordinates.T
+        elif type == "columns":
+            coords = self.coordinates @ projective.swapaxes(-1, -2)
+            return coords.swapaxes(-1, -2)
 
 
 class ProjectivePlane(ProjectiveSpace):
