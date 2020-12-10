@@ -103,6 +103,13 @@ class Point(HyperbolicObject):
 
         return self.space.hyperboloid_coords(self.hyp_data)
 
+    def poincare_coords(self, hyp_data=None):
+        if hyp_data is not None:
+            klein = self.space.poincare_to_kleinian(hyp_data)
+            self.kleinian_coords(klein)
+
+        return self.space.kleinian_to_poincare(self.kleinian_coords())
+
     #TODO: rewrite these so they make sense for many points
     def distance(self, other):
         product = bilinear_form(self.space.minkowski(),
@@ -134,7 +141,98 @@ class Point(HyperbolicObject):
 class IdealPoint(HyperbolicObject):
     pass
 
-class Hyperplane(HyperbolicObject):
+class Subspace(HyperbolicObject):
+    def set(self, hyp_data):
+        HyperbolicObject.set(self, hyp_data)
+
+        #TODO: compute an orthogonal ideal basis if we're not given
+        #one
+        self.ideal_basis = hyp_data
+
+    def ideal_basis_coords(self, coords="kleinian"):
+        if coords == "kleinian":
+            return self.space.kleinian_coords(self.ideal_basis)
+
+        return self.ideal_basis
+
+    def sphere_parameter(self):
+        klein = self.ideal_basis_coords()
+
+        poincare_midpoint = self.space.kleinian_to_poincare(
+            klein.sum(axis=-2) / klein.shape[-2]
+        )
+
+        poincare_extreme = utils.sphere_inversion(poincare_midpoint)
+
+        center = (poincare_midpoint + poincare_extreme) / 2
+        radius = np.sqrt(utils.normsq(poincare_midpoint - poincare_extreme)) / 2
+
+        return center, radius
+
+    def circle_parameter(self):
+        center, radius = self.sphere_parameter()
+        klein = self.ideal_basis_coords()
+        thetas = utils.circle_angles(center, klein)
+
+        return center, radius, thetas
+
+class Segment(Point, Subspace):
+    def __init__(self, space, segment):
+        try:
+            self._construct_from_object(segment)
+            self.endpoints = segment.endpoints
+            self.ideal_basis = segment.ideal_basis
+            return
+        except (AttributeError, TypeError):
+            pass
+
+        self.space = space
+
+        try:
+            self.endpoints = segment.hyp_data
+        except AttributeError:
+            self.endpoints = segment
+
+        self.compute_ideal_endpoints(self.endpoints)
+
+    def from_endpoints(endpoints):
+        return Segment(space, endpoints.hyp_data)
+
+    def set(self, hyp_data):
+        self.hyp_data = hyp_data
+        self.endpoints = self.hyp_data[...,0,:,:]
+        self.ideal_basis = self.hyp_data[...,1,:,:]
+
+    def compute_ideal_endpoints(self, endpoints):
+        products = endpoints @ self.space.minkowski() @ endpoints.swapaxes(-1, -2)
+        a11 = products[..., 0, 0]
+        a22 = products[..., 1, 1]
+        a12 = products[..., 0, 1]
+
+        a = a22
+        b = 2 * a12
+        c = a11
+
+        mu1 = (-b + np.sqrt(b * b - 4 * a * c)) / (2*a)
+        mu2 = (-b - np.sqrt(b * b - 4 * a * c)) / (2*a)
+
+        null1 = endpoints[..., 0, :] + (mu1.T * endpoints[..., 1, :].T).T
+        null2 = endpoints[..., 0, :] + (mu2.T * endpoints[..., 1, :].T).T
+
+        self.ideal_basis = np.array([null1, null2]).swapaxes(0, -2)
+        self.hyp_data = np.stack([endpoints, self.ideal_basis], axis=-3)
+
+    def circle_parameter(self):
+        center, radius = self.sphere_parameter()
+
+        klein = self.space.kleinian_coords(self.endpoints)
+        poincare = self.space.kleinian_to_poincare(klein)
+
+        thetas = utils.circle_angles(center, poincare)
+
+        return center, radius, thetas
+
+class Hyperplane(Subspace):
     def __init__(self, space, spacelike_vector):
         self.space = space
         self.spacelike_vector = spacelike_vector
@@ -144,12 +242,6 @@ class Hyperplane(HyperbolicObject):
         self.hyp_data = hyp_data
         self.spacelike_vector = self.hyp_data.T[:,0,...].T
         self.ideal_basis = self.hyp_data.T[:,1:,...].T
-
-    def ideal_basis_coords(self, coords="kleinian"):
-        if coords == "kleinian":
-            return self.space.kleinian_coords(self.ideal_basis)
-
-        return self.ideal_basis
 
     def compute_ideal_basis(self):
         #TODO: do this in a dimension-agnostic way
@@ -176,38 +268,16 @@ class Hyperplane(HyperbolicObject):
 
         return Hyperplane(space, evecs[:,reflected])
 
-class HyperbolicHyperplanes:
-    def __init__(self, space, points):
-        self.space = space
-        self.set(points)
-
-    def set(self, points):
-        self.points = points
-
-    def get_kleinian_coords(self):
-
-        ideal_arr = np.transpose(self.points, (2, 1, 0))[1:]
-
-        kcoords = np.array([
-            HyperbolicPoints(self.space, pts, type="array").kleinian_coordinates()
-            for pts in ideal_arr
-        ])
-
-        return np.transpose(kcoords, (1, 0, 2))
-
-
-class HyperbolicTangentVector:
+class TangentVector(HyperbolicObject):
     def __init__(self, space, point, vector):
         self.space = space
         self.set(point, vector)
 
-    def set(self, point, vector):
-        self.point = HyperbolicPoint(self.space, point)
-        self.vector = self.space.project_to_hyperboloid(
-            self.point.coords,
-            vector
-        )
+    def set(self, hyp_data):
+        self.hyp_data = hyp_data
 
+
+    #this code doesn't work right now
     def normalize(self):
         norm2 = bilinear_form(self.space.minkowski(), self.vector, self.vector)
         if norm2 != 0.0:
@@ -333,6 +403,22 @@ class HyperbolicSpace:
         projective_coords, dim_index = utils.dimension_to_axis(points, n, -1)
 
         return self.projective.affine_coordinates(points).swapaxes(-1, dim_index)
+
+    def kleinian_to_poincare(self, points):
+        euc_products = points @ points.swapaxes(-1, -2)
+        euc_norms = np.diagonal(euc_products, axis1=-2, axis2=-1)
+
+        mult_factor = 1 / (1. + np.sqrt(1 - euc_norms))
+
+        return (points.T * mult_factor.T).T
+
+    def poincare_to_kleinian(self, points):
+        euc_products = points @ points.swapaxes(-1, -2)
+        euc_norms = np.diagonal(euc_products, axis1=-2, axis2=-1)
+
+        mult_factor = 2. / (1. + euc_norms)
+
+        return (points.T * mult_factor.T).T
 
     def get_elliptic(self, block_elliptic):
         mat = block_diagonal([1.0, block_elliptic])

@@ -17,6 +17,35 @@ def permutation_matrix(permutation):
 
     return p_mat
 
+def circle_angles(center, coords):
+    xs = (coords - np.expand_dims(center, axis=-2))[..., 0]
+    ys = (coords - np.expand_dims(center, axis=-2))[..., 1]
+
+    return np.arctan2(ys, xs)
+
+def normsq(vectors, bilinear_form=None):
+    vecs = vectors
+    if bilinear_form is None:
+        bilinear_form = np.identity(vectors.shape[-1])
+
+    if len(vectors.shape) < 2:
+        vecs = np.expand_dims(vectors, axis=0)
+
+    return np.diagonal(vecs @ bilinear_form @ vecs.swapaxes(-1,-2), axis1=-2, axis2=-1)
+
+def short_arc(thetas):
+    thetas[thetas < 0] += 2 * np.pi
+    thetas.sort(axis=-1)
+
+    thetas[thetas[:,1] - thetas[:,0] > np.pi] = np.flip(
+        thetas[thetas[:,1] - thetas[:,0] > np.pi], axis=-1
+    )
+
+    return thetas
+
+def sphere_inversion(points):
+    return (points.T / (normsq(points)).T).T
+
 def swap_matrix(i, j, n):
     permutation = list(range(n))
     permutation[i] = j
