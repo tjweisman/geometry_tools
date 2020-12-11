@@ -14,6 +14,7 @@ class GeometryException(Exception):
 
 class HyperbolicObject:
     def __init__(self, space, hyp_data):
+        self.unit_ndims = 1
         try:
             self._construct_from_object(hyp_data)
         except TypeError:
@@ -69,6 +70,7 @@ class HyperbolicObject:
 
 class Point(HyperbolicObject):
     def __init__(self, space, point, coords="projective"):
+        self.unit_ndims = 1
         try:
             self._construct_from_object(point)
         except TypeError:
@@ -116,6 +118,9 @@ class IdealPoint(HyperbolicObject):
     pass
 
 class Subspace(HyperbolicObject):
+    def __init__(self, hyp_data):
+        super().__init__(hyp_data)
+        self.unit_ndims = 2
     #TODO: make a constructor that computes an orthogonal ideal basis
     #if we're not given one
     def set(self, hyp_data):
@@ -152,6 +157,7 @@ class Subspace(HyperbolicObject):
 
 class Segment(Point, Subspace):
     def __init__(self, space, segment):
+        self.unit_ndims = 2
         try:
             self._construct_from_object(segment)
             self.endpoints = segment.endpoints
@@ -209,6 +215,7 @@ class Segment(Point, Subspace):
 class Hyperplane(Subspace):
     def __init__(self, space, spacelike_vector):
         self.space = space
+        self.unit_ndims = 2
         self.compute_ideal_basis(spacelike_vector)
 
     def set(self, hyp_data):
@@ -258,6 +265,7 @@ class Hyperplane(Subspace):
 class TangentVector(HyperbolicObject):
     def __init__(self, space, point_data, vector=None):
         self.space = space
+        self.unit_ndims = 2
         if vector is None:
             try:
                 self._construct_from_object(point_data)
@@ -316,6 +324,7 @@ class TangentVector(HyperbolicObject):
 class Isometry(HyperbolicObject):
     def __init__(self, space, hyp_data, column_vectors=True):
         self.space = space
+        self.unit_ndims = 2
 
         try:
             self._construct_from_object(hyp_data)
@@ -329,23 +338,19 @@ class Isometry(HyperbolicObject):
         self.matrix = hyp_data
         self.hyp_data = hyp_data
 
-    def _apply_to_data(self, hyp_data, broadcast):
-        if broadcast == "matmul":
-            product = hyp_data @ self.matrix
-        elif broadcast == "pairwise":
-            product = utils.pairwise_matrix_product(hyp_data, self.matrix)
-        elif broadcast == "elementwise":
-            exp_data = np.expand_dims(hyp_data, axis=-2)
-            product = np.squeeze(exp_data @ self.matrix, axis=-2)
+    def _apply_to_data(self, hyp_data, broadcast, unit_ndims=1):
+        return utils.matrix_product(hyp_data,
+                                    self.matrix,
+                                    unit_ndims, self.unit_ndims,
+                                    broadcast=broadcast)
 
-        return product
-
-    def apply(self, hyp_obj, broadcast="matmul"):
+    def apply(self, hyp_obj, broadcast="elementwise"):
         new_obj = copy(hyp_obj)
 
         try:
             hyp_data = new_obj.hyp_data
-            product = self._apply_to_data(new_obj.hyp_data, broadcast)
+            product = self._apply_to_data(new_obj.hyp_data, broadcast,
+                                          new_obj.unit_ndims)
             new_obj.set(product)
             return new_obj
         except AttributeError:
@@ -485,8 +490,6 @@ class HyperbolicSpace:
         tangent = self.get_base_tangent(radius.shape).normalized()
         start_vertex = tangent.point_along(radius)
 
-        start_vertex.set(np.expand_dims(start_vertex.hyp_data, axis=-2))
-
         cyclic_rep = HyperbolicRepresentation(self)
         cyclic_rep["a"] = self.get_standard_rotation(2 * np.pi / n)
 
@@ -494,8 +497,6 @@ class HyperbolicSpace:
         mats = cyclic_rep.isometries(words)
 
         vertices = mats.apply(start_vertex, "pairwise")
-        vertices.set(np.squeeze(vertices.hyp_data, axis=-2))
-
         return vertices
 
     def polygon_interior_angle(self, n, hyp_radius):

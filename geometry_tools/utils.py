@@ -116,23 +116,46 @@ def make_orientation_preserving(matrix):
     preserved[reversing_index, ..., -1, :] *= -1
     return preserved
 
-def pairwise_matrix_product(array1, array2):
-    """do matrix multiplication where we treat array1 and array2 as
-    ndarrays of matrices.
+def expand_unit_axes(array, unit_axes, new_axes):
+    if new_axes <= unit_axes:
+        return array
+
+    return np.expand_dims(array.T, axis=tuple(range(unit_axes, new_axes))).T
+
+def squeeze_excess(array, unit_axes, other_unit_axes):
+    squeezable = np.array(array.T.shape[unit_axes:other_unit_axes])
+    (to_squeeze,) = np.nonzero(squeezable == 1)
+    to_squeeze += unit_axes
+
+    return np.squeeze(array.T, axis=tuple(to_squeeze)).T
+
+def matrix_product(array1, array2, unit_axis_1=2, unit_axis_2=2,
+                   broadcast="elementwise"):
+    """do ndarray multiplication, where we treat array1 and array2 as
+    ndarrays of ndarrays with ndim unit_axis1 and unit_axis2.
+
+    broadcasting is either elementwise or pairwise.
     """
 
-    reshape1, reshape2 = array1, array2
+    reshape1 = expand_unit_axes(array1, unit_axis_1, unit_axis_2)
+    reshape2 = expand_unit_axes(array2, unit_axis_2, unit_axis_1)
 
-    excess1 = reshape1.ndim - 2
-    excess2 = reshape2.ndim - 2
+    if broadcast == "pairwise":
+        large_axes = max(unit_axis_1, unit_axis_2)
 
-    if excess1 > 0:
-        reshape1 = np.expand_dims(array1,
-                                  axis=tuple(range(excess1, excess1 + excess2)))
+        excess1 = reshape1.ndim - large_axes
+        excess2 = reshape2.ndim - large_axes
 
-    if excess2 > 0:
-        reshape2 = np.expand_dims(array2, axis=tuple(range(excess1)))
+        if excess1 > 0:
+            reshape1 = np.expand_dims(reshape1,
+                                      axis=tuple(range(excess1, excess1 + excess2)))
+
+        if excess2 > 0:
+            reshape2 = np.expand_dims(reshape2, axis=tuple(range(excess1)))
 
     product = reshape1 @ reshape2
+
+    if unit_axis_1 < unit_axis_2:
+        product = squeeze_excess(product, unit_axis_1, unit_axis_2)
 
     return product
