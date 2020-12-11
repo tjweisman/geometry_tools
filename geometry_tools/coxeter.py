@@ -65,10 +65,13 @@ class CoxeterGroup:
 
         return rep
 
-def test():
-    gp = CoxeterGroup([
-        ('a', 'b', 3),
-        ('a', 'c', 3),
-        ('b', 'c', 4)
-    ])
-    return gp
+class TriangleGroup(CoxeterGroup):
+    def __init__(self, vertex_params):
+        v1, v2, v3 = vertex_params
+        CoxeterGroup.__init__(
+            self, [
+                ['a', 'b', v1],
+                ['b', 'c', v2],
+                ['c', 'a', v3]
+            ]
+        )

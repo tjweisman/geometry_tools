@@ -6,6 +6,7 @@ from scipy.optimize import fsolve
 
 from geometry_tools import projective, representation, utils
 
+#TODO: this is garbage
 def bilinear_form(matrix, v1, v2):
     w, h = matrix.shape
     v1 = v1.reshape((1, w))
@@ -16,23 +17,8 @@ def bilinear_form(matrix, v1, v2):
 def hyp_to_affine_dist(r):
     return (np.exp(2 * r) - 1) / (1 + np.exp(2 * r))
 
-def rotation_matrix(angle):
-    return np.array([[np.cos(angle), -1*np.sin(angle)],
-                     [np.sin(angle), np.cos(angle)]])
-
-def block_diagonal(matrices):
-    mats = [np.matrix(matrix) for matrix in matrices]
-    n = len(mats)
-    arr = [[None] * n for i in range(n)]
-    for i, matrix_i in enumerate(mats):
-        for j, matrix_j in enumerate(mats):
-            if i == j:
-                arr[i][j] = matrix_i
-            else:
-                h, _ = matrix_i.shape
-                _, w = matrix_j.shape
-                arr[i][j] = np.zeros((h, w))
-    return np.block(arr)
+class GeometryException(Exception):
+    pass
 
 class HyperbolicObject:
     def __init__(self, space, hyp_data):
@@ -54,6 +40,7 @@ class HyperbolicObject:
 
         try:
             array = np.array([obj.hyp_data for obj in hyp_obj])
+            self.set(array)
             return
         except (TypeError, AttributeError):
             pass
@@ -142,11 +129,12 @@ class IdealPoint(HyperbolicObject):
     pass
 
 class Subspace(HyperbolicObject):
+    #TODO: make a constructor that computes an orthogonal ideal basis
+    #if we're not given one
     def set(self, hyp_data):
         HyperbolicObject.set(self, hyp_data)
 
-        #TODO: compute an orthogonal ideal basis if we're not given
-        #one
+
         self.ideal_basis = hyp_data
 
     def ideal_basis_coords(self, coords="kleinian"):
@@ -235,18 +223,19 @@ class Segment(Point, Subspace):
 class Hyperplane(Subspace):
     def __init__(self, space, spacelike_vector):
         self.space = space
-        self.spacelike_vector = spacelike_vector
-        self.compute_ideal_basis()
+        self.compute_ideal_basis(spacelike_vector)
 
     def set(self, hyp_data):
         self.hyp_data = hyp_data
         self.spacelike_vector = self.hyp_data.T[:,0,...].T
         self.ideal_basis = self.hyp_data.T[:,1:,...].T
 
-    def compute_ideal_basis(self):
-        #TODO: do this in a dimension-agnostic way
+    def compute_ideal_basis(self, spacelike_vector):
         n = self.space.dimension + 1
-        transform = self.space.origin_to(self.spacelike_vector)
+        transform = self.space.spacelike_to(spacelike_vector)
+
+        if len(spacelike_vector.shape) < 2:
+            spacelike_vector = np.expand_dims(spacelike_vector, axis=0)
 
         standard_ideal_basis = np.vstack(
             [np.ones((1, n-1)), np.eye(n - 1, n - 1, -1)]
@@ -254,19 +243,31 @@ class Hyperplane(Subspace):
         standard_ideal_basis[n-1, n-2] = -1.
 
         self.ideal_basis = transform.apply(standard_ideal_basis.T).hyp_data
-        self.hyp_data = np.vstack([self.spacelike_vector, self.ideal_basis])
+        self.spacelike_vector = spacelike_vector
+        self.hyp_data = np.concatenate([self.spacelike_vector, self.ideal_basis],
+                                       axis=-2)
 
     def from_reflection(space, reflection):
-        #TODO: construct from an array of reflections
         try:
-            matrix = reflection.matrix.T
+            matrix = reflection.matrix.swapaxes(-1, -2)
         except AttributeError:
             matrix = reflection
 
+        #numpy's eig expects a matrix operating on the left
         evals, evecs = np.linalg.eig(matrix)
-        reflected = np.argmin(evals)
 
-        return Hyperplane(space, evecs[:,reflected])
+        #sometimes eigenvalues will be complex due to roundoff error
+        #so we cast to reals to avoid warnings
+        reflected = np.argmin(np.real(evals), axis=-1)
+
+        #it might make sense to throw a fit if the eigenvalues reveal
+        #that this isn't a reflection.
+
+        spacelike = np.take_along_axis(
+            np.real(evecs), np.expand_dims(reflected, axis=(-1,-2)), axis=-1
+        )
+
+        return Hyperplane(space, spacelike.swapaxes(-1,-2))
 
 class TangentVector(HyperbolicObject):
     def __init__(self, space, point, vector):
@@ -421,7 +422,7 @@ class HyperbolicSpace:
         return (points.T * mult_factor.T).T
 
     def get_elliptic(self, block_elliptic):
-        mat = block_diagonal([1.0, block_elliptic])
+        mat = scipy.linalg.block_diag([[1.0], block_elliptic])
 
         return Isometry(self, mat)
 
@@ -460,7 +461,9 @@ class HyperbolicSpace:
             [1.0, 1.0],
             [1.0, -1.0]
         ])
-        return block_diagonal([basis_change, np.identity(self.dimension - 1)])
+        return scipy.linalg.block_diag(
+            [basis_change, np.identity(self.dimension - 1)]
+        )
 
     def get_standard_loxodromic(self, parameter):
         basis_change = self.loxodromic_basis_change()
@@ -474,8 +477,10 @@ class HyperbolicSpace:
         )
 
     def get_standard_rotation(self, angle):
-        affine = block_diagonal([rotation_matrix(angle),
-                                 np.identity(self.dimension - 2)])
+        affine = scipy.linalg.block_diag(
+            [utils.rotation_matrix(angle),
+             np.identity(self.dimension - 2)]
+        )
         return self.get_elliptic(affine)
 
     def regular_polygon(self, n, hyp_radius):
@@ -500,38 +505,41 @@ class HyperbolicSpace:
 
         return tv1.angle(tv2)
 
-    def origin_to(self, v):
-        """if v is timelike, "origin" is the vector (1,0,...). Otherwise
-        "origin" is the spacelike vector (0,1,0,...)
-        """
+    def timelike_to(self, v):
+        lengths = utils.normsq(v, self.minkowski())
+        if (lengths > 0).any():
+            raise GeometryException
 
-        #TODO: return an array of vectors
+        return Isometry(self, utils.find_isometry(self.minkowski(), v),
+                        column_vectors=False)
 
-        vector = v.reshape(self.dimension + 1, 1)
-        length = vector.T @ self.minkowski() @ vector
+    def spacelike_to(self, v):
+        iso = utils.find_isometry(self.minkowski(), v)
 
-        #find the orthogonal complement (and an orthonormal basis)
-        plane_vectors = scipy.linalg.null_space(vector.T @ self.minkowski())
-        basis_vectors = np.column_stack([vector, plane_vectors])
-        transform = utils.indefinite_orthogonalize(self.minkowski(), basis_vectors)
+        #find the index of the timelike basis vector
+        lengths = np.expand_dims(utils.normsq(iso, self.minkowski()), axis=-1)
+        t_index = np.argmin(lengths, axis=-2)
 
-        if length < 0:
-            return Isometry(self, transform)
+        #apply a permutation so the isometry actually preserves the
+        #form. we do the permutation in two steps because it could be
+        #either a 2-cycle or a 3-cycle.
+        p_iso = iso.copy()
 
-        #if original vector is spacelike, find the unique timelike basis vector
-        lengths = np.diagonal(transform.T @ self.minkowski() @ transform)
-        t_index = np.argmin(lengths)
+        #first swap timelike index with zero
+        indices = np.stack([np.zeros_like(t_index), t_index], axis=-2)
+        p_indices = np.stack([t_index, np.zeros_like(t_index)], axis=-2)
 
-        #then apply a permutation so that the minkowski basis maps isometrically to our basis
-        permutation = list(range(self.dimension + 1))
-        permutation[0] = t_index
-        permutation[t_index] = 1
-        permutation[1] = 0
+        p_values = np.take_along_axis(iso, indices, axis=-2)
+        np.put_along_axis(p_iso, p_indices, p_values, axis=-2)
 
-        pmat = utils.permutation_matrix(permutation)
-        transform = transform @ np.linalg.inv(pmat)
+        #then swap timelike index with one
+        indices = np.stack([np.ones_like(t_index), t_index], axis=-2)
+        p_indices = np.stack([t_index, np.ones_like(t_index)], axis=-2)
 
-        return Isometry(self, transform)
+        p_values = np.take_along_axis(p_iso, indices, axis=-2)
+        np.put_along_axis(p_iso, p_indices, p_values, axis=-2)
+
+        return Isometry(self, p_iso, column_vectors=False)
 
 class HyperbolicPlane(HyperbolicSpace):
     def __init__(self):
