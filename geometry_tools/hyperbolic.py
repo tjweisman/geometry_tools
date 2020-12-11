@@ -6,16 +6,8 @@ from scipy.optimize import fsolve
 
 from geometry_tools import projective, representation, utils
 
-#TODO: this is garbage
-def bilinear_form(matrix, v1, v2):
-    w, h = matrix.shape
-    v1 = v1.reshape((1, w))
-    v2 = v2.reshape((h, 1))
-
-    return (v1 @ matrix @ v2)[0,0]
-
-def hyp_to_affine_dist(r):
-    return (np.exp(2 * r) - 1) / (1 + np.exp(2 * r))
+#TODO: raise exceptions when nonsensical geometry data is passed to
+#these classes
 
 class GeometryException(Exception):
     pass
@@ -58,6 +50,9 @@ class HyperbolicObject:
     def __str__(self):
         return "Hyperbolic object with data:\n" + self.hyp_data.__str__()
 
+    def __getitem__(self, item):
+        return self.__class__(self.space, self.hyp_data[item])
+
     def projective_coords(self, hyp_data=None):
         #all hyperbolic object data is stored as projective
         #coordinates
@@ -73,7 +68,7 @@ class HyperbolicObject:
         return self.space.kleinian_coords(self.hyp_data)
 
 class Point(HyperbolicObject):
-    def __init__(self, space, point, coords="kleinian"):
+    def __init__(self, space, point, coords="projective"):
         try:
             self._construct_from_object(point)
         except TypeError:
@@ -97,33 +92,25 @@ class Point(HyperbolicObject):
 
         return self.space.kleinian_to_poincare(self.kleinian_coords())
 
-    #TODO: rewrite these so they make sense for many points
     def distance(self, other):
-        product = bilinear_form(self.space.minkowski(),
-                                self.hyp_data, other.hyp_data)
-        return np.arccosh(np.abs(product))
+        """compute all pairwise distances (w.r.t. last two dimensions) between
+        self and other"""
+        products = (
+            self.hyp_data @ self.space.minkowski() @ other.hyp_data.swapaxes(-1, -2)
+        )
+        return np.arccosh(np.abs(products))
+
+    def origin_to(self):
+        """return an isometry taking the origin to this point"""
+        return self.space.timelike_to(self.hyp_data)
 
     def unit_tangent_towards(self, other):
         diff = other.hyp_data - self.hyp_data
-        tv = HyperbolicTangentVector(self.space, self, diff)
-        tv.normalize()
-        return tv
+        return TangentVector(self.space, self, diff).normalized()
 
-    def translation_to_origin(self):
-        klein_vec = self.kleinian_coords()
-        block = projective.orthogonal_transform(klein_vec)
 
-        elliptic = self.space.get_elliptic(block)
-
-        affine_coords = elliptic.apply(self).kleinian_coords().flatten()
-        aff_param = affine_coords[0]
-
-        param = np.sqrt((1 - aff_param) / (1 + aff_param))
-
-        return elliptic.inv() @ self.space.get_standard_loxodromic(param) @ elliptic
-
-    def collection(space, collection_data):
-        return HyperbolicPoints(space, collection_data)
+class DualPoint(HyperbolicObject):
+    pass
 
 class IdealPoint(HyperbolicObject):
     pass
@@ -133,7 +120,6 @@ class Subspace(HyperbolicObject):
     #if we're not given one
     def set(self, hyp_data):
         HyperbolicObject.set(self, hyp_data)
-
 
         self.ideal_basis = hyp_data
 
@@ -248,6 +234,8 @@ class Hyperplane(Subspace):
                                        axis=-2)
 
     def from_reflection(space, reflection):
+        """construct a hyperplane which is the fixpoint set of a given
+        reflection"""
         try:
             matrix = reflection.matrix.swapaxes(-1, -2)
         except AttributeError:
@@ -257,11 +245,9 @@ class Hyperplane(Subspace):
         evals, evecs = np.linalg.eig(matrix)
 
         #sometimes eigenvalues will be complex due to roundoff error
-        #so we cast to reals to avoid warnings
+        #so we cast to reals to avoid warnings. TODO: throw an error
+        #message if imaginary part is large.
         reflected = np.argmin(np.real(evals), axis=-1)
-
-        #it might make sense to throw a fit if the eigenvalues reveal
-        #that this isn't a reflection.
 
         spacelike = np.take_along_axis(
             np.real(evecs), np.expand_dims(reflected, axis=(-1,-2)), axis=-1
@@ -270,43 +256,62 @@ class Hyperplane(Subspace):
         return Hyperplane(space, spacelike.swapaxes(-1,-2))
 
 class TangentVector(HyperbolicObject):
-    def __init__(self, space, point, vector):
+    def __init__(self, space, point_data, vector=None):
         self.space = space
-        self.set(point, vector)
+        if vector is None:
+            try:
+                self._construct_from_object(point_data)
+                return
+            except TypeError:
+                pass
+
+            self.set(point_data)
+            return
+
+        self.compute_data(point_data, vector)
+
+    def compute_data(self, point, vector):
+        #wrapping these as hyperbolic objects first
+        pt = Point(self.space, point)
+        vec = DualPoint(self.space, vector)
+
+        projected = self.space.project_to_hyperboloid(pt.hyp_data, vec.hyp_data)
+
+        self.set(np.stack([pt.hyp_data, projected], axis=-2))
 
     def set(self, hyp_data):
         self.hyp_data = hyp_data
+        self.point = self.hyp_data[..., 0, :]
+        self.vector = self.hyp_data[..., 1, :]
 
+    def normalized(self):
+        normed_vec = utils.normalize(self.vector, self.space.minkowski())
+        return TangentVector(self.space, self.point, normed_vec)
 
-    #this code doesn't work right now
-    def normalize(self):
-        norm2 = bilinear_form(self.space.minkowski(), self.vector, self.vector)
-        if norm2 != 0.0:
-            self.vector = self.vector / np.abs(np.sqrt(norm2))
+    def origin_to(self, force_oriented=False):
+        normed = utils.normalize(self.hyp_data, self.space.minkowski())
+        isom = utils.find_isometry(self.space.minkowski(), normed,
+                                   force_oriented)
 
-    def translation_to_origin(self):
-        point_translation = self.point.translation_to_origin()
-        translated = point_translation.apply(self)
-        affine_tangent_vector = translated.vector[1:]
-        block_elliptic = projective.orthogonal_transform(affine_tangent_vector)
-
-        elliptic = self.space.get_elliptic(block_elliptic)
-
-        return elliptic @ point_translation
-
-    def point_along(self, distance):
-        affine_point = np.concatenate([
-            [hyp_to_affine_dist(distance)],
-            np.zeros(self.space.dimension - 1)
-        ])
-        basept = self.space.get_point(affine_point, coords="kleinian")
-
-        return self.translation_to_origin().inv().apply(basept)
+        return Isometry(self.space, isom, column_vectors=False)
 
     def angle(self, other):
-        return self.space.hyperbolic_angle(self.point.coords,
-                                           self.vector,
-                                           other.vector)
+        v1 = self.space.project_to_hyperboloid(self.point, self.normalized().vector)
+        v2 = self.space.project_to_hyperboloid(self.point, other.normalized().vector)
+
+        product = utils.apply_bilinear(v1, v2, self.space.minkowski())
+        return np.arccos(product)
+
+    def point_along(self, distance):
+        kleinian_shape = list(self.point.shape)
+        kleinian_shape[-1] -= 1
+
+        kleinian_pt = np.zeros(kleinian_shape)
+        kleinian_pt[..., 0] = self.space.hyp_to_affine_dist(distance)
+
+        basepoint = Point(self.space, kleinian_pt, coords="kleinian")
+
+        return self.origin_to().apply(basepoint, "elementwise")
 
 class Isometry(HyperbolicObject):
     def __init__(self, space, hyp_data, column_vectors=True):
@@ -324,22 +329,36 @@ class Isometry(HyperbolicObject):
         self.matrix = hyp_data
         self.hyp_data = hyp_data
 
-    def apply(self, hyp_obj):
+    def _apply_to_data(self, hyp_data, broadcast):
+        if broadcast == "matmul":
+            product = hyp_data @ self.matrix
+        elif broadcast == "pairwise":
+            product = utils.pairwise_matrix_product(hyp_data, self.matrix)
+        elif broadcast == "elementwise":
+            exp_data = np.expand_dims(hyp_data, axis=-2)
+            product = np.squeeze(exp_data @ self.matrix, axis=-2)
+
+        return product
+
+    def apply(self, hyp_obj, broadcast="matmul"):
         new_obj = copy(hyp_obj)
 
         try:
-            #already looks like a hyperbolic object
-            new_obj.set(new_obj.hyp_data @ self.matrix)
+            hyp_data = new_obj.hyp_data
+            product = self._apply_to_data(new_obj.hyp_data, broadcast)
+            new_obj.set(product)
             return new_obj
         except AttributeError:
             pass
 
         #otherwise, it's an array of vectors which we'll interpret as
         #some kind of hyperbolic object
-        return HyperbolicObject(self.space, hyp_obj @ self.matrix)
+        product = self._apply_to_data(hyp_obj, broadcast)
+        return HyperbolicObject(self.space, product)
 
     def inv(self):
-        return Isometry(self.space, np.linalg.inv(self.matrix))
+        return Isometry(self.space, np.linalg.inv(self.matrix),
+                        column_vectors=False)
 
     def __matmul__(self, other):
         return self.apply(other)
@@ -355,7 +374,7 @@ class HyperbolicRepresentation(representation.Representation):
 
     def __setitem__(self, generator, isometry):
         try:
-            super().__setitem__(generator, isometry.matrix)
+            super().__setitem__(generator, isometry.matrix.T)
             return
         except AttributeError:
             super().__setitem__(generator, isometry)
@@ -375,10 +394,6 @@ class HyperbolicRepresentation(representation.Representation):
         return Isometry(self.space, matrix_array)
 
 class HyperbolicSpace:
-    """Class to work with the projective model for hyperbolic space,
-    coordinatized as the unit circle in a standard affine chart.
-
-    """
     def __init__(self, dimension):
         self.projective = projective.ProjectiveSpace(dimension + 1)
         self.dimension = dimension
@@ -391,11 +406,7 @@ class HyperbolicSpace:
         n = self.dimension + 1
         projective_coords, dim_index = utils.dimension_to_axis(points, n, -1)
 
-        transposed = projective_coords.swapaxes(-1, -2)
-        norms = transposed @ self.minkowski() @ projective_coords
-        norms = norms.reshape(norms.shape + (1,))
-
-        hyperbolized = projective_coords / np.sqrt(np.abs(norms))
+        hyperbolized = utils.normalize(projective_coords, self.minkowski())
 
         return hyperbolized.swapaxes(-1, dim_index)
 
@@ -406,55 +417,41 @@ class HyperbolicSpace:
         return self.projective.affine_coordinates(points).swapaxes(-1, dim_index)
 
     def kleinian_to_poincare(self, points):
-        euc_products = points @ points.swapaxes(-1, -2)
-        euc_norms = np.diagonal(euc_products, axis1=-2, axis2=-1)
-
+        euc_norms = utils.normsq(points)
         mult_factor = 1 / (1. + np.sqrt(1 - euc_norms))
 
         return (points.T * mult_factor.T).T
 
     def poincare_to_kleinian(self, points):
-        euc_products = points @ points.swapaxes(-1, -2)
-        euc_norms = np.diagonal(euc_products, axis1=-2, axis2=-1)
-
+        euc_norms = utils.normsq(points)
         mult_factor = 2. / (1. + euc_norms)
 
         return (points.T * mult_factor.T).T
 
     def get_elliptic(self, block_elliptic):
-        mat = scipy.linalg.block_diag([[1.0], block_elliptic])
+        mat = scipy.linalg.block_diag(1.0, block_elliptic)
 
         return Isometry(self, mat)
 
-    def hyperboloid_projection(self, basepoint):
-        basepoint = basepoint.reshape((self.dimension + 1, 1))
-        normal = self.minkowski() @ basepoint
-        unit_normal = normal / np.linalg.norm(normal)
-
-        return np.identity(self.dimension + 1) - (unit_normal @ unit_normal.reshape((1, self.dimension + 1)))
-
     def project_to_hyperboloid(self, basepoint, tangent_vector):
-        projection = self.hyperboloid_projection(basepoint)
-        tangent_vector = tangent_vector.reshape((self.dimension + 1, 1))
-        return projection @ tangent_vector
+        return tangent_vector - utils.projection(
+            tangent_vector, basepoint, self.minkowski())
 
-    def riemannian_metric(self, point):
-        projection = self.hyperboloid_projection(point)
-        return projection.T @ self.minkowski() @ projection
+    def get_origin(self, shape=()):
+        return self.get_point(np.zeros(shape + (self.dimension,)))
 
-    def hyperbolic_angle(self, point, v1, v2):
-        metric = self.riemannian_metric(point)
-        prod = bilinear_form(metric, v1, v2)
-        norm1 = bilinear_form(metric, v1, v1)
-        norm2 = bilinear_form(metric, v2, v2)
+    def get_base_tangent(self, shape=()):
+        origin = self.get_origin(shape)
+        vector = np.zeros(() + (self.dimension + 1,))
+        vector[..., 1] = 1
 
-        return np.arccos(prod / np.abs(np.sqrt(norm1 * norm2)))
-
-    def get_origin(self):
-        return self.get_point(np.zeros(self.dimension))
+        return TangentVector(self, origin, vector)
 
     def get_point(self, point, coords="kleinian"):
         return Point(self, point, coords)
+
+    def hyp_to_affine_dist(self, r):
+        return (np.exp(2 * r) - 1) / (1 + np.exp(2 * r))
 
     def loxodromic_basis_change(self):
         basis_change = np.matrix([
@@ -462,7 +459,7 @@ class HyperbolicSpace:
             [1.0, -1.0]
         ])
         return scipy.linalg.block_diag(
-            [basis_change, np.identity(self.dimension - 1)]
+            basis_change, np.identity(self.dimension - 1)
         )
 
     def get_standard_loxodromic(self, parameter):
@@ -478,42 +475,47 @@ class HyperbolicSpace:
 
     def get_standard_rotation(self, angle):
         affine = scipy.linalg.block_diag(
-            [utils.rotation_matrix(angle),
-             np.identity(self.dimension - 2)]
+            utils.rotation_matrix(angle),
+            np.identity(self.dimension - 2)
         )
         return self.get_elliptic(affine)
 
     def regular_polygon(self, n, hyp_radius):
-        #TODO: fix to return Point
-        origin = self.get_point([0., 0.])
-        tangent = HyperbolicTangentVector(self, origin, np.array([0.0, 1.0, 0.0]))
-        tangent.normalize()
+        radius = np.array(hyp_radius)
+        tangent = self.get_base_tangent(radius.shape).normalized()
+        start_vertex = tangent.point_along(radius)
 
-        start_vertex = tangent.point_along(hyp_radius)
-        rotation = self.get_standard_rotation(2 * np.pi / n)
+        start_vertex.set(np.expand_dims(start_vertex.hyp_data, axis=-2))
 
-        vertices = [start_vertex]
-        for i in range(n - 1):
-            vertices.append(rotation.apply(vertices[-1]))
+        cyclic_rep = HyperbolicRepresentation(self)
+        cyclic_rep["a"] = self.get_standard_rotation(2 * np.pi / n)
 
-        return HyperbolicPoints(self, vertices)
+        words = ["a" * i for i in range(n)]
+        mats = cyclic_rep.isometries(words)
+
+        vertices = mats.apply(start_vertex, "pairwise")
+        vertices.set(np.squeeze(vertices.hyp_data, axis=-2))
+
+        return vertices
 
     def polygon_interior_angle(self, n, hyp_radius):
         polygon = self.regular_polygon(n, hyp_radius)
-        tv1 = polygon[0].unit_tangent_towards(polygon[-1])
-        tv2 = polygon[0].unit_tangent_towards(polygon[1])
+
+        tv1 = polygon[..., 0, :].unit_tangent_towards(polygon[..., -1, :])
+        tv2 = polygon[..., 0, :].unit_tangent_towards(polygon[..., 1, :])
 
         return tv1.angle(tv2)
 
-    def timelike_to(self, v):
+    def timelike_to(self, v, force_oriented=False):
         lengths = utils.normsq(v, self.minkowski())
         if (lengths > 0).any():
             raise GeometryException
 
-        return Isometry(self, utils.find_isometry(self.minkowski(), v),
+        return Isometry(self, utils.find_isometry(self.minkowski(),
+                                                  v, force_oriented),
                         column_vectors=False)
 
-    def spacelike_to(self, v):
+    def spacelike_to(self, v, force_oriented=False):
         iso = utils.find_isometry(self.minkowski(), v)
 
         #find the index of the timelike basis vector
@@ -538,6 +540,9 @@ class HyperbolicSpace:
 
         p_values = np.take_along_axis(p_iso, indices, axis=-2)
         np.put_along_axis(p_iso, p_indices, p_values, axis=-2)
+
+        if force_oriented:
+            p_iso = utils.make_orientation_preserving(p_iso)
 
         return Isometry(self, p_iso, column_vectors=False)
 
@@ -564,4 +569,6 @@ class HyperbolicPlane(HyperbolicSpace):
             [1.0, 0.0, 0.0],
             [0.0, 0.0, 1.0]
         ])
-        return basis_change @ diag_reflection @ np.linalg.inv(basis_change)
+        return Isometry(self,
+                        basis_change @ diag_reflection @ np.linalg.inv(basis_change)
+        )

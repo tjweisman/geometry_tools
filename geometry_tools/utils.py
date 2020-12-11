@@ -91,7 +91,7 @@ def indefinite_orthogonalize(form, matrices):
 
     return normalize(result, form)
 
-def find_isometry(form, partial_map):
+def find_isometry(form, partial_map, force_oriented=False):
     #find a form-preserving matrix agreeing with a specified map on
     #the flag defined by the standard basis
 
@@ -104,19 +104,35 @@ def find_isometry(form, partial_map):
     kernel = vh[..., orth_partial.shape[-2]:, :]
 
     orth_kernel = indefinite_orthogonalize(form, kernel)
+    iso = np.concatenate([orth_partial, orth_kernel], axis=-2)
 
-    return np.concatenate([orth_partial, orth_kernel], axis=-2)
+    if force_oriented:
+        iso = make_orientation_preserving(iso)
 
-def extend_form(form, matrix):
-    #this is really inefficient for large arrays, and probably unstable.
-    n, m = matrix.shape
-    if m < 1:
-        return
-    orthogonalized = np.array(matrix[:,0]).reshape(n,1)
-    for i in range(1, m):
-        complement = scipy.linalg.null_space(orthogonalized.T @ form)
-        orthogonalized = np.column_stack([orthogonalized, complement[:,0]])
+    return iso
 
-    norm_sq = 1./np.diagonal(orthogonalized.T @ form @ orthogonalized)
+def make_orientation_preserving(matrix):
+    preserved = matrix.copy()
+    preserved[reversing_index, ..., -1, :] *= -1
+    return preserved
 
-    return orthogonalized @ np.diag(np.sqrt(np.abs(norm_sq)))
+def pairwise_matrix_product(array1, array2):
+    """do matrix multiplication where we treat array1 and array2 as
+    ndarrays of matrices.
+    """
+
+    reshape1, reshape2 = array1, array2
+
+    excess1 = reshape1.ndim - 2
+    excess2 = reshape2.ndim - 2
+
+    if excess1 > 0:
+        reshape1 = np.expand_dims(array1,
+                                  axis=tuple(range(excess1, excess1 + excess2)))
+
+    if excess2 > 0:
+        reshape2 = np.expand_dims(array2, axis=tuple(range(excess1)))
+
+    product = reshape1 @ reshape2
+
+    return product
