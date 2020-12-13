@@ -21,7 +21,7 @@ affine_triangle_pts = plane.affine_coordinates(pts)
 affine_triangle = Polygon(affine_triangle_pts, fill=False,
                           edgecolor="black")
 
-basepoint = np.array([1.0, 1.0, 1.0]).T
+basepoint = np.array([1.0, 1.0, 1.0])
 
 scale_factor = 1.5
 triangle_automorphism = np.matrix([
@@ -31,10 +31,12 @@ triangle_automorphism = np.matrix([
 ])
 
 num_pts = 10
-point_sequence = [
-    (np.matmul((triangle_automorphism**k), basepoint)).T
-    for k in range(-1 * num_pts, num_pts)
-]
+
+auts = np.array([
+    triangle_automorphism**k for k in range(-1 * num_pts, num_pts)
+])
+point_sequence = basepoint @ auts
+
 xs, ys = plane.xy_coords(point_sequence)
 
 fig, ax = plt.subplots()

@@ -1,3 +1,14 @@
+"""geometry_tools.coxeter
+
+Module to work with Coxeter groups.
+
+Right now the only useful thing this can do is produce the canonical
+representation of a Coxeter group whose Coxeter matrix has finite
+entries, and conjugate it so that it preserves a diagonal symmetric
+bilinear form.
+
+"""
+
 from collections import defaultdict
 
 import numpy as np
@@ -9,7 +20,9 @@ GENERATOR_NAMES = "abcdefghijklmnopqrstuvwxyz"
 
 class CoxeterGroup:
     def __init__(self, diagram):
-        """diagram is an iterable of triples of the form (generator1,
+        """Construct a Coxeter group.
+
+        diagram is an iterable of triples of the form (generator1,
         generator2, order). order < 0 is interpreted as infinity.
 
         """
@@ -35,6 +48,10 @@ class CoxeterGroup:
         self.bilinear_form = -1 * np.cos(np.pi / self.coxeter_matrix)
 
     def canonical_representation(self):
+        """Get the canonical representation of the Coxeter group (all Coxeter
+        matrix entries must be finite).
+
+        """
         num_gens = len(self.generators)
         rep = Representation(GENERATOR_NAMES[:num_gens])
 
@@ -49,6 +66,11 @@ class CoxeterGroup:
         return rep
 
     def diagonal_rep(self, order_eigenvalues="signed"):
+        """Get a representation of the Coxeter group which preserves a
+        diagonal symmetric bilinear form by conjugating the canonical
+        representation.
+
+        """
         eigs, U = np.linalg.eigh(self.bilinear_form)
         D = np.diag(1 / np.sqrt(np.abs(eigs)))
 
@@ -66,6 +88,9 @@ class CoxeterGroup:
         return rep
 
 class TriangleGroup(CoxeterGroup):
+    """Convenience class for building a triangle group.
+
+    """
     def __init__(self, vertex_params):
         v1, v2, v3 = vertex_params
         CoxeterGroup.__init__(

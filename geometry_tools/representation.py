@@ -1,14 +1,28 @@
-import numpy as np
+"""geometry_tools.representation
+
+Module to work with group representations into finite-dim vector
+spaces, using numerical matrices.
+
+"""
+
 import re
 import itertools
 
+import numpy as np
 from scipy.special import binom
 
 class RepresentationException(Exception):
     pass
 
 class Representation:
-    #technically, this is just a free group representation
+    """Model a representation for a finitely generated group
+    representation into GL(n).
+
+    Really this is just a convenient way of mapping words in the
+    generators to matrices - there's no group theory being done here
+    at all.
+
+    """
 
     @staticmethod
     def invert_gen(generator):
@@ -22,9 +36,22 @@ class Representation:
         return self._dim
 
     def elements(self, max_length):
-        for i in range(max_length + 1):
-            for word in itertools.product(self.generators, repeat=i):
-                yield (''.join(word), self[word])
+        for word in free_words_less_than(max_length):
+            yield (word, self[word])
+
+    def free_words_of_length(self, length):
+        if length == 0:
+            yield ""
+        else:
+            for word in self.free_words_of_length(length - 1):
+                for generator in self.generators:
+                    if len(word) == 0 or generator != self.invert_gen(word[-1]):
+                        yield word + generator
+
+    def free_words_less_than(self, length):
+        for i in range(length):
+            for word in self.free_words_of_length(i):
+                yield word
 
     def semi_gens(self):
         for gen in self.generators:
@@ -96,19 +123,7 @@ class Representation:
 
         return square_rep
 
-    def free_words_of_length(self, length):
-        if length == 0:
-            yield ""
-        else:
-            for word in self.free_words_of_length(length - 1):
-                for generator in self.generators:
-                    if len(word) == 0 or generator != self.invert_gen(word[-1]):
-                        yield word + generator
 
-    def free_words_less_than(self, length):
-        for i in range(length):
-            for word in self.free_words_of_length(i):
-                yield word
 
 def sym_index(i,j, n):
     if i > j:
@@ -143,6 +158,9 @@ def so_to_psl(A):
     """the isomorphism SO(2,1) --> PSL(2), assuming the matrix A is a 3x3
     matrix determining a linear map in a basis where the symmetric
     bilinear form has matrix diag(-1, -1, 1).
+
+    This would probably be more useful if I did it for the form with
+    signature (-1, 1, 1), but oh well
 
     """
 
