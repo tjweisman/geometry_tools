@@ -8,7 +8,6 @@ from geometry_tools import projective, representation, utils
 
 #arbitrary
 ERROR_THRESHOLD = 1e-8
-
 BOUNDARY_THRESHOLD = 1e-5
 
 CHECK_LIGHT_CONE = False
@@ -61,6 +60,13 @@ class HyperbolicObject:
     def set(self, hyp_data):
         self._assert_geometry_valid(hyp_data)
         self.hyp_data = hyp_data
+
+    def flatten_to_unit(self):
+        flattened = copy(self)
+        new_shape = (-1,) + self.hyp_data.shape[-1 * self.unit_ndims:]
+        new_data = np.reshape(self.hyp_data, new_shape)
+        flattened.set(new_data)
+        return flattened
 
     def __repr__(self):
         return "({}, {})".format(
@@ -210,7 +216,7 @@ class Subspace(IdealPoint):
 
 class Segment(Point, Subspace):
     def __init__(self, space, endpoint1, endpoint2=None):
-        self.unit_ndims = 3
+        self.unit_ndims = 2
         self.space = space
 
         if endpoint2 is None:
@@ -249,9 +255,9 @@ class Segment(Point, Subspace):
     def _assert_geometry_valid(self, hyp_data):
         HyperbolicObject._assert_geometry_valid(self, hyp_data)
 
-        if (hyp_data.shape[-3] != 2 or hyp_data.shape[-2] != 2):
+        if (hyp_data.shape[-2] != 4):
             raise GeometryError( ("Underlying data for a hyperbolic"
-            " segment in H{} must have shape (..., 2, 2, {}) but data"
+            " segment in H{} must have shape (..., 4, {}) but data"
             " has shape {}").format(self.space.dimension,
                                    self.space.dimension + 1, hyp_data.shape))
 
@@ -270,8 +276,8 @@ class Segment(Point, Subspace):
     def set(self, hyp_data):
         HyperbolicObject.set(self, hyp_data)
 
-        self.endpoints = self.hyp_data[...,0,:,:]
-        self.ideal_basis = self.hyp_data[...,1,:,:]
+        self.endpoints = self.hyp_data[..., :2, :]
+        self.ideal_basis = self.hyp_data[..., 2:, :]
 
     def compute_ideal_endpoints(self, endpoints):
         end_data = Point(self.space, endpoints).hyp_data
@@ -291,7 +297,7 @@ class Segment(Point, Subspace):
         null2 = end_data[..., 0, :] + (mu2.T * end_data[..., 1, :].T).T
 
         ideal_basis = np.array([null1, null2]).swapaxes(0, -2)
-        hyp_data = np.stack([end_data, ideal_basis], axis=-3)
+        hyp_data = np.concatenate([end_data, ideal_basis], axis=-2)
 
         self.set(hyp_data)
 
@@ -714,15 +720,12 @@ class HyperbolicSpace:
                 < ERROR_THRESHOLD).all()
 
     def all_spacelike(self, vectors):
-        return True
         return (utils.normsq(vectors, self.minkowski()) > ERROR_THRESHOLD).all()
 
     def all_timelike(self, vectors):
-        return True
         return (utils.normsq(vectors, self.minkowski()) < ERROR_THRESHOLD).all()
 
     def all_lightlike(self, vectors):
-        return True
         return (np.abs(utils.normsq(vectors, self.minkowski())) < ERROR_THRESHOLD).all()
 
 
