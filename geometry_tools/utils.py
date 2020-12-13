@@ -49,8 +49,8 @@ def short_arc(thetas):
     thetas[thetas < 0] += 2 * np.pi
     thetas.sort(axis=-1)
 
-    thetas[thetas[:,1] - thetas[:,0] > np.pi] = np.flip(
-        thetas[thetas[:,1] - thetas[:,0] > np.pi], axis=-1
+    thetas[thetas[...,1] - thetas[...,0] > np.pi] = np.flip(
+        thetas[thetas[...,1] - thetas[...,0] > np.pi], axis=-1
     )
 
     return thetas
@@ -113,7 +113,7 @@ def find_isometry(form, partial_map, force_oriented=False):
 
 def make_orientation_preserving(matrix):
     preserved = matrix.copy()
-    preserved[reversing_index, ..., -1, :] *= -1
+    preserved[np.linalg.det(preserved) < 0, -1, :] *= -1
     return preserved
 
 def expand_unit_axes(array, unit_axes, new_axes):
@@ -140,18 +140,26 @@ def matrix_product(array1, array2, unit_axis_1=2, unit_axis_2=2,
     reshape1 = expand_unit_axes(array1, unit_axis_1, unit_axis_2)
     reshape2 = expand_unit_axes(array2, unit_axis_2, unit_axis_1)
 
-    if broadcast == "pairwise":
+    if broadcast == "pairwise" or broadcast == "pairwise_reversed":
         large_axes = max(unit_axis_1, unit_axis_2)
 
         excess1 = reshape1.ndim - large_axes
         excess2 = reshape2.ndim - large_axes
 
         if excess1 > 0:
-            reshape1 = np.expand_dims(reshape1,
-                                      axis=tuple(range(excess1, excess1 + excess2)))
+            if broadcast == "pairwise_reversed":
+                reshape1 = np.expand_dims(reshape1,
+                                          axis=tuple(range(excess1, excess1 + excess2)))
+            else:
+                reshape1 = np.expand_dims(reshape1,
+                                          axis=tuple(range(excess2)))
 
         if excess2 > 0:
-            reshape2 = np.expand_dims(reshape2, axis=tuple(range(excess1)))
+            if broadcast == "pairwise_reversed":
+                reshape2 = np.expand_dims(reshape2, axis=tuple(range(excess1)))
+            else:
+                reshape2 = np.expand_dims(reshape2,
+                                          axis=tuple(range(excess2, excess1 + excess2)))
 
     product = reshape1 @ reshape2
 
