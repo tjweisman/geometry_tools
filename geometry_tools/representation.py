@@ -31,22 +31,30 @@ class Representation:
             if re.match("[a-z]", gen):
                 yield gen
 
-    def __init__(self, generator_names=[]):
+    def __init__(self, generator_names=[], normalization_step=-1):
         self.generators = {name[0].lower():None
                            for name in generator_names}
 
         for gen in list(self.generators):
             self.generators[gen.upper()] = None
 
+        self.normalization_step = normalization_step
+
         self._dim = None
 
+    def normalize(self, matrix):
+        """function to force a matrices into a subgroup of GL(d,R)
+        """
+        return matrix
+
     def _word_value(self, word):
-        if len(word) == 1:
-            return self.generators[word[0]]
-        elif len(word) > 1:
-            return self.generators[word[0]] @ self._word_value(word[1:])
-        else:
-            return np.identity(self._dim)
+        matrix = np.identity(self._dim)
+        for i, letter in enumerate(word):
+            matrix = matrix @ self.generators[letter]
+            if (self.normalization_step > 0 and
+                (i % self.normalization_step) == 0):
+                matrix = self.normalize(matrix)
+        return matrix
 
     def __getitem__(self, word):
         return self._word_value(word)
@@ -87,6 +95,20 @@ class Representation:
             square_rep[g] = proj * tensor_rep[g] * incl
 
         return square_rep
+
+    def free_words_of_length(self, length):
+        if length == 0:
+            yield ""
+        else:
+            for word in self.free_words_of_length(length - 1):
+                for generator in self.generators:
+                    if len(word) == 0 or generator != self.invert_gen(word[-1]):
+                        yield word + generator
+
+    def free_words_less_than(self, length):
+        for i in range(length):
+            for word in self.free_words_of_length(i):
+                yield word
 
 def sym_index(i,j, n):
     if i > j:

@@ -7,10 +7,11 @@ from scipy.optimize import fsolve
 from geometry_tools import projective, representation, utils
 
 #arbitrary
-ERROR_THRESHOLD = 0.1
+ERROR_THRESHOLD = 1e-8
 
-#TODO: raise exceptions when nonsensical geometry data is passed to
-#these classes
+BOUNDARY_THRESHOLD = 1e-5
+
+CHECK_LIGHT_CONE = False
 
 class GeometryError(Exception):
     pass
@@ -107,6 +108,9 @@ class Point(HyperbolicObject):
 
     def _assert_geometry_valid(self, hyp_data):
         super()._assert_geometry_valid(hyp_data)
+        if not CHECK_LIGHT_CONE:
+            return
+
         if not self.space.all_timelike(hyp_data):
             raise GeometryError( ("Point data must consist of vectors in the "
                                   "closure of the Minkowski light cone"))
@@ -144,6 +148,9 @@ class Point(HyperbolicObject):
 class DualPoint(HyperbolicObject):
     def _assert_geometry_valid(self, hyp_data):
         super()._assert_geometry_valid(hyp_data)
+        if not CHECK_LIGHT_CONE:
+            return
+
         if not self.space.all_spacelike(hyp_data):
             raise GeometryError("Dual point data must consist of vectors"
                                 " in the complement of the Minkowski light cone")
@@ -151,20 +158,21 @@ class DualPoint(HyperbolicObject):
 class IdealPoint(HyperbolicObject):
     def _assert_geometry_valid(self, hyp_data):
         super()._assert_geometry_valid(hyp_data)
+
+        if not CHECK_LIGHT_CONE:
+            return
+
         if not self.space.all_lightlike(hyp_data):
             raise GeometryError("Ideal point data must consist of vectors"
                                 "in the boundary of the Minkowski light cone")
 
 class Subspace(IdealPoint):
-    def __init__(self, hyp_data):
-        super().__init__(hyp_data)
+    def __init__(self, space, hyp_data):
+        super().__init__(space, hyp_data)
         self.unit_ndims = 2
 
-    #TODO: make a constructor that computes an orthogonal ideal basis
-    #if we're not given one
     def set(self, hyp_data):
         HyperbolicObject.set(self, hyp_data)
-
         self.ideal_basis = hyp_data
 
     def ideal_basis_coords(self, coords="kleinian"):
@@ -218,6 +226,14 @@ class Segment(Point, Subspace):
             except (AttributeError, GeometryError):
                 pass
 
+        self.set_endpoints(endpoint1, endpoint2)
+
+    def from_endpoints(space, endpoint1, endpoint2=None):
+        segment = Segment(space, endpoint1, endpoint2)
+        segment.set_endpoints(endpoint1, endpoint2)
+
+    def set_endpoints(self, endpoint1, endpoint2=None):
+        if endpoint2 is None:
             point_data = Point(self.space, endpoint1).hyp_data
             self.compute_ideal_endpoints(endpoint1)
             return
@@ -238,6 +254,9 @@ class Segment(Point, Subspace):
             " segment in H{} must have shape (..., 2, 2, {}) but data"
             " has shape {}").format(self.space.dimension,
                                    self.space.dimension + 1, hyp_data.shape))
+
+        if not CHECK_LIGHT_CONE:
+            return
 
         if not self.space.all_timelike(hyp_data[..., 0, :, :]):
             raise GeometryError( "segment data at index [..., 0, :,"
@@ -275,6 +294,12 @@ class Segment(Point, Subspace):
         hyp_data = np.stack([end_data, ideal_basis], axis=-3)
 
         self.set(hyp_data)
+
+    def get_ideal_endpoints(self):
+        return Subspace(self.space, self.ideal_basis)
+
+    def get_endpoints(self):
+        return Points(self.space, self.endpoints)
 
     def circle_parameters(self, short_arc=True, degrees=True):
         center, radius = self.sphere_parameters()
@@ -319,6 +344,9 @@ class Hyperplane(Subspace):
                                   " have shape (..., {0}, {0}) but data has shape"
                                   " {1}").format(n, hyp_data.shape))
 
+
+        if not CHECK_LIGHT_CONE:
+            return
 
         if not self.space.all_spacelike(hyp_data[..., 0, :]):
             raise GeometryError( ("Hyperplane data at index [..., 0, :]"
@@ -409,6 +437,9 @@ class TangentVector(HyperbolicObject):
                      self.space.dimension, self.space.dimension + 1, hyp_data.shape)
             )
 
+        if not CHECK_LIGHT_CONE:
+            return
+
         point_data = hyp_data[..., 0, :]
         vector_data = hyp_data[..., 1, :]
 
@@ -482,7 +513,16 @@ class Isometry(HyperbolicObject):
             else:
                 self.set(hyp_data)
 
+    def _assert_geometry_valid(self, hyp_data):
+        n = self.space.dimension + 1
+        if hyp_data.shape[-2:] != (n, n):
+            raise GeometryError(
+                ("Isometries of H^n must be ndarray of {0} x {0}"
+                 " matrices, got array with shape {1}").format(
+                     n, hyp_data.shape))
+
     def set(self, hyp_data):
+        super().set(hyp_data)
         self.matrix = hyp_data
         self.hyp_data = hyp_data
 
@@ -516,9 +556,10 @@ class Isometry(HyperbolicObject):
         return self.apply(other)
 
 class HyperbolicRepresentation(representation.Representation):
-    def __init__(self, space, generator_names=[]):
+    def __init__(self, space, generator_names=[], normalization_step=-1):
         self.space = space
-        representation.Representation.__init__(self, generator_names)
+        representation.Representation.__init__(self, generator_names,
+                                               normalization_step)
 
     def __getitem__(self, word):
         matrix = self._word_value(word)
@@ -531,8 +572,11 @@ class HyperbolicRepresentation(representation.Representation):
         except AttributeError:
             super().__setitem__(generator, isometry)
 
-    def from_matrix_rep(space, rep):
-        hyp_rep = HyperbolicRepresentation(space)
+    def normalize(self, matrix):
+        return utils.indefinite_orthogonalize(self.space.minkowski(), matrix)
+
+    def from_matrix_rep(space, rep, **kwargs):
+        hyp_rep = HyperbolicRepresentation(space, **kwargs)
         for g, matrix in rep.generators.items():
             hyp_rep[g] = matrix
 
@@ -570,7 +614,8 @@ class HyperbolicSpace:
 
     def kleinian_to_poincare(self, points):
         euc_norms = utils.normsq(points)
-        mult_factor = 1 / (1. + np.sqrt(1 - euc_norms))
+        #we take a square root to combat roundoff error
+        mult_factor = 1 / (1. + np.sqrt(np.abs(1 - euc_norms)))
 
         return (points.T * mult_factor.T).T
 
@@ -664,13 +709,20 @@ class HyperbolicSpace:
         denom = np.sqrt(1 + (np.sin(gamma) * np.sinh(hyp_radius))**2)
         return 2 * np.arcsin(np.cos(gamma) / denom)
 
+    def close_to_boundary(self, vectors):
+        return (np.abs(utils.normsq(self.kleinian_coords(vectors)) - 1)
+                < ERROR_THRESHOLD).all()
+
     def all_spacelike(self, vectors):
+        return True
         return (utils.normsq(vectors, self.minkowski()) > ERROR_THRESHOLD).all()
 
     def all_timelike(self, vectors):
+        return True
         return (utils.normsq(vectors, self.minkowski()) < ERROR_THRESHOLD).all()
 
     def all_lightlike(self, vectors):
+        return True
         return (np.abs(utils.normsq(vectors, self.minkowski())) < ERROR_THRESHOLD).all()
 
 
