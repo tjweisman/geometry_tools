@@ -1,3 +1,10 @@
+"""geometry_tools.hyperbolic
+
+Provides classes to model objects in hyperbolic space with numerical
+coordinates.
+
+"""
+
 from copy import copy
 
 import numpy as np
@@ -13,9 +20,29 @@ BOUNDARY_THRESHOLD = 1e-5
 CHECK_LIGHT_CONE = False
 
 class GeometryError(Exception):
+    """Thrown if there's an attempt to construct a hyperbolic object with
+    numerical data that doesn't make sense for that type of object."""
     pass
 
 class HyperbolicObject:
+    """Model for an abstract object in hyperbolic space.
+
+    Subclasses of HyperbolicObject model more specific objects in
+    hyperbolic geometry, e.g. points, geodesic segments, hyperplanes,
+    ideal points.
+
+    Every object in hyperbolic space H^n has the underlying data of an
+    ndarray whose last dimension is n+1. This is interpreted as a
+    collection of (row) vectors in R^(n+1), or more precisely R^(n,1),
+    which transforms via the action of the special orthogonal group
+    O(n,1).
+
+    The last unit_ndims dimensions of this underlying array represent
+    a single object in hyperbolic space, which transforms as a unit
+    under the action of O(n,1). The remaining dimensions of the array
+    are used to represent an array of such "unit objects."
+
+    """
     def __init__(self, space, hyp_data):
         self.unit_ndims = 1
         try:
@@ -39,8 +66,10 @@ class HyperbolicObject:
             )
 
     def _construct_from_object(self, hyp_obj):
-        #if we're passed a hyperbolic object or an array of hyperbolic objects,
-        #build a new one out of them
+        """if we're passed a hyperbolic object or an array of hyperbolic
+        objects, build a new one out of them
+
+        """
         try:
             self.space = hyp_obj.space
             self.set(hyp_obj.hyp_data)
@@ -57,11 +86,26 @@ class HyperbolicObject:
 
         raise TypeError
 
+    def obj_shape(self):
+        """Get the shape of the ndarray of "unit objects" this
+        HyperbolicObject represents.
+
+        """
+        return self.hyp_data.shape[:-1 * unit_ndims]
+
     def set(self, hyp_data):
+        """set the underlying data of the hyperbolic object.
+
+        Subclasses may override this method to give special names to
+        portions of the underlying data.
+
+        """
         self._assert_geometry_valid(hyp_data)
         self.hyp_data = hyp_data
 
     def flatten_to_unit(self):
+        """return a flattened version of the hyperbolic object.
+        """
         flattened = copy(self)
         new_shape = (-1,) + self.hyp_data.shape[-1 * self.unit_ndims:]
         new_data = np.reshape(self.hyp_data, new_shape)
@@ -83,20 +127,26 @@ class HyperbolicObject:
         return self.__class__(self.space, self.hyp_data[item])
 
     def projective_coords(self, hyp_data=None):
-        #all hyperbolic object data is stored as projective
-        #coordinates
+        """wrapper for HyperbolicObject.set, since underlying coordinates are
+        projective."""
         if hyp_data is not None:
             self.set(hyp_data)
 
         return self.hyp_data
 
     def kleinian_coords(self, hyp_data=None):
+        """Get kleinian (affine) coordinates for this object.
+        """
         if hyp_data is not None:
             self.set(self.space.projective.affine_to_projective(hyp_data))
 
         return self.space.kleinian_coords(self.hyp_data)
 
 class Point(HyperbolicObject):
+    """Model for a point (or ndarray of points) in the closure of
+    hyperbolic space.
+
+    """
     def __init__(self, space, point, coords="projective"):
         self.unit_ndims = 1
         self.space = space
@@ -122,12 +172,16 @@ class Point(HyperbolicObject):
                                   "closure of the Minkowski light cone"))
 
     def hyperboloid_coords(self, hyp_data=None):
+        """Get point coordinates on the unit hyperboloid
+        """
         if hyp_data is not None:
             self.set(hyp_data)
 
         return self.space.hyperboloid_coords(self.hyp_data)
 
     def poincare_coords(self, hyp_data=None):
+        """Get point coordinates in the Poincare ball (radius 1)
+        """
         if hyp_data is not None:
             klein = self.space.poincare_to_kleinian(hyp_data)
             self.kleinian_coords(klein)
@@ -135,23 +189,38 @@ class Point(HyperbolicObject):
         return self.space.kleinian_to_poincare(self.kleinian_coords())
 
     def distance(self, other):
-        """compute all pairwise distances (w.r.t. last two dimensions) between
-        self and other"""
-        products = (
-            self.hyp_data @ self.space.minkowski() @ other.hyp_data.swapaxes(-1, -2)
-        )
+        """compute elementwise distances (with respect to last two dimensions)
+        between self and other
+
+        """
+        #TODO: allow for pairwise distances
+        products = utils.apply_bilinear(self.hyp_data, other.hyp_data,
+                                        self.space.minkowski())
+
         return np.arccosh(np.abs(products))
 
     def origin_to(self):
-        """return an isometry taking the origin to this point"""
+        """Get an isometry taking the origin to this point.
+
+        Not guaranteed to be orientation-preserving."""
         return self.space.timelike_to(self.hyp_data)
 
     def unit_tangent_towards(self, other):
+        """Get the unit tangent vector pointing from this point to another
+        point in hyperbolic space.
+
+        """
         diff = other.hyp_data - self.hyp_data
         return TangentVector(self.space, self, diff).normalized()
 
 
 class DualPoint(HyperbolicObject):
+    """Model for a "dual point" in hyperbolic space (a point in the
+    complement of the projectivization of the Minkowski light cone,
+    corresponding to a geodesic hyperplane in hyperbolic space)
+
+    """
+
     def _assert_geometry_valid(self, hyp_data):
         super()._assert_geometry_valid(hyp_data)
         if not CHECK_LIGHT_CONE:
@@ -162,6 +231,10 @@ class DualPoint(HyperbolicObject):
                                 " in the complement of the Minkowski light cone")
 
 class IdealPoint(HyperbolicObject):
+    """Model for an ideal point in hyperbolic space (lying on the boundary
+    of the projectivization of the Minkowski light cone)
+
+    """
     def _assert_geometry_valid(self, hyp_data):
         super()._assert_geometry_valid(hyp_data)
 
@@ -173,6 +246,9 @@ class IdealPoint(HyperbolicObject):
                                 "in the boundary of the Minkowski light cone")
 
 class Subspace(IdealPoint):
+    """Model for a geodesic subspace of hyperbolic space.
+
+    """
     def __init__(self, space, hyp_data):
         super().__init__(space, hyp_data)
         self.unit_ndims = 2
@@ -182,12 +258,23 @@ class Subspace(IdealPoint):
         self.ideal_basis = hyp_data
 
     def ideal_basis_coords(self, coords="kleinian"):
+        """Get coordinates for a basis of this subspace lying on the ideal
+        boundary of H^n.
+
+        """
         if coords == "kleinian":
             return self.space.kleinian_coords(self.ideal_basis)
 
         return self.ideal_basis
 
     def sphere_parameters(self):
+        """Get parameters describing a k-sphere corresponding to this subspace
+        in the Poincare model.
+
+        Returns a pair (center, radius). In the Poincare model, this
+        subspace lies on a sphere with these parameters.
+
+        """
         klein = self.ideal_basis_coords()
 
         poincare_midpoint = self.space.kleinian_to_poincare(
@@ -202,6 +289,16 @@ class Subspace(IdealPoint):
         return center, radius
 
     def circle_parameters(self, short_arc=True, degrees=True):
+        """Get parameters describing a circular arc corresponding to this
+        subspace in the Poincare model.
+
+        Returns a tuple (center, radius, thetas). In the Poincare
+        model, the subspace lies on a circle with this center and
+        radius. thetas is an ndarray with shape (..., 2), giving the
+        angle (with respect to the center of the circle) of two of the
+        ideal points in this subspace.
+
+        """
         center, radius = self.sphere_parameters()
         klein = self.ideal_basis_coords()
         thetas = utils.circle_angles(center, klein)
@@ -215,6 +312,7 @@ class Subspace(IdealPoint):
         return center, radius, thetas
 
 class Segment(Point, Subspace):
+    """Model a geodesic segment in hyperbolic space."""
     def __init__(self, space, endpoint1, endpoint2=None):
         self.unit_ndims = 2
         self.space = space
@@ -235,13 +333,28 @@ class Segment(Point, Subspace):
         self.set_endpoints(endpoint1, endpoint2)
 
     def from_endpoints(space, endpoint1, endpoint2=None):
+        """Explicitly construct a segment from its endpoints.
+
+        If endpoint2 is None, expect endpoint1 to be an array of
+        points with shape (..., 2, n). Otherwise, expect endpoint1 and
+        endpoint2 to be arrays of points with the same shape.
+
+        """
         segment = Segment(space, endpoint1, endpoint2)
         segment.set_endpoints(endpoint1, endpoint2)
+        return segment
 
     def set_endpoints(self, endpoint1, endpoint2=None):
+        """Set the endpoints of a segment.
+
+        If endpoint2 is None, expect endpoint1 to be an array of
+        points with shape (..., 2, n). Otherwise, expect endpoint1 and
+        endpoint2 to be arrays of points with the same shape.
+
+        """
         if endpoint2 is None:
             point_data = Point(self.space, endpoint1).hyp_data
-            self.compute_ideal_endpoints(endpoint1)
+            self._compute_ideal_endpoints(endpoint1)
             return
 
         pt1 = Point(self.space, endpoint1)
@@ -250,7 +363,7 @@ class Segment(Point, Subspace):
             [endpoint1.hyp_data, endpoint2.hyp_data], axis=-2)
         )
 
-        self.compute_ideal_endpoints(self.endpoints)
+        self._compute_ideal_endpoints(self.endpoints)
 
     def _assert_geometry_valid(self, hyp_data):
         HyperbolicObject._assert_geometry_valid(self, hyp_data)
@@ -279,7 +392,7 @@ class Segment(Point, Subspace):
         self.endpoints = self.hyp_data[..., :2, :]
         self.ideal_basis = self.hyp_data[..., 2:, :]
 
-    def compute_ideal_endpoints(self, endpoints):
+    def _compute_ideal_endpoints(self, endpoints):
         end_data = Point(self.space, endpoints).hyp_data
         products = end_data @ self.space.minkowski() @ end_data.swapaxes(-1, -2)
         a11 = products[..., 0, 0]
@@ -307,7 +420,22 @@ class Segment(Point, Subspace):
     def get_endpoints(self):
         return Points(self.space, self.endpoints)
 
+    def get_end_pair(self):
+        """Return a pair of point objects, one for each endpoint
+        """
+        return (self.endpoints[..., 0, :], self.endpoints[..., 1, :])
+
     def circle_parameters(self, short_arc=True, degrees=True):
+        """Get parameters describing a circular arc corresponding to this
+        segment in the Poincare model.
+
+        Returns a tuple (center, radius, thetas). In the Poincare
+        model, the segment lies on a circle with this center and
+        radius. thetas is an ndarray with shape (..., 2), giving the
+        angle (with respect to the center of the circle) of the
+        endpoints of the segment.
+
+        """
         center, radius = self.sphere_parameters()
 
         klein = self.space.kleinian_coords(self.endpoints)
@@ -323,6 +451,7 @@ class Segment(Point, Subspace):
         return center, radius, thetas
 
 class Hyperplane(Subspace):
+    """Model for a geodesic hyperplane in hyperbolic space."""
     def __init__(self, space, hyperplane_data):
         self.space = space
         self.unit_ndims = 2
@@ -339,7 +468,7 @@ class Hyperplane(Subspace):
         except GeometryError:
             pass
 
-        self.compute_ideal_basis(hyperplane_data)
+        self._compute_ideal_basis(hyperplane_data)
 
     def _assert_geometry_valid(self, hyp_data):
         HyperbolicObject._assert_geometry_valid(self, hyp_data)
@@ -369,7 +498,7 @@ class Hyperplane(Subspace):
         self.spacelike_vector = self.hyp_data[..., 0, :]
         self.ideal_basis = self.hyp_data[..., 1:, :]
 
-    def compute_ideal_basis(self, vector):
+    def _compute_ideal_basis(self, vector):
         spacelike_vector = DualPoint(self.space, vector).hyp_data
 
         n = self.space.dimension + 1
@@ -391,7 +520,7 @@ class Hyperplane(Subspace):
 
     def from_reflection(space, reflection):
         """construct a hyperplane which is the fixpoint set of a given
-        reflection"""
+        reflection."""
         try:
             matrix = reflection.matrix.swapaxes(-1, -2)
         except AttributeError:
@@ -418,6 +547,7 @@ class Hyperplane(Subspace):
         return Hyperplane(space, spacelike.swapaxes(-1,-2))
 
 class TangentVector(HyperbolicObject):
+    """Model for a tangent vector in hyperbolic space."""
     def __init__(self, space, point_data, vector=None):
         self.space = space
         self.unit_ndims = 2
@@ -431,7 +561,7 @@ class TangentVector(HyperbolicObject):
             self.set(point_data)
             return
 
-        self.compute_data(point_data, vector)
+        self._compute_data(point_data, vector)
 
     def _assert_geometry_valid(self, hyp_data):
         super()._assert_geometry_valid(hyp_data)
@@ -457,7 +587,7 @@ class TangentVector(HyperbolicObject):
         if (np.abs(products) > ERROR_THRESHOLD).any():
             raise GeometryError("tangent vector must be orthogonal to point")
 
-    def compute_data(self, point, vector):
+    def _compute_data(self, point, vector):
         #wrapping these as hyperbolic objects first
         pt = Point(self.space, point)
 
@@ -475,10 +605,18 @@ class TangentVector(HyperbolicObject):
         self.vector = self.hyp_data[..., 1, :]
 
     def normalized(self):
+        """Get a unit tangent vector in the same direction as this tangent
+        vector.
+
+        """
         normed_vec = utils.normalize(self.vector, self.space.minkowski())
         return TangentVector(self.space, self.point, normed_vec)
 
     def origin_to(self, force_oriented=True):
+        """Get an isometry taking the "origin" (a tangent vector pointing
+        along the second standard basis vector) to this vector.
+
+        """
         normed = utils.normalize(self.hyp_data, self.space.minkowski())
         isom = utils.find_isometry(self.space.minkowski(), normed,
                                    force_oriented)
@@ -486,9 +624,14 @@ class TangentVector(HyperbolicObject):
         return Isometry(self.space, isom, column_vectors=False)
 
     def isometry_to(self, other, force_oriented=True):
+        """Get an isometry taking this tangent vector to a scalar multiple of
+        the other."""
         return other.origin_to(force_oriented) @ self.origin_to(force_oriented).inv()
 
     def angle(self, other):
+        """Compute the angle between two tangent vectors.
+
+        """
         v1 = self.space.project_to_hyperboloid(self.point, self.normalized().vector)
         v2 = self.space.project_to_hyperboloid(self.point, other.normalized().vector)
 
@@ -496,6 +639,10 @@ class TangentVector(HyperbolicObject):
         return np.arccos(product)
 
     def point_along(self, distance):
+        """Get a point in hyperbolic space along the geodesic specified by
+        this tangent vector.
+
+        """
         kleinian_shape = list(self.point.shape)
         kleinian_shape[-1] -= 1
 
@@ -507,7 +654,17 @@ class TangentVector(HyperbolicObject):
         return self.origin_to().apply(basepoint, "elementwise")
 
 class Isometry(HyperbolicObject):
+    """Model for an isometry of hyperbolic space.
+
+    """
     def __init__(self, space, hyp_data, column_vectors=True):
+        """Constructor for Isometry.
+
+        Underlying data is stored as row vectors, but by default the
+        constructor accepts matrices acting on columns, since that's
+        how my head thinks.
+
+        """
         self.space = space
         self.unit_ndims = 2
 
@@ -539,6 +696,18 @@ class Isometry(HyperbolicObject):
                                     broadcast=broadcast)
 
     def apply(self, hyp_obj, broadcast="elementwise"):
+        """Apply this isometry to another object in hyperbolic space.
+
+        Broadcast is either "elementwise" or "pairwise", treating self
+        and hyp_obj as ndarrays of isometries and hyperbolic objects,
+        respectively.
+
+        hyp_obj may be either a HyperbolicObject instance or the
+        underlying data of one. In either case, this function returns
+        a HyperbolicObject (of the same subclass as hyp_obj, if
+        applicable).
+
+        """
         new_obj = copy(hyp_obj)
 
         try:
@@ -556,12 +725,21 @@ class Isometry(HyperbolicObject):
         return HyperbolicObject(self.space, product)
 
     def inv(self):
+        """invert the isometry"""
         return Isometry(self.space, np.linalg.inv(self.matrix.swapaxes(-1,-2)))
 
     def __matmul__(self, other):
         return self.apply(other)
 
 class HyperbolicRepresentation(representation.Representation):
+    """Model a representation for a finitely generated group
+    representation into O(n,1).
+
+    Really this is just a convenient way of mapping words in the
+    generators to hyperbolic isometries - there's no group theory
+    being done here at all.
+
+    """
     def __init__(self, space, generator_names=[], normalization_step=-1):
         self.space = space
         representation.Representation.__init__(self, generator_names,
@@ -582,6 +760,8 @@ class HyperbolicRepresentation(representation.Representation):
         return utils.indefinite_orthogonalize(self.space.minkowski(), matrix)
 
     def from_matrix_rep(space, rep, **kwargs):
+        """Construct a hyperbolic representation from a matrix
+        representation"""
         hyp_rep = HyperbolicRepresentation(space, **kwargs)
         for g, matrix in rep.generators.items():
             hyp_rep[g] = matrix
@@ -589,6 +769,10 @@ class HyperbolicRepresentation(representation.Representation):
         return hyp_rep
 
     def isometries(self, words):
+        """Get an Isometry object holding the matrices which are the images of
+        a sequence of words in the generators.
+
+        """
         matrix_array = np.array(
             [representation.Representation.__getitem__(self, word)
              for word in words]
@@ -596,14 +780,23 @@ class HyperbolicRepresentation(representation.Representation):
         return Isometry(self.space, matrix_array)
 
 class HyperbolicSpace:
+    """Class to generate objects in hyperbolic geometry and perform some
+    utility computations."""
     def __init__(self, dimension):
         self.projective = projective.ProjectiveSpace(dimension + 1)
         self.dimension = dimension
 
     def minkowski(self):
+        """Get the matrix for the Minkowski bilinear form, with signature (-1,
+        1, 1, ...., 1).
+
+        """
         return np.diag(np.concatenate(([-1.0], np.ones(self.dimension))))
 
     def hyperboloid_coords(self, points):
+        """Project an ndarray of points to the unit hyperboloid defined by the
+        Minkowski quadratic form."""
+
         #last index of array as the dimension
         n = self.dimension + 1
         projective_coords, dim_index = utils.dimension_to_axis(points, n, -1)
@@ -613,6 +806,9 @@ class HyperbolicSpace:
         return hyperbolized.swapaxes(-1, dim_index)
 
     def kleinian_coords(self, points):
+        """Get kleinian coordinates for an ndarray of points.
+
+        """
         n = self.dimension + 1
         projective_coords, dim_index = utils.dimension_to_axis(points, n, -1)
 
@@ -632,18 +828,37 @@ class HyperbolicSpace:
         return (points.T * mult_factor.T).T
 
     def get_elliptic(self, block_elliptic):
+        """Get an elliptic isometry stabilizing the origin in the
+        Poincare/Klein models.
+
+        block_elliptic is an element of O(n), whose image is taken
+        diagonally in O(n,1).
+
+        """
         mat = scipy.linalg.block_diag(1.0, block_elliptic)
 
         return Isometry(self, mat)
 
     def project_to_hyperboloid(self, basepoint, tangent_vector):
+        """Project a vector in R^(n,1) to lie in the tangent space to the unit
+        hyperboloid at a given basepoint.
+
+        """
         return tangent_vector - utils.projection(
             tangent_vector, basepoint, self.minkowski())
 
     def get_origin(self, shape=()):
+        """Get a Point mapping to the origin of the Poincare/Klein models.
+
+        """
         return self.get_point(np.zeros(shape + (self.dimension,)))
 
     def get_base_tangent(self, shape=()):
+        """Get a TangentVector whose basepoint maps to the origin of the
+        Poincare/Klein models, and whose vector is the second standard
+        basis vector in R^(n,1).
+
+        """
         origin = self.get_origin(shape)
         vector = np.zeros(() + (self.dimension + 1,))
         vector[..., 1] = 1
@@ -654,9 +869,13 @@ class HyperbolicSpace:
         return Point(self, point, coords)
 
     def hyp_to_affine_dist(self, r):
+        """Convert distance in hyperbolic space to distance from the origin in
+        the Klein model.
+
+        """
         return (np.exp(2 * r) - 1) / (1 + np.exp(2 * r))
 
-    def loxodromic_basis_change(self):
+    def _loxodromic_basis_change(self):
         basis_change = np.matrix([
             [1.0, 1.0],
             [1.0, -1.0]
@@ -666,7 +885,13 @@ class HyperbolicSpace:
         )
 
     def get_standard_loxodromic(self, parameter):
-        basis_change = self.loxodromic_basis_change()
+        """Get a loxodromic isometry whose axis intersects the origin.
+
+        WARNING: not vectorized.
+
+        """
+
+        basis_change = self._loxodromic_basis_change()
         diagonal_loxodromic = np.diag(
             np.concatenate(([parameter, 1.0/parameter],
                        np.ones(self.dimension - 1)))
@@ -677,6 +902,10 @@ class HyperbolicSpace:
         )
 
     def get_standard_rotation(self, angle):
+        """Get a rotation about the origin by a fixed angle.
+
+        WARNING: not vectorized.
+        """
         affine = scipy.linalg.block_diag(
             utils.rotation_matrix(angle),
             np.identity(self.dimension - 2)
@@ -684,6 +913,12 @@ class HyperbolicSpace:
         return self.get_elliptic(affine)
 
     def regular_polygon(self, n, hyp_radius):
+        """Get a regular polygon with n vertices, inscribed on a circle of
+        radius hyp_radius.
+
+        (This is actually vectorized.)
+
+        """
         radius = np.array(hyp_radius)
         tangent = self.get_base_tangent(radius.shape).normalized()
         start_vertex = tangent.point_along(radius)
@@ -698,47 +933,103 @@ class HyperbolicSpace:
         return vertices
 
     def regular_polygon_radius(self, n, interior_angle):
+        """Find r such that a regular n-gon inscribed on a circle of radius r
+        has the given interior angle.
+
+        """
         alpha = interior_angle / 2
         gamma = np.pi / n
         term = ((np.cos(alpha)**2 - np.sin(gamma)**2) /
                 ((np.sin(alpha) * np.sin(gamma))**2))
         return np.arcsinh(np.sqrt(term))
 
-    def genus_g_surface_radius(self, g):
-        return self.regular_polygon_radius(4 * g, np.pi / (4*g))
-
-    def regular_surface_polygon(self, g):
-        return self.regular_polygon(4 * g, self.genus_g_surface_radius(g))
-
     def polygon_interior_angle(self, n, hyp_radius):
+        """Get the interior angle of a regular n-gon inscribed on a circle
+        with the given hyperbolic radius.
+
+        """
         gamma = np.pi / n
         denom = np.sqrt(1 + (np.sin(gamma) * np.sinh(hyp_radius))**2)
         return 2 * np.arcsin(np.cos(gamma) / denom)
 
+    def genus_g_surface_radius(self, g):
+        """Find the radius of a regular polygon giving the fundamental domain
+        for the action of a hyperbolic surface group with genus g.
+
+        """
+        return self.regular_polygon_radius(4 * g, np.pi / (4*g))
+
+    def regular_surface_polygon(self, g):
+        """Get a regular polygon which is the fundamental domain for the
+        action of a hyperbolic surface group with genus g.
+
+        """
+        return self.regular_polygon(4 * g, self.genus_g_surface_radius(g))
+
+
+
     def close_to_boundary(self, vectors):
+        """Return true if all of the given vectors have kleinian coords close
+        to the boundary of H^n.
+
+        """
         return (np.abs(utils.normsq(self.kleinian_coords(vectors)) - 1)
                 < ERROR_THRESHOLD).all()
 
     def all_spacelike(self, vectors):
+        """Return true if all of the vectors are spacelike.
+
+        Highly susceptible to round-off error, probably don't rely on
+        this.
+
+        """
         return (utils.normsq(vectors, self.minkowski()) > ERROR_THRESHOLD).all()
 
     def all_timelike(self, vectors):
+        """Return true if all of the vectors are timelike.
+
+        Highly susceptible to round-off error, probably don't rely on
+        this.
+
+        """
         return (utils.normsq(vectors, self.minkowski()) < ERROR_THRESHOLD).all()
 
     def all_lightlike(self, vectors):
+        """Return true if all of the vectors are timelike.
+
+        Highly susceptible to round-off error, probably don't rely on
+        this.
+
+        """
         return (np.abs(utils.normsq(vectors, self.minkowski())) < ERROR_THRESHOLD).all()
 
 
     def timelike_to(self, v, force_oriented=False):
-        lengths = utils.normsq(v, self.minkowski())
-        if (lengths > 0).any():
-            raise GeometryError
+        """Find an isometry taking the origin of the Poincare/Klein models to
+        the given vector v.
+
+        We expect v to be timelike in order for this to make sense.
+
+        """
+        if not self.all_timelike(v):
+            raise GeometryError( "Cannot find isometry taking a"
+            " timelike vector to a non-timelike vector."  )
 
         return Isometry(self, utils.find_isometry(self.minkowski(),
                                                   v, force_oriented),
                         column_vectors=False)
 
     def spacelike_to(self, v, force_oriented=False):
+        """Find an isometry taking the second standard basis vector (0, 1, 0,
+        ...) to the given vector v.
+
+        We expect v to be spacelike in order for this to make sense.
+
+        """
+        if not self.all_spacelike(v):
+            raise GeometryError( "Cannot find isometry taking a"
+            " spacelike vector to a non-spacelike vector.")
+
         iso = utils.find_isometry(self.minkowski(), v)
 
         #find the index of the timelike basis vector
@@ -770,12 +1061,18 @@ class HyperbolicSpace:
         return Isometry(self, p_iso, column_vectors=False)
 
 class HyperbolicPlane(HyperbolicSpace):
+    """Hyperbolic space of dimension 2.
+
+    None of these functions are properly vectorized, so don't use them
+    (none of them are all that useful anyway)
+
+    """
     def __init__(self):
         self.projective = projective.ProjectivePlane()
         self.dimension = 2
 
     def get_boundary_point(self, theta):
-        return np.array([1.0, np.cos(theta), np.sin(theta)])
+        return IdealPoint(self, np.array([1.0, np.cos(theta), np.sin(theta)]))
 
     def basis_change(self):
         basis_change = np.matrix([
