@@ -91,7 +91,7 @@ class HyperbolicObject:
         HyperbolicObject represents.
 
         """
-        return self.hyp_data.shape[:-1 * unit_ndims]
+        return self.hyp_data.shape[:-1 * self.unit_ndims]
 
     def set(self, hyp_data):
         """set the underlying data of the hyperbolic object.
@@ -513,7 +513,8 @@ class Hyperplane(Subspace):
         standard_ideal_basis[n-1, n-2] = -1.
 
 
-        ideal_basis = transform.apply(standard_ideal_basis.T).hyp_data
+        ideal_basis = transform.apply(standard_ideal_basis.T,
+                                      broadcast="pairwise").hyp_data
         hyp_data = np.concatenate([spacelike_vector, ideal_basis],
                                   axis=-2)
         self.set(hyp_data)
@@ -657,7 +658,7 @@ class Isometry(HyperbolicObject):
     """Model for an isometry of hyperbolic space.
 
     """
-    def __init__(self, space, hyp_data, column_vectors=True):
+    def __init__(self, space, hyp_data, column_vectors=False):
         """Constructor for Isometry.
 
         Underlying data is stored as row vectors, but by default the
@@ -726,7 +727,7 @@ class Isometry(HyperbolicObject):
 
     def inv(self):
         """invert the isometry"""
-        return Isometry(self.space, np.linalg.inv(self.matrix.swapaxes(-1,-2)))
+        return Isometry(self.space, np.linalg.inv(self.matrix))
 
     def __matmul__(self, other):
         return self.apply(other)
@@ -747,7 +748,7 @@ class HyperbolicRepresentation(representation.Representation):
 
     def __getitem__(self, word):
         matrix = self._word_value(word)
-        return Isometry(self.space, matrix)
+        return Isometry(self.space, matrix, column_vectors=True)
 
     def __setitem__(self, generator, isometry):
         try:
@@ -777,7 +778,7 @@ class HyperbolicRepresentation(representation.Representation):
             [representation.Representation.__getitem__(self, word)
              for word in words]
         )
-        return Isometry(self.space, matrix_array)
+        return Isometry(self.space, matrix_array, column_vectors=True)
 
 class HyperbolicSpace:
     """Class to generate objects in hyperbolic geometry and perform some
@@ -816,7 +817,7 @@ class HyperbolicSpace:
 
     def kleinian_to_poincare(self, points):
         euc_norms = utils.normsq(points)
-        #we take a square root to combat roundoff error
+        #we take absolute value to combat roundoff error
         mult_factor = 1 / (1. + np.sqrt(np.abs(1 - euc_norms)))
 
         return (points.T * mult_factor.T).T
@@ -837,7 +838,7 @@ class HyperbolicSpace:
         """
         mat = scipy.linalg.block_diag(1.0, block_elliptic)
 
-        return Isometry(self, mat)
+        return Isometry(self, mat, column_vectors=True)
 
     def project_to_hyperboloid(self, basepoint, tangent_vector):
         """Project a vector in R^(n,1) to lie in the tangent space to the unit
@@ -876,7 +877,7 @@ class HyperbolicSpace:
         return (np.exp(2 * r) - 1) / (1 + np.exp(2 * r))
 
     def _loxodromic_basis_change(self):
-        basis_change = np.matrix([
+        basis_change = np.array([
             [1.0, 1.0],
             [1.0, -1.0]
         ])
@@ -898,7 +899,8 @@ class HyperbolicSpace:
         )
 
         return Isometry(self,
-            basis_change @ diagonal_loxodromic @ np.linalg.inv(basis_change)
+                        basis_change @ diagonal_loxodromic @ np.linalg.inv(basis_change),
+                        column_vectors=True
         )
 
     def get_standard_rotation(self, angle):
@@ -1025,12 +1027,15 @@ class HyperbolicSpace:
 
         We expect v to be spacelike in order for this to make sense.
 
+
         """
+        normed = utils.normalize(v, self.minkowski())
+
         if not self.all_spacelike(v):
             raise GeometryError( "Cannot find isometry taking a"
             " spacelike vector to a non-spacelike vector.")
 
-        iso = utils.find_isometry(self.minkowski(), v)
+        iso = utils.find_isometry(self.minkowski(), normed)
 
         #find the index of the timelike basis vector
         lengths = np.expand_dims(utils.normsq(iso, self.minkowski()), axis=-1)
@@ -1075,7 +1080,7 @@ class HyperbolicPlane(HyperbolicSpace):
         return IdealPoint(self, np.array([1.0, np.cos(theta), np.sin(theta)]))
 
     def basis_change(self):
-        basis_change = np.matrix([
+        basis_change = np.array([
             [1.0, 1.0, 0.0],
             [1.0, -1.0, 0.0],
             [0.0, 0.0, 1.0]
@@ -1083,12 +1088,8 @@ class HyperbolicPlane(HyperbolicSpace):
         return basis_change
 
     def get_standard_reflection(self):
-        basis_change = self.basis_change
-        diag_reflection = np.matrix([
-            [0.0, 1.0, 0.0],
+        return Isometry(self, np.array([
             [1.0, 0.0, 0.0],
-            [0.0, 0.0, 1.0]
-        ])
-        return Isometry(self,
-                        basis_change @ diag_reflection @ np.linalg.inv(basis_change)
-        )
+            [0.0, -1.0, 0.0],
+            [0.0, 0.0, 1.0]]),
+                        column_vectors=True)

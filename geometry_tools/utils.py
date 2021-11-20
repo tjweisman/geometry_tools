@@ -41,6 +41,47 @@ def permutation_matrix(permutation):
 
     return p_mat
 
+def diagonalize_form(bilinear_form, order_eigenvalues="signed", reverse=False):
+    """Return a matrix conjugating a symmetric real bilinear form to a
+    diagonal form.
+
+    """
+    n, _ = bilinear_form.shape
+
+    eigs, U = np.linalg.eigh(bilinear_form)
+    D = np.diag(1 / np.sqrt(np.abs(eigs)))
+
+
+    perm = np.identity(n)
+
+    if order_eigenvalues:
+        if order_eigenvalues == "signed":
+            order = np.argsort(eigs)
+        if order_eigenvalues == "minkowski":
+            negative = np.count_nonzero(eigs < 0)
+            positive = np.count_nonzero(eigs > 0)
+
+            if negative <= positive:
+                order = np.concatenate(
+                    ((eigs < 0).nonzero()[0],
+                     (eigs > 0).nonzero()[0],
+                     (eigs == 0).nonzero()[0])
+                )
+            else:
+                order = np.concatenate(
+                    ((eigs > 0).nonzero()[0],
+                     (eigs < 0).nonzero()[0],
+                     (eigs == 0).nonzero()[0])
+                )
+        if reverse:
+            order = np.flip(order)
+
+        perm = permutation_matrix(order)
+
+    W = U @ D @ np.linalg.inv(perm)
+
+    return W
+
 def circle_angles(center, coords):
     """return angles relative to the center of a circle.
 

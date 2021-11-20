@@ -11,6 +11,8 @@ import itertools
 import numpy as np
 from scipy.special import binom
 
+from . import utils
+
 class RepresentationException(Exception):
     pass
 
@@ -36,7 +38,7 @@ class Representation:
         return self._dim
 
     def elements(self, max_length):
-        for word in free_words_less_than(max_length):
+        for word in self.free_words_less_than(max_length):
             yield (word, self[word])
 
     def free_words_of_length(self, length):
@@ -154,23 +156,31 @@ def symmetric_projection(n):
 
     return np.matrix(proj_matrix)
 
-def so_to_psl(A):
+def o_to_pgl(A, bilinear_form=np.diag((-1, 1, 1))):
     """the isomorphism SO(2,1) --> PSL(2), assuming the matrix A is a 3x3
     matrix determining a linear map in a basis where the symmetric
-    bilinear form has matrix diag(-1, -1, 1).
-
-    This would probably be more useful if I did it for the form with
-    signature (-1, 1, 1), but oh well
+    bilinear form has matrix diag(-1, 1, 1).
 
     """
 
-    a = np.sqrt((A[1][1] + A[2][1] + A[1][2] + A[2][2]) / 2)
-    b = (A[0][1] + A[0][2]) / (2 * a)
-    c = (A[1][0] + A[2][0]) / (2 * a)
-    d = (A[2][0] - A[1][0]) / (2 * b)
+    conj = utils.diagonalize_form(bilinear_form,
+                                  order_eigenvalues="minkowski",
+                                  reverse=True)
 
-    return np.matrix([[a, c],
-                      [b, d]])
+    A_d = np.linalg.inv(conj) @ A @ conj
+
+    #the computation below actually assumes that the form preserved by
+    #A_d has matrix diag(-1, -1, 1). the conjugation above is by a
+    #nontrivial permutation matrix for the default value of
+    #bilinear_form.
+
+    a = np.sqrt((A_d[1][1] + A_d[2][1] + A_d[1][2] + A_d[2][2]) / 2)
+    b = (A_d[0][1] + A_d[0][2]) / (2 * a)
+    c = (A_d[1][0] + A_d[2][0]) / (2 * a)
+    d = (A_d[2][0] - A_d[1][0]) / (2 * b)
+
+    return np.array([[a, c],
+                     [b, d]])
 
 def psl_irrep(A, dim):
     """the irreducible representation from SL(2) to SL(dim) (via action on

@@ -8,6 +8,8 @@ represents a copy of n-dimensional projective space.
 
 import numpy as np
 
+from . import utils
+
 class ProjectivizationException(Exception):
     pass
 
