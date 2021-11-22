@@ -88,11 +88,11 @@ def circle_angles(center, coords):
     center is an ndarray of shape (..., 2) representing x,y
     coordinates the centers of some circles.
 
-    coords is an ndarray of shape (..., 2,2) representing x,y
-    coordinates of a pair of points.
+    coords is an ndarray of shape (..., 2) representing x,y
+    coordinates of some points.
 
-    Return: ndarray of shape (..., 2) representing angles (relative to
-    x-axis) of each of the pair of points specified by coords.
+    Return: ndarray representing angles (relative to x-axis) of each
+    of the pair of points specified by coords.
 
     """
     xs = (coords - np.expand_dims(center, axis=-2))[..., 0]
@@ -134,14 +134,43 @@ def short_arc(thetas):
     thetas have been swapped.
 
     """
-    thetas[thetas < 0] += 2 * np.pi
-    thetas.sort(axis=-1)
+    shifted_thetas = np.copy(thetas)
 
-    thetas[thetas[...,1] - thetas[...,0] > np.pi] = np.flip(
-        thetas[thetas[...,1] - thetas[...,0] > np.pi], axis=-1
+    shifted_thetas[shifted_thetas < 0] += 2 * np.pi
+    shifted_thetas.sort(axis=-1)
+
+    shifted_thetas[shifted_thetas[...,1] - shifted_thetas[...,0] > np.pi] = np.flip(
+        shifted_thetas[shifted_thetas[...,1] - shifted_thetas[...,0] > np.pi], axis=-1
     )
 
-    return thetas
+    return shifted_thetas
+
+def arc_include(thetas, reference_theta):
+    """reorder angles so that the counterclockwise arc between them always
+    includes some reference point on the circle.
+
+    thetas: ndarray of pairs of angles in the range (-2pi, 2pi)
+
+    reference_theta: ndarray of angles in the range (-2pi, 2pi)
+
+    return: ndarray theta_p of pairs of angles, so that
+    reference_theta lies in the counterclockwise angle between
+    theta_p[0] and theta_p[1].
+
+    """
+
+    s_thetas = np.copy(thetas)
+    s_theta1 = thetas[..., 1] - thetas[..., 0]
+    s_reference = np.expand_dims(reference_theta - thetas[..., 0],
+                                 axis=-1)
+
+    s_thetas[s_theta1 < 0] += 2 * np.pi
+    s_reference[s_reference < 0] += 2 * np.pi
+
+    to_swap = (s_theta1 < s_reference[..., 0])
+
+    s_thetas[to_swap] = np.flip(s_thetas[to_swap], axis=-1)
+    return s_thetas
 
 def sphere_inversion(points):
     return (points.T / (normsq(points)).T).T

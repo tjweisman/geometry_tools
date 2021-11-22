@@ -79,7 +79,7 @@ class HyperbolicObject:
 
         try:
             # TODO: this will break if this iterable is a generator
-            array = np.array([obj.hyp_data; self.space = obj.space for obj in hyp_obj])
+            array = np.array([obj.hyp_data for obj in hyp_obj])
             self.space = hyp_obj[0].space
             self.set(array)
             return
@@ -161,6 +161,8 @@ class Point(HyperbolicObject):
 
         if coords == "kleinian":
             self.kleinian_coords(point)
+        elif coords == "poincare":
+            self.poincare_coords(point)
         else:
             self.set(point)
 
@@ -185,7 +187,7 @@ class Point(HyperbolicObject):
         """Get point coordinates in the Poincare ball (radius 1)
         """
         if hyp_data is not None:
-            klein = self.space.poincare_to_kleinian(hyp_data)
+            klein = self.space.poincare_to_kleinian(np.array(hyp_data))
             self.kleinian_coords(klein)
 
         return self.space.kleinian_to_poincare(self.kleinian_coords())
@@ -290,7 +292,8 @@ class Subspace(IdealPoint):
 
         return center, radius
 
-    def circle_parameters(self, short_arc=True, degrees=True):
+    def circle_parameters(self, short_arc=True, degrees=True,
+                          coords="poincare"):
         """Get parameters describing a circular arc corresponding to this
         subspace in the Poincare model.
 
@@ -301,6 +304,10 @@ class Subspace(IdealPoint):
         ideal points in this subspace.
 
         """
+        if coords != "poincare":
+            #TODO: don't let this pass silently (issue a warning)
+            pass
+
         center, radius = self.sphere_parameters()
         klein = self.ideal_basis_coords()
         thetas = utils.circle_angles(center, klein)
@@ -362,7 +369,7 @@ class Segment(Point, Subspace):
         pt1 = Point(self.space, endpoint1)
         pt2 = Point(self.space, endpoint2)
         self.endpoints = Point(self.space, np.stack(
-            [endpoint1.hyp_data, endpoint2.hyp_data], axis=-2)
+            [pt1.hyp_data, pt2.hyp_data], axis=-2)
         )
 
         self._compute_ideal_endpoints(self.endpoints)
@@ -427,7 +434,8 @@ class Segment(Point, Subspace):
         """
         return (self.endpoints[..., 0, :], self.endpoints[..., 1, :])
 
-    def circle_parameters(self, short_arc=True, degrees=True):
+    def circle_parameters(self, short_arc=True, degrees=True,
+                          coords="poincare"):
         """Get parameters describing a circular arc corresponding to this
         segment in the Poincare model.
 
@@ -691,14 +699,15 @@ class Horosphere(HyperbolicObject):
         self.set(hyp_data)
 
     def circle_parameters(self, coords="poincare"):
-        center = self.hyp_data[..., 0, :]
-        reference = self.hyp_data[..., 1, :]
+        ideal_coords = self.space.kleinian_coords(self.center)
+        interior_coords = self.space.kleinian_coords(self.reference)
 
-        ideal_coords = self.space.kleinian_coords(center)
-
-        interior_coords = self.space.kleinian_coords(reference)
         if coords == "poincare":
+            ideal_coords = self.space.kleinian_to_poincare(ideal_coords)
             interior_coords = self.space.kleinian_to_poincare(interior_coords)
+        else:
+            #TODO: do some kleinian horosphere computations
+            pass
 
         model_radius = (utils.normsq(ideal_coords - interior_coords) /
                         (2 * (1 - utils.apply_bilinear(ideal_coords,
@@ -708,31 +717,47 @@ class Horosphere(HyperbolicObject):
 
         return model_center, model_radius
 
-    def intersect_geodesic(self, geodesic):
-        k_center, k_radius = self.circle_parameters(coords="kleinian")
+    def intersect_geodesic(self, geodesic, p2=None):
+        segment = Segment(self.space, geodesic, p2)
+        geodesic_endpts = IdealPoint(self.space,
+                                     segment.ideal_basis).kleinian_coords()
 
-        endpoints = Point(self.space, geodesic)
-        geodesic_endpts = endpoints.kleinian_coords()
+        # compute an isometry taking this geodesic to one which passes
+        # through the origin (so we can do intersection calculations
+        # in Euclidean geometry)
+        midpt = Point(self.space,
+                      (geodesic_endpts[..., 0, :] + geodesic_endpts[..., 1, :]) / 2.,
+                       coords="kleinian")
+        coord_change = midpt.origin_to()
+        coord_inv = coord_change.inv()
+
+        c_hsph = coord_inv @ self
+        c_seg = coord_inv @ segment
+
+        p_center, p_radius = c_hsph.circle_parameters(coords="poincare")
+        geodesic_endpts = IdealPoint(self.space,
+                                     c_seg.ideal_basis).kleinian_coords()
 
         u = geodesic_endpts[..., 0, :]
         v = geodesic_endpts[..., 1, :]
 
         a = utils.normsq(u - v)
-        b = 2 * ((utils.apply_bilinear(k_center, v - u) +
+        b = 2 * ((utils.apply_bilinear(p_center, v - u) +
                   utils.apply_bilinear(u, v) -
                   utils.normsq(u)))
-        c = utils.normsq(v - k_center) - k_radius**2
+        c = utils.normsq(v - p_center) - p_radius**2
 
         #TODO: check to see if the intersection actually occurs
         t1 = (-1 * b + np.sqrt(b**2 - 4 * a * c)) / (2 * a)
         t2 = (-1 * b - np.sqrt(b**2 - 4 * a * c)) / (2 * a)
 
-        p1_klein = t1 * u + (1 - t1) * v
-        p2_klein = t2 * u + (1 - t2) * v
+        p1_poincare = t1 * u + (1 - t1) * v
+        p2_poincare = t2 * u + (1 - t2) * v
 
-        klein_pts = np.stack([p1_klein, p2_klein], axis=-2)
+        poincare_pts = np.stack([p1_poincare, p2_poincare], axis=-2)
+        klein_pts = self.space.poincare_to_kleinian(poincare_pts)
 
-        return Point(self.space, klein_pts, coords="kleinian")
+        return coord_change @ Point(self.space, klein_pts, coords="kleinian")
 
 class HorosphereArc(Horosphere):
     """Model for an arc lying along a horosphere
@@ -775,6 +800,7 @@ class HorosphereArc(Horosphere):
     def set(self, hyp_data):
         HyperbolicObject.set(self, hyp_data)
         self.center = self.hyp_data[..., 0, :]
+        self.reference = self.hyp_data[..., 1, :]
         self.endpoints = self.hyp_data[..., 1:, :]
 
 
@@ -796,9 +822,7 @@ class HorosphereArc(Horosphere):
         self.set(hyp_data)
 
     def circle_parameters(self, coords="poincare", degrees=True):
-        p1 = self.endpoints[..., 0, :]
-        horosphere = Horosphere(self.space, self.center, p1)
-        center, radius = horosphere.circle_parameters(coords=coords)
+        center, radius = Horosphere.circle_parameters(self, coords=coords)
 
         model_coords = self.space.kleinian_coords(self.endpoints)
         if coords == "poincare":
@@ -806,8 +830,11 @@ class HorosphereArc(Horosphere):
 
         thetas = utils.circle_angles(center, model_coords)
 
-        # TODO: always choose the arc which doesn't contain the
-        # horosphere center
+        center_theta = utils.circle_angles(
+            center, self.space.kleinian_coords(self.center)
+        )[..., 0]
+
+        thetas = np.flip(utils.arc_include(thetas, center_theta), axis=-1)
 
         if degrees:
             thetas *= 180 / np.pi
