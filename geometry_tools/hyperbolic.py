@@ -78,7 +78,9 @@ class HyperbolicObject:
             pass
 
         try:
-            array = np.array([obj.hyp_data for obj in hyp_obj])
+            # TODO: this will break if this iterable is a generator
+            array = np.array([obj.hyp_data; self.space = obj.space for obj in hyp_obj])
+            self.space = hyp_obj[0].space
             self.set(array)
             return
         except (TypeError, AttributeError):
@@ -653,6 +655,165 @@ class TangentVector(HyperbolicObject):
         basepoint = Point(self.space, kleinian_pt, coords="kleinian")
 
         return self.origin_to().apply(basepoint, "elementwise")
+
+class Horosphere(HyperbolicObject):
+    """Model for a horosphere in hyperbolic space
+
+    """
+    def __init__(self, space, center, reference_point=None):
+        self.unit_ndims = 2
+        self.space = space
+        if reference_point is None:
+            try:
+                self._construct_from_object(center)
+                return
+            except TypeError:
+                pass
+
+            try:
+                self.set(center)
+                return
+            except (AttributeError, GeometryError):
+                pass
+
+        self.set_center_ref(center, reference_point)
+
+    def set(self, hyp_data):
+        HyperbolicObject.set(self, hyp_data)
+        self.center = hyp_data[..., 0, :]
+        self.reference = hyp_data[..., 1, :]
+
+    def set_center_ref(self, center, reference_point):
+        centers = IdealPoint(self.space, center)
+        refs = Point(self.space, reference_point)
+
+        hyp_data = np.stack([centers.hyp_data, refs.hyp_data], axis=-2)
+        self.set(hyp_data)
+
+    def circle_parameters(self, coords="poincare"):
+        center = self.hyp_data[..., 0, :]
+        reference = self.hyp_data[..., 1, :]
+
+        ideal_coords = self.space.kleinian_coords(center)
+
+        interior_coords = self.space.kleinian_coords(reference)
+        if coords == "poincare":
+            interior_coords = self.space.kleinian_to_poincare(interior_coords)
+
+        model_radius = (utils.normsq(ideal_coords - interior_coords) /
+                        (2 * (1 - utils.apply_bilinear(ideal_coords,
+                                                       interior_coords))))
+
+        model_center = ideal_coords * (1 - model_radius)
+
+        return model_center, model_radius
+
+    def intersect_geodesic(self, geodesic):
+        k_center, k_radius = self.circle_parameters(coords="kleinian")
+
+        endpoints = Point(self.space, geodesic)
+        geodesic_endpts = endpoints.kleinian_coords()
+
+        u = geodesic_endpts[..., 0, :]
+        v = geodesic_endpts[..., 1, :]
+
+        a = utils.normsq(u - v)
+        b = 2 * ((utils.apply_bilinear(k_center, v - u) +
+                  utils.apply_bilinear(u, v) -
+                  utils.normsq(u)))
+        c = utils.normsq(v - k_center) - k_radius**2
+
+        #TODO: check to see if the intersection actually occurs
+        t1 = (-1 * b + np.sqrt(b**2 - 4 * a * c)) / (2 * a)
+        t2 = (-1 * b - np.sqrt(b**2 - 4 * a * c)) / (2 * a)
+
+        p1_klein = t1 * u + (1 - t1) * v
+        p2_klein = t2 * u + (1 - t2) * v
+
+        klein_pts = np.stack([p1_klein, p2_klein], axis=-2)
+
+        return Point(self.space, klein_pts, coords="kleinian")
+
+class HorosphereArc(Horosphere):
+    """Model for an arc lying along a horosphere
+
+    """
+    def __init__(self, space, p1, p2=None, center=None):
+        self.unit_ndims = 2
+        self.space = space
+
+        if p2 is None and center is None:
+            try:
+                self._construct_from_object(p1)
+                return
+            except TypeError:
+                pass
+            try:
+                self.set(p1)
+                return
+            except (AttributeError, GeometryError):
+                pass
+
+        if center is None:
+            self.set_endpoints(p1, p2)
+            return
+
+        self.set_data(p1, p2, center)
+
+    def _compute_center(self, endpoints):
+        #TODO: actually compute the center, given endpoints
+        pass
+
+    def set_endpoints(self, p1, p2=None):
+        if p2 is None:
+            self._compute_center(p1)
+            return
+
+        endpts = np.stack(p1, p2, axis=-2)
+        self._compute_center(endpts)
+
+    def set(self, hyp_data):
+        HyperbolicObject.set(self, hyp_data)
+        self.center = self.hyp_data[..., 0, :]
+        self.endpoints = self.hyp_data[..., 1:, :]
+
+
+    def set_data(self, p1, p2, center):
+        if p2 is None:
+            pt_data = Point(self.space, p1)
+            pt_1 = pt_data[..., 0, :]
+            pt_2 = pt_data[..., 1, :]
+        else:
+            pt_1 = Point(self.space, p1)
+            pt_2 = Point(self.space, p2)
+
+        center_pt = IdealPoint(self.space, center)
+
+        hyp_data = np.stack([center_pt.hyp_data,
+                             pt_1.hyp_data,
+                             pt_2.hyp_data], axis=-2)
+
+        self.set(hyp_data)
+
+    def circle_parameters(self, coords="poincare", degrees=True):
+        p1 = self.endpoints[..., 0, :]
+        horosphere = Horosphere(self.space, self.center, p1)
+        center, radius = horosphere.circle_parameters(coords=coords)
+
+        model_coords = self.space.kleinian_coords(self.endpoints)
+        if coords == "poincare":
+            model_coords = self.space.kleinian_to_poincare(model_coords)
+
+        thetas = utils.circle_angles(center, model_coords)
+
+        # TODO: always choose the arc which doesn't contain the
+        # horosphere center
+
+        if degrees:
+            thetas *= 180 / np.pi
+
+        return center, radius, thetas
+
 
 class Isometry(HyperbolicObject):
     """Model for an isometry of hyperbolic space.
