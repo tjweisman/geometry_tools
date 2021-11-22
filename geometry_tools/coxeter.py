@@ -71,15 +71,8 @@ class CoxeterGroup:
         representation.
 
         """
-        eigs, U = np.linalg.eigh(self.bilinear_form)
-        D = np.diag(1 / np.sqrt(np.abs(eigs)))
-
-        perm = np.identity(len(self.generators))
-
-        if order_eigenvalues and order_eigenvalues == "signed":
-            perm = utils.permutation_matrix(np.argsort(eigs))
-
-        W = U @ D @ np.linalg.inv(perm)
+        W = utils.diagonalize_form(self.bilinear_form,
+                                   order_eigenvalues=order_eigenvalues)
 
         rep = self.canonical_representation()
         for g in self.generators:

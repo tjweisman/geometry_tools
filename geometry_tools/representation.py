@@ -162,25 +162,37 @@ def o_to_pgl(A, bilinear_form=np.diag((-1, 1, 1))):
     bilinear form has matrix diag(-1, 1, 1).
 
     """
+    conj = np.eye(3)
+    conj_i = np.eye(3)
 
-    conj = utils.diagonalize_form(bilinear_form,
-                                  order_eigenvalues="minkowski",
-                                  reverse=True)
+    if bilinear_form is not None:
+        killing_conj = np.array([[ 0. , -0.5, -0.5],
+                                 [-1. ,  0. ,  0. ],
+                                 [ 0. ,  0.5, -0.5]])
 
-    A_d = np.linalg.inv(conj) @ A @ conj
+        form_conj = utils.diagonalize_form(bilinear_form,
+                                      order_eigenvalues="minkowski",
+                                      reverse=True)
 
-    #the computation below actually assumes that the form preserved by
-    #A_d has matrix diag(-1, -1, 1). the conjugation above is by a
-    #nontrivial permutation matrix for the default value of
-    #bilinear_form.
+        conj = form_conj @ np.linalg.inv(killing_conj)
+        conj_i = killing_conj @ np.linalg.inv(form_conj)
 
-    a = np.sqrt((A_d[1][1] + A_d[2][1] + A_d[1][2] + A_d[2][2]) / 2)
-    b = (A_d[0][1] + A_d[0][2]) / (2 * a)
-    c = (A_d[1][0] + A_d[2][0]) / (2 * a)
-    d = (A_d[2][0] - A_d[1][0]) / (2 * b)
+    A_d = conj_i @ A @ conj
 
-    return np.array([[a, c],
-                     [b, d]])
+    a = np.sqrt(np.abs(A_d[0][0]))
+    b = np.sqrt(np.abs(A_d[2][0]))
+    c = np.sqrt(np.abs(A_d[0][2]))
+    d = np.sqrt(np.abs(A_d[2][2]))
+
+    if A_d[0][1] < 0:
+        b = b * -1
+    if A_d[1][0] < 0:
+        c = c * -1
+    if A_d[1][2] * A_d[0][1] < 0:
+        d = d * -1
+
+    return np.array([[a, b],
+                     [c, d]])
 
 def psl_irrep(A, dim):
     """the irreducible representation from SL(2) to SL(dim) (via action on
