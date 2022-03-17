@@ -11,7 +11,11 @@ from matplotlib.collections import LineCollection
 
 from geometry_tools import hyperbolic, utils
 
-RADIUS_THRESHOLD = 100
+
+#I played around with this a bit, but it's an eyeball test
+#TBH. Determines the radius at which we start approximating circular
+#arcs with straight lines.
+RADIUS_THRESHOLD = 80
 
 class HyperbolicDrawing:
     def __init__(self, figsize=8,
