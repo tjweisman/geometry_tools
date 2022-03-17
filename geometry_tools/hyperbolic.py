@@ -7,6 +7,8 @@ coordinates.
 
 from copy import copy
 
+import traceback
+
 import numpy as np
 import scipy
 from scipy.optimize import fsolve
@@ -34,7 +36,7 @@ class HyperbolicObject:
     Every object in hyperbolic space H^n has the underlying data of an
     ndarray whose last dimension is n+1. This is interpreted as a
     collection of (row) vectors in R^(n+1), or more precisely R^(n,1),
-    which transforms via the action of the special orthogonal group
+    which transforms via the action of the indefinite orthogonal group
     O(n,1).
 
     The last unit_ndims dimensions of this underlying array represent
@@ -43,13 +45,21 @@ class HyperbolicObject:
     are used to represent an array of such "unit objects."
 
     """
-    def __init__(self, space, hyp_data):
-        self.unit_ndims = 1
+
+    def __init__(self, space, hyp_data, aux_data=None,
+                 unit_ndims=1, aux_ndims=0):
+
+        self.unit_ndims = unit_ndims
+        self.aux_ndims = aux_ndims
+
         try:
             self._construct_from_object(hyp_data)
         except TypeError:
             self.space = space
-            self.set(hyp_data)
+            if aux_data is None:
+                self.set(hyp_data)
+            else:
+                self.set(hyp_data, aux_data)
 
     def _assert_geometry_valid(self, hyp_data):
         if hyp_data.ndim < self.unit_ndims:
@@ -64,6 +74,24 @@ class HyperbolicObject:
                 ("Hyperbolic space has dimension {}, but received array of of shape"
                  " {}").format(self.space.dimension, hyp_data.shape)
             )
+    def _assert_aux_valid(self, aux_data):
+        if aux_data is None and self.aux_ndims == 0:
+            return
+        if aux_data.ndim < self.aux_ndims:
+            raise GeometryError(
+                ("{} expects an auxiliary array with ndim at least {}, got array of shape"
+                ).format(
+                    self.__class__.__name__, self.unit_ndims, hyp_data.shape
+                )
+            )
+        if self.space.dimension + 1 != aux_data.shape[-1]:
+            raise GeometryError(
+                ("Hyperbolic space has dimension {}, but received auxiliary array of of shape"
+                 " {}").format(self.space.dimension, hyp_data.shape)
+            )
+
+    def _compute_aux_data(self, hyp_data):
+        return None
 
     def _construct_from_object(self, hyp_obj):
         """if we're passed a hyperbolic object or an array of hyperbolic
@@ -72,16 +100,30 @@ class HyperbolicObject:
         """
         try:
             self.space = hyp_obj.space
-            self.set(hyp_obj.hyp_data)
+            if hyp_obj.aux_data is None:
+                self.set(hyp_obj.hyp_data)
+            else:
+                self.set(hyp_obj.hyp_data, aux_data=hyp_obj.aux_data)
             return
         except AttributeError:
             pass
 
         try:
-            # TODO: this will break if this iterable is a generator
-            array = np.array([obj.hyp_data for obj in hyp_obj])
-            self.space = hyp_obj[0].space
-            self.set(array)
+            unrolled_obj = list(hyp_obj)
+            hyp_array = np.array([obj.hyp_data for obj in unrolled_obj])
+            aux_array = np.array([obj.aux_data for obj in unrolled_obj])
+
+            if (aux_array == None).any():
+                aux_array = None
+
+            self.space = unrolled_obj[0].space
+            #we don't require subclasses to take kwargs (maybe this is
+            #bad practice...)
+
+            if aux_array is None:
+                self.set(hyp_array)
+            else:
+                self.set(hyp_array, aux_data=aux_array)
             return
         except (TypeError, AttributeError):
             pass
@@ -95,7 +137,7 @@ class HyperbolicObject:
         """
         return self.hyp_data.shape[:-1 * self.unit_ndims]
 
-    def set(self, hyp_data):
+    def set(self, hyp_data, aux_data=None):
         """set the underlying data of the hyperbolic object.
 
         Subclasses may override this method to give special names to
@@ -103,13 +145,22 @@ class HyperbolicObject:
 
         """
         self._assert_geometry_valid(hyp_data)
-        self.hyp_data = hyp_data
+        if aux_data is None:
+            aux_data = self._compute_aux_data(hyp_data)
 
-    def flatten_to_unit(self):
+        self._assert_aux_valid(aux_data)
+
+        self.hyp_data = hyp_data
+        self.aux_data = aux_data
+
+    def flatten_to_unit(self, unit=None):
         """return a flattened version of the hyperbolic object.
         """
+        if unit is None:
+            unit = self.unit_ndims
+
         flattened = copy(self)
-        new_shape = (-1,) + self.hyp_data.shape[-1 * self.unit_ndims:]
+        new_shape = (-1,) + self.hyp_data.shape[-1 * unit:]
         new_data = np.reshape(self.hyp_data, new_shape)
         flattened.set(new_data)
         return flattened
@@ -151,6 +202,8 @@ class Point(HyperbolicObject):
     """
     def __init__(self, space, point, coords="projective"):
         self.unit_ndims = 1
+        self.aux_ndims = 0
+
         self.space = space
 
         try:
@@ -254,8 +307,7 @@ class Subspace(IdealPoint):
 
     """
     def __init__(self, space, hyp_data):
-        super().__init__(space, hyp_data)
-        self.unit_ndims = 2
+        HyperbolicObject.__init__(self, space, hyp_data, unit_ndims=2)
 
     def set(self, hyp_data):
         HyperbolicObject.set(self, hyp_data)
@@ -323,6 +375,7 @@ class Subspace(IdealPoint):
 class PointPair(Point):
     def __init__(self, space, endpoint1, endpoint2=None):
         self.unit_ndims = 2
+        self.aux_ndims = 0
         self.space = space
 
         if endpoint2 is None:
@@ -330,12 +383,6 @@ class PointPair(Point):
                 self._construct_from_object(endpoint1)
                 return
             except (AttributeError, TypeError, GeometryError):
-                pass
-
-            try:
-                self.set(endpoint1)
-                return
-            except (AttributeError, GeometryError):
                 pass
 
         self.set_endpoints(endpoint1, endpoint2)
@@ -392,6 +439,33 @@ class Geodesic(PointPair, Subspace):
 class Segment(Geodesic):
     """Model a geodesic segment in hyperbolic space."""
 
+    #TODO: reimplement ideal endpoints as auxiliary data?
+
+    def __init__(self, space, endpoint1, endpoint2=None):
+        self.unit_ndims = 2
+        self.aux_ndims = 0
+        self.space = space
+
+        if endpoint2 is None:
+            try:
+                self._construct_from_object(endpoint1)
+                return
+            except (AttributeError, TypeError, GeometryError):
+                pass
+
+            try:
+                self.set(endpoint1)
+                return
+            except (AttributeError, GeometryError) as e:
+                pass
+
+        self.set_endpoints(endpoint1, endpoint2)
+
+    def set(self, hyp_data):
+        HyperbolicObject.set(self, hyp_data)
+        self.endpoints = self.hyp_data[..., :2, :]
+        self.ideal_basis = self.hyp_data[..., 2:, :]
+
     def set_endpoints(self, endpoint1, endpoint2=None):
         """Set the endpoints of a segment.
 
@@ -432,12 +506,6 @@ class Segment(Geodesic):
         if not self.space.all_lightlike(hyp_data[..., 1, :, :]):
             raise GeometryError( "segment data at index [..., 1, :,"
             ":] must consist of lightlike vectors" )
-
-    def set(self, hyp_data):
-        HyperbolicObject.set(self, hyp_data)
-
-        self.endpoints = self.hyp_data[..., :2, :]
-        self.ideal_basis = self.hyp_data[..., 2:, :]
 
     def _compute_ideal_endpoints(self, endpoints):
         end_data = Point(self.space, endpoints).hyp_data
@@ -495,9 +563,12 @@ class Segment(Geodesic):
 
 class Hyperplane(Subspace):
     """Model for a geodesic hyperplane in hyperbolic space."""
+
+    #TODO: reimplement so ideal_basis is aux_data
     def __init__(self, space, hyperplane_data):
         self.space = space
         self.unit_ndims = 2
+        self.aux_ndims = 0
 
         try:
             self._construct_from_object(hyperplane_data)
@@ -605,6 +676,8 @@ class TangentVector(HyperbolicObject):
     def __init__(self, space, point_data, vector=None):
         self.space = space
         self.unit_ndims = 2
+        self.aux_ndims = 0
+
         if vector is None:
             try:
                 self._construct_from_object(point_data)
@@ -654,7 +727,7 @@ class TangentVector(HyperbolicObject):
         self.set(np.stack([pt.hyp_data, projected], axis=-2))
 
     def set(self, hyp_data):
-        super().set(hyp_data)
+        HyperbolicObject.set(self, hyp_data)
         self.point = self.hyp_data[..., 0, :]
         self.vector = self.hyp_data[..., 1, :]
 
@@ -713,6 +786,8 @@ class Horosphere(HyperbolicObject):
     """
     def __init__(self, space, center, reference_point=None):
         self.unit_ndims = 2
+        self.aux_ndims = 0
+
         self.space = space
         if reference_point is None:
             try:
@@ -808,6 +883,7 @@ class HorosphereArc(Horosphere):
     """
     def __init__(self, space, p1, p2=None, center=None):
         self.unit_ndims = 2
+        self.aux_ndims = 0
         self.space = space
 
         if p2 is None and center is None:
@@ -946,6 +1022,34 @@ class BoundaryArc(Geodesic):
 
         return center, radius, thetas
 
+class Polygon(Point):
+    def __init__(self, space, vertices, aux_data=None):
+        HyperbolicObject.__init__(self, space, vertices, aux_data,
+                                  unit_ndims=2, aux_ndims=3)
+
+    def set(self, hyp_data, aux_data=None):
+        HyperbolicObject.set(self, hyp_data, aux_data)
+        self.vertices = self.hyp_data
+        self.edges = self.aux_data
+
+    def _compute_aux_data(self, hyp_data):
+        segments = Segment(self.space, hyp_data, np.roll(hyp_data, -1, axis=-2))
+        return segments.hyp_data
+
+    def get_edges(self):
+        return Segment(self.space, self.edges)
+
+    def get_vertices(self):
+        return Point(self.space, self.hyp_data)
+
+    def circle_parameters(self, short_arc=True, degrees=True,
+                          coords="poincare", flatten=False):
+        if not flatten:
+            return self.get_edges().circle_parameters(short_arc, degrees, coords)
+
+        flat_segments = self.get_edges().flatten_to_unit()
+        return flat_segments.circle_parameters(short_arc, degrees, coords)
+
 class Isometry(HyperbolicObject):
     """Model for an isometry of hyperbolic space.
 
@@ -960,6 +1064,7 @@ class Isometry(HyperbolicObject):
         """
         self.space = space
         self.unit_ndims = 2
+        self.aux_ndims = 0
 
         try:
             self._construct_from_object(hyp_data)
@@ -1005,9 +1110,18 @@ class Isometry(HyperbolicObject):
 
         try:
             hyp_data = new_obj.hyp_data
-            product = self._apply_to_data(new_obj.hyp_data, broadcast,
+            hyp_product = self._apply_to_data(new_obj.hyp_data, broadcast,
                                           new_obj.unit_ndims)
-            new_obj.set(product)
+            aux_data = new_obj.aux_data
+            aux_product = None
+
+            if aux_data is not None:
+                aux_product = self._apply_to_data(new_obj.aux_data, broadcast,
+                                                  new_obj.aux_ndims)
+                new_obj.set(hyp_product, aux_product)
+            else:
+                new_obj.set(hyp_product)
+
             return new_obj
         except AttributeError:
             pass
