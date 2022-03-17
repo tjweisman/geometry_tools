@@ -6,6 +6,10 @@ class FSA:
         self._out_dict = copy.deepcopy(vert_dict)
         self._in_dict = self.in_dict()
 
+    @property
+    def out_dict(self):
+        return self._out_dict
+
     def in_dict(self):
         in_dict = {v:{} for v in self._out_dict}
         for v, neighbors_out in self._out_dict.items():

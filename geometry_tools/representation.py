@@ -194,6 +194,19 @@ def o_to_pgl(A, bilinear_form=np.diag((-1, 1, 1))):
     return np.array([[a, b],
                      [c, d]])
 
+def sl2_to_so21(A):
+    """the isomorphism SL(2,R) to SO(2,1) via the adjoint action, where
+    SO(2,1) preserves the symmetric bilinear form with matrix diag(-1, 1,
+    1)"""
+    killing_conj = np.array([[-0., -1., -0.],
+                             [-1., -0.,  1.],
+                             [-1., -0., -1.]])
+    permutation = utils.permutation_matrix((2,1,0))
+
+    A_3 = psl_irrep(A, 3)
+    return (permutation @ killing_conj @ A_3 @
+            np.linalg.inv(killing_conj) @ permutation)
+
 def psl_irrep(A, dim):
     """the irreducible representation from SL(2) to SL(dim) (via action on
     homogeneous polynomials)
@@ -205,7 +218,7 @@ def psl_irrep(A, dim):
     c = A[1,0]
     d = A[1,1]
 
-    im = np.matrix(np.zeros((dim, dim)))
+    im = np.zeros((dim, dim))
     n = dim - 1
     for k in range(dim):
         for j in range(dim):

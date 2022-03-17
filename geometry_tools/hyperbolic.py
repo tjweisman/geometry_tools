@@ -320,8 +320,7 @@ class Subspace(IdealPoint):
 
         return center, radius, thetas
 
-class Segment(Point, Subspace):
-    """Model a geodesic segment in hyperbolic space."""
+class PointPair(Point):
     def __init__(self, space, endpoint1, endpoint2=None):
         self.unit_ndims = 2
         self.space = space
@@ -341,17 +340,9 @@ class Segment(Point, Subspace):
 
         self.set_endpoints(endpoint1, endpoint2)
 
-    def from_endpoints(space, endpoint1, endpoint2=None):
-        """Explicitly construct a segment from its endpoints.
-
-        If endpoint2 is None, expect endpoint1 to be an array of
-        points with shape (..., 2, n). Otherwise, expect endpoint1 and
-        endpoint2 to be arrays of points with the same shape.
-
-        """
-        segment = Segment(space, endpoint1, endpoint2)
-        segment.set_endpoints(endpoint1, endpoint2)
-        return segment
+    def set(self, hyp_data):
+        HyperbolicObject.set(self, hyp_data)
+        self.endpoints = self.hyp_data[..., :2, :]
 
     def set_endpoints(self, endpoint1, endpoint2=None):
         """Set the endpoints of a segment.
@@ -362,7 +353,55 @@ class Segment(Point, Subspace):
 
         """
         if endpoint2 is None:
-            point_data = Point(self.space, endpoint1).hyp_data
+            self.set(endpoint1)
+            return
+
+        pt1 = Point(self.space, endpoint1)
+        pt2 = Point(self.space, endpoint2)
+        self.set(np.stack([pt1.hyp_data, pt2.hyp_data], axis=-2))
+
+    def get_endpoints(self):
+        return Point(self.space, self.endpoints)
+
+    def get_end_pair(self, as_points=False):
+        """Return a pair of point objects, one for each endpoint
+        """
+        if as_points:
+            p1, p2 = self.get_end_pair(as_points=False)
+            return (Point(self.space, p1), Point(self.space, p2))
+        return (self.endpoints[..., 0, :], self.endpoints[..., 1, :])
+
+    def endpoint_coords(self, coords="kleinian"):
+        return self.space.kleinian_coords(self.endpoints)
+
+class Geodesic(PointPair, Subspace):
+    def set(self, hyp_data):
+        HyperbolicObject.set(self, hyp_data)
+        self.endpoints = self.hyp_data[..., :2, :]
+        self.ideal_basis = self.hyp_data[..., :2, :]
+
+    def from_reflection(space, reflection):
+        if space.dimension != 2:
+            raise GeometryError("Creating segment from reflection expects dimension 2, got dimension {}".format(space.dimension))
+
+        hyperplane = Hyperplane.from_reflection(space, reflection)
+        pt1 = hyperplane.ideal_basis[..., 0, :]
+        pt2 = hyperplane.ideal_basis[..., 1, :]
+        return Geodesic(space, pt1, pt2)
+
+class Segment(Geodesic):
+    """Model a geodesic segment in hyperbolic space."""
+
+    def set_endpoints(self, endpoint1, endpoint2=None):
+        """Set the endpoints of a segment.
+
+        If endpoint2 is None, expect endpoint1 to be an array of
+        points with shape (..., 2, n). Otherwise, expect endpoint1 and
+        endpoint2 to be arrays of points with the same shape.
+
+        """
+        if endpoint2 is None:
+            self.endpoints = Point(self.space, endpoint1).hyp_data
             self._compute_ideal_endpoints(endpoint1)
             return
 
@@ -394,7 +433,6 @@ class Segment(Point, Subspace):
             raise GeometryError( "segment data at index [..., 1, :,"
             ":] must consist of lightlike vectors" )
 
-
     def set(self, hyp_data):
         HyperbolicObject.set(self, hyp_data)
 
@@ -408,15 +446,17 @@ class Segment(Point, Subspace):
         a22 = products[..., 1, 1]
         a12 = products[..., 0, 1]
 
-        a = a22
-        b = 2 * a12
-        c = a11
+        a = a11 - 2 * a12 + a22
+        b = 2 * a12 - 2 * a22
+        c = a22
 
         mu1 = (-b + np.sqrt(b * b - 4 * a * c)) / (2*a)
         mu2 = (-b - np.sqrt(b * b - 4 * a * c)) / (2*a)
 
-        null1 = end_data[..., 0, :] + (mu1.T * end_data[..., 1, :].T).T
-        null2 = end_data[..., 0, :] + (mu2.T * end_data[..., 1, :].T).T
+        null1 = ((mu1.T * end_data[..., 0, :].T).T +
+                 ((1 - mu1).T * end_data[..., 1, :].T).T)
+        null2 = ((mu2.T * end_data[..., 0, :].T).T +
+                 ((1 - mu2).T * end_data[..., 1, :].T).T)
 
         ideal_basis = np.array([null1, null2]).swapaxes(0, -2)
         hyp_data = np.concatenate([end_data, ideal_basis], axis=-2)
@@ -425,14 +465,6 @@ class Segment(Point, Subspace):
 
     def get_ideal_endpoints(self):
         return Subspace(self.space, self.ideal_basis)
-
-    def get_endpoints(self):
-        return Points(self.space, self.endpoints)
-
-    def get_end_pair(self):
-        """Return a pair of point objects, one for each endpoint
-        """
-        return (self.endpoints[..., 0, :], self.endpoints[..., 1, :])
 
     def circle_parameters(self, short_arc=True, degrees=True,
                           coords="poincare"):
@@ -459,6 +491,7 @@ class Segment(Point, Subspace):
             thetas *= 180 / np.pi
 
         return center, radius, thetas
+
 
 class Hyperplane(Subspace):
     """Model for a geodesic hyperplane in hyperbolic space."""
@@ -500,7 +533,6 @@ class Hyperplane(Subspace):
         if not self.space.all_lightlike(hyp_data[..., 1:, :]):
             raise GeometryError( ("Hyperplane data at index [..., 1, :]"
                                   " must consist of lightlike vectors") )
-
 
     def set(self, hyp_data):
         HyperbolicObject.set(self, hyp_data)
@@ -556,6 +588,17 @@ class Hyperplane(Subspace):
         )
 
         return Hyperplane(space, spacelike.swapaxes(-1,-2))
+
+    def boundary_arc_parameters(self, degrees=True):
+        bdry_arcs = BoundaryArc(self.space, self.ideal_basis)
+        center, radius, thetas = bdry_arcs.circle_parameters(degrees=degrees)
+
+        signs = np.sign(np.linalg.det(self.hyp_data))
+
+        thetas[signs < 0] = np.flip(
+            thetas[signs < 0], axis=-1
+        )
+        return center, radius, thetas
 
 class TangentVector(HyperbolicObject):
     """Model for a tangent vector in hyperbolic space."""
@@ -841,6 +884,67 @@ class HorosphereArc(Horosphere):
 
         return center, radius, thetas
 
+class BoundaryArc(Geodesic):
+    def __init__(self, space, endpoint1, endpoint2=None):
+        PointPair.__init__(self, space, endpoint1, endpoint2)
+
+    def set(self, hyp_data):
+        HyperbolicObject.set(self, hyp_data)
+        self.endpoints = hyp_data[..., :2, :]
+        self.orientation_pt = hyp_data[..., 2, :]
+
+    def set_endpoints(self, endpoint1, endpoint2):
+        if endpoint2 is None:
+            endpoint_data = endpoint1
+        else:
+            pt1 = Point(self.space, endpoint1)
+            pt2 = Point(self.space, endpoint2)
+            endpoint_data = np.stack(
+                [pt1.hyp_data, pt2.hyp_data], axis=-2
+            )
+
+        self._build_orientation_point(endpoint_data)
+
+    def orientation(self):
+        return np.linalg.det(self.hyp_data)
+
+    def flip_orientation(self):
+        self.hyp_data[..., 2, :] *= -1
+        self.set(self.hyp_data)
+
+    def _build_orientation_point(self, endpoints):
+        orientation_pt_1 = np.zeros(endpoints.shape[:-2] +
+                                    (1, self.space.dimension + 1))
+        orientation_pt_2 = np.zeros(endpoints.shape[:-2] +
+                                    (1, self.space.dimension + 1))
+        orientation_pt_1[..., 0, 0] = 1.0
+        orientation_pt_2[..., 0, 1] = 1.0
+
+        point_data = np.concatenate((endpoints, orientation_pt_1), axis=-2)
+
+        dets = np.linalg.det(point_data)
+        point_data[np.abs(dets) < ERROR_THRESHOLD, 2] = orientation_pt_2
+
+        self.set(point_data)
+
+
+    def circle_parameters(self, coords="poincare", degrees=True):
+        center = np.zeros(self.hyp_data.shape[:-2] + (2,))
+        radius = np.ones(self.hyp_data.shape[:-2])
+
+        klein_coords = self.space.kleinian_coords(self.endpoints)
+
+        thetas = utils.circle_angles(center, klein_coords)
+
+        if degrees:
+            thetas *= 180 / np.pi
+
+        orientation = self.orientation()
+        thetas[orientation < 0] = np.flip(
+            thetas[orientation < 0], axis=-1
+        )
+
+        return center, radius, thetas
 
 class Isometry(HyperbolicObject):
     """Model for an isometry of hyperbolic space.
@@ -980,6 +1084,8 @@ class HyperbolicSpace:
         1, 1, ...., 1).
 
         """
+        #TODO: allow for a different underlying bilinear form
+
         return np.diag(np.concatenate(([-1.0], np.ones(self.dimension))))
 
     def hyperboloid_coords(self, points):
