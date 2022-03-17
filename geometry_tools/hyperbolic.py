@@ -156,14 +156,28 @@ class HyperbolicObject:
     def flatten_to_unit(self, unit=None):
         """return a flattened version of the hyperbolic object.
         """
+
+        aux_unit = unit
         if unit is None:
             unit = self.unit_ndims
+            aux_unit = self.aux_ndims
 
         flattened = copy(self)
         new_shape = (-1,) + self.hyp_data.shape[-1 * unit:]
-        new_data = np.reshape(self.hyp_data, new_shape)
-        flattened.set(new_data)
+        new_hyp_data = np.reshape(self.hyp_data, new_shape)
+
+        new_aux_data = None
+        if self.aux_data is not None:
+            new_aux_shape = (-1,) + self.aux_data.shape[-1 * aux_unit:]
+            new_aux_data = np.reshape(self.aux_data, new_aux_shape)
+            flattened.set(new_hyp_data, new_aux_data)
+        else:
+            flattened.set(new_hyp_data)
+
         return flattened
+
+    def flatten_to_aux(self):
+        return self.flatten_to_unit(self.aux_ndims)
 
     def __repr__(self):
         return "({}, {})".format(
@@ -178,6 +192,10 @@ class HyperbolicObject:
 
     def __getitem__(self, item):
         return self.__class__(self.space, self.hyp_data[item])
+
+    def coords(self, hyp_data=None):
+        if coords.lower() in ["klein", "kleinian"]:
+            return self.kleinian_coords(hyp_data)
 
     def projective_coords(self, hyp_data=None):
         """wrapper for HyperbolicObject.set, since underlying coordinates are
@@ -244,6 +262,14 @@ class Point(HyperbolicObject):
             self.kleinian_coords(klein)
 
         return self.space.kleinian_to_poincare(self.kleinian_coords())
+
+    def coords(self, coords, hyp_data=None):
+        if coords.lower() in ["klein", "kleinian"]:
+            return self.kleinian_coords(hyp_data)
+        if coords.lower() == "poincare":
+            return self.poincare_coords(hyp_data)
+        if coords.lower() == "hyperboloid":
+            return self.hyperboloid_coords(hyp_data)
 
     def distance(self, other):
         """compute elementwise distances (with respect to last two dimensions)
@@ -419,7 +445,7 @@ class PointPair(Point):
         return (self.endpoints[..., 0, :], self.endpoints[..., 1, :])
 
     def endpoint_coords(self, coords="kleinian"):
-        return self.space.kleinian_coords(self.endpoints)
+        return self.get_endpoints().coords(coords)
 
 class Geodesic(PointPair, Subspace):
     def set(self, hyp_data):

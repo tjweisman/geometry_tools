@@ -5,17 +5,30 @@ module into matplotlib figures.
 
 """
 
+import copy
+
+import numpy as np
+
 import matplotlib.pyplot as plt
-from matplotlib.patches import Circle, Arc
-from matplotlib.collections import LineCollection
+from matplotlib.patches import Circle, Arc, PathPatch
+from matplotlib.collections import LineCollection, PolyCollection
+
+from matplotlib.transforms import Affine2D
+from matplotlib.path import Path
 
 from geometry_tools import hyperbolic, utils
 
+#TODO: make a robust way to handle different coordinate systems
+KLEIN_NAMES = ["klein", "kleinian"]
 
 #I played around with this a bit, but it's an eyeball test
 #TBH. Determines the radius at which we start approximating circular
 #arcs with straight lines.
 RADIUS_THRESHOLD = 80
+
+#how far apart points can be before we decide that we ordered the
+#polygon wrong
+DISTANCE_THRESHOLD = 1e-5
 
 class HyperbolicDrawing:
     def __init__(self, figsize=8,
@@ -45,7 +58,7 @@ class HyperbolicDrawing:
     def draw_plane(self, **kwargs):
         plane = Circle((0., 0.), 1.0, facecolor=self.facecolor,
                        edgecolor=self.edgecolor,
-                       linewidth=self.linewidth, **kwargs)
+                       linewidth=self.linewidth, zorder=0, **kwargs)
 
         self.ax.add_patch(plane)
 
@@ -97,8 +110,72 @@ class HyperbolicDrawing:
 
         plt.plot(x, y, **default_kwargs)
 
+    def get_circle_arcpath(self, circle_params,
+                           radius_threshold=RADIUS_THRESHOLD):
+        """Get a matplotlib path object for the circular arc representing this
+        geometric object.
+
+        """
+        center, radius, theta = circle_params
+        if not np.isnan(radius) and radius < radius_threshold:
+            cx, cy = center
+            transform = Affine2D()
+            transform.scale(radius)
+            transform.translate(cx, cy)
+            return transform.transform_path(Path.arc(theta[0], theta[1]))
+
+        vertices = arc.endpoint_coords(coords=self.model)
+        codes = [Path.MOVETO, Path.LINETO]
+        return Path(vertices, codes)
+
+    def get_polygon_arcpath(self, polygon,
+                            radius_threshold=RADIUS_THRESHOLD,
+                            distance_threshold=DISTANCE_THRESHOLD):
+
+        vertices = np.zeros((0, 2))
+        codes = np.zeros((0,))
+        first_segment = True
+
+        polysegs = polygon.get_edges()
+        centers, radii, thetas = polysegs.circle_parameters(coords=self.model)
+
+        for center, radius, theta, segment in zip(centers, radii, thetas, polysegs):
+            g_path = self.get_circle_arcpath((center, radius, theta),
+                                             radius_threshold)
+            g_verts = g_path.vertices
+            p1, p2 = segment.get_end_pair(as_points=True)
+
+            if np.linalg.norm(p1.coords(self.model) - g_verts[0]) > distance_threshold:
+                g_verts = g_verts[::-1]
+
+            g_codes = copy.deepcopy(g_path.codes)
+            if not first_segment:
+                g_codes[0] = Path.LINETO
+
+            vertices = np.concatenate((vertices, g_verts), axis=-2)
+            codes = np.concatenate((codes, g_codes))
+            first_segment = False
+
+        return Path(vertices, codes)
+
     def draw_polygon(self, polygon, **kwargs):
-        pass
+        default_kwargs = {
+            "facecolor": "none",
+            "edgecolor": "black"
+        }
+        for key, value in kwargs.items():
+            default_kwargs[key] = value
+
+        polylist = polygon.flatten_to_unit()
+
+        if self.model == "klein":
+            polys = PolyCollection(polylist.coords("klein"), **default_kwargs)
+            self.ax.add_collection(polys)
+
+        elif self.model == "poincare":
+            for poly in polylist:
+                path = self.get_polygon_arcpath(poly)
+                self.ax.add_patch(PathPatch(path, **default_kwargs))
 
     def draw_horoball(self, horoball, **kwargs):
         pass
