@@ -73,7 +73,6 @@ class HyperbolicDrawing:
                     self.ax.add_patch(arc)
                 else:
                     x,y = endpts.T
-                    print(x, y)
                     self.ax.plot(x, y, **default_kwargs)
 
     def draw_point(self, point, **kwargs):

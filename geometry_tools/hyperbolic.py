@@ -1208,6 +1208,22 @@ class HyperbolicSpace:
         )
         return self.get_elliptic(affine)
 
+    def sl2r_iso(self, matrix):
+        """Convert 2x2 matrices to isometries.
+
+        matrix is an array of shape (..., 2, 2), and interpreted as an
+        array of elements of SL^+-(2, R).
+
+        """
+
+        #we apply a conjugation so coordinates for RP^1 are what we
+        #expect
+
+        conj = np.array([[1, -1], [1, 1]])
+        cmat = conj @ matrix @ np.linalg.inv(conj)
+        return Isometry(self, representation.sl2_to_so21(cmat),
+                        column_vectors=True)
+
     def regular_polygon(self, n, hyp_radius):
         """Get a regular polygon with n vertices, inscribed on a circle of
         radius hyp_radius.

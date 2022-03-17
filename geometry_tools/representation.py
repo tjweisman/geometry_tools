@@ -213,17 +213,17 @@ def psl_irrep(A, dim):
 
     """
 
-    a = A[0,0]
-    b = A[0,1]
-    c = A[1,0]
-    d = A[1,1]
+    a = A[..., 0, 0]
+    b = A[..., 0, 1]
+    c = A[..., 1, 0]
+    d = A[..., 1, 1]
 
-    im = np.zeros((dim, dim))
+    im = np.zeros(A.shape[:-2] +(dim, dim))
     n = dim - 1
     for k in range(dim):
         for j in range(dim):
             for i in range(max(0, j - n + k), min(j+1, k+1)):
-                im[j,k] += (binom(k,i) * binom(n - k, j - i)
+                im[..., j,k] += (binom(k,i) * binom(n - k, j - i)
                           * a**i * c**(k - i) * b**(j - i)
                           * d**(n - k - j + i))
     return im
