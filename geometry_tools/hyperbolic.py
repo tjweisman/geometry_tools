@@ -415,29 +415,38 @@ class Subspace(IdealPoint):
         subspace lies on a sphere with these parameters.
 
         """
-        if model != Model.POINCARE:
+
+        if model == Model.POINCARE:
+            klein_basis = self.ideal_basis_coords(model=Model.KLEIN)
+            klein_midpoint = klein_basis.sum(axis=-2) / klein_basis.shape[-2]
+            poincare_midpoint = self.space.kleinian_to_poincare(klein_midpoint)
+            poincare_extreme = utils.sphere_inversion(poincare_midpoint)
+
+            center = (poincare_midpoint + poincare_extreme) / 2
+            radius = np.sqrt(utils.normsq(poincare_midpoint - poincare_extreme)) / 2
+
+        elif model == Model.HALFSPACE:
+            halfspace_basis = self.ideal_basis_coords(model=Model.HALFSPACE)
+            halfspace_midpoint = (halfspace_basis.sum(axis=-2) /
+                                  halfspace_basis.shape[-2])
+
+            #just use the first element of the basis
+            center = halfspace_midpoint
+            radius = np.sqrt(
+                utils.normsq(halfspace_basis[..., 0, :] - halfspace_midpoint)
+            )
+        else:
             raise GeometryError(
                 ("Cannot compute spherical parameters for an object of type {}"
                  " in model: '{}'").format(self.__class__.__name__, model)
             )
-
-        klein = self.ideal_basis_coords()
-
-        poincare_midpoint = self.space.kleinian_to_poincare(
-            klein.sum(axis=-2) / klein.shape[-2]
-        )
-
-        poincare_extreme = utils.sphere_inversion(poincare_midpoint)
-
-        center = (poincare_midpoint + poincare_extreme) / 2
-        radius = np.sqrt(utils.normsq(poincare_midpoint - poincare_extreme)) / 2
 
         return center, radius
 
     def circle_parameters(self, short_arc=True, degrees=True,
                           model=Model.POINCARE):
         """Get parameters describing a circular arc corresponding to this
-        subspace in the Poincare model.
+        subspace in the Poincare or halfspace models.
 
         Returns a tuple (center, radius, thetas). In the Poincare
         model, the subspace lies on a circle with this center and
@@ -446,11 +455,9 @@ class Subspace(IdealPoint):
         ideal points in this subspace.
 
         """
-
-
         center, radius = self.sphere_parameters(model)
-        klein = self.ideal_basis_coords()
-        thetas = utils.circle_angles(center, klein)
+        endpoints = self.ideal_basis_coords(model)
+        thetas = utils.circle_angles(center, endpoints)
 
         if short_arc:
             thetas = utils.short_arc(thetas)
@@ -636,7 +643,7 @@ class Segment(Geodesic):
     def circle_parameters(self, short_arc=True, degrees=True,
                           model=Model.POINCARE):
         """Get parameters describing a circular arc corresponding to this
-        segment in the Poincare model.
+        segment in the Poincare or halfspace models.
 
         Returns a tuple (center, radius, thetas). In the Poincare
         model, the segment lies on a circle with this center and
@@ -647,10 +654,9 @@ class Segment(Geodesic):
         """
         center, radius = self.sphere_parameters(model)
 
-        klein = self.space.kleinian_coords(self.endpoints)
-        poincare = self.space.kleinian_to_poincare(klein)
+        endpoints = self.endpoint_coords(model)
 
-        thetas = utils.circle_angles(center, poincare)
+        thetas = utils.circle_angles(center, endpoints)
         if short_arc:
             thetas = utils.short_arc(thetas)
 

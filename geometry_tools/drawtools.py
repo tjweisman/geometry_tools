@@ -123,8 +123,9 @@ class HyperbolicDrawing:
                                    **default_kwargs)
             self.ax.add_collection(lines)
 
-        elif self.model == Model.POINCARE:
-            centers, radii, thetas = seglist.circle_parameters(degrees=True)
+        elif self.model == Model.POINCARE or self.model == Model.HALFSPACE:
+            centers, radii, thetas = seglist.circle_parameters(model=self.model,
+                                                               degrees=True)
             endpt_coords = seglist.get_endpoints().coords(self.model)
 
             for center, radius, theta, endpts in zip(centers, radii,
@@ -219,7 +220,7 @@ class HyperbolicDrawing:
             polys = PolyCollection(polylist.coords("klein"), **default_kwargs)
             self.ax.add_collection(polys)
 
-        elif self.model == Model.POINCARE:
+        elif self.model == Model.POINCARE or self.model == Model.HALFSPACE:
             for poly in polylist:
                 path = self.get_polygon_arcpath(poly)
                 self.ax.add_patch(PathPatch(path, **default_kwargs))
