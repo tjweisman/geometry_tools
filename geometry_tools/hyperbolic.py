@@ -6,8 +6,7 @@ coordinates.
 """
 
 from copy import copy
-
-import traceback
+from enum import Enum
 
 import numpy as np
 import scipy
@@ -25,6 +24,39 @@ class GeometryError(Exception):
     """Thrown if there's an attempt to construct a hyperbolic object with
     numerical data that doesn't make sense for that type of object."""
     pass
+
+class Model(Enum):
+    """Enumerate implemented models of hyperbolic space.
+
+    Models can have different aliases, and can be compared to strings
+    with the == operator, which returns True if the strings match any
+    alias name (case insensitive).
+
+    """
+    #NOTE: have not implemented the halfspace model yet!
+    POINCARE = "poincare"
+    KLEIN = "klein"
+    KLEINIAN = "klein"
+    HALFSPACE = "halfspace"
+    HALFPLANE = "halfspace"
+    HYPERBOLOID = "hyperboloid"
+    PROJECTIVE = "projective"
+
+    def aliases(self):
+        return [name for name, member in Model.__members__.items()
+                if member is self]
+
+    def __eq__(self, other):
+        if self is other:
+            return True
+
+        try:
+            if other.upper() in self.aliases():
+                return True
+        except AttributeError:
+            pass
+
+        return False
 
 class HyperbolicObject:
     """Model for an abstract object in hyperbolic space.
@@ -193,9 +225,16 @@ class HyperbolicObject:
     def __getitem__(self, item):
         return self.__class__(self.space, self.hyp_data[item])
 
-    def coords(self, hyp_data=None):
-        if coords.lower() in ["klein", "kleinian"]:
+    def coords(self, model, hyp_data=None):
+        if model == Model.KLEIN:
             return self.kleinian_coords(hyp_data)
+        if model == Model.PROJECTIVE:
+            return self.projective_coords(hyp_data)
+
+        raise GeometryError(
+            "Unimplemented model for an object of type {}: '{}'".format(
+                self.__class__.__name__, model
+            ))
 
     def projective_coords(self, hyp_data=None):
         """wrapper for HyperbolicObject.set, since underlying coordinates are
@@ -218,7 +257,7 @@ class Point(HyperbolicObject):
     hyperbolic space.
 
     """
-    def __init__(self, space, point, coords="projective"):
+    def __init__(self, space, point, model=Model.PROJECTIVE):
         self.unit_ndims = 1
         self.aux_ndims = 0
 
@@ -230,12 +269,17 @@ class Point(HyperbolicObject):
         except TypeError:
             pass
 
-        if coords == "kleinian":
+        if model == Model.KLEIN:
             self.kleinian_coords(point)
-        elif coords == "poincare":
+        elif model == Model.POINCARE:
             self.poincare_coords(point)
-        else:
+        elif model == Model.PROJECTIVE:
             self.set(point)
+        else:
+            raise GeometryError(
+                "Cannot initialize an object of type {} using model: '{}'".format(
+                    self.__class__.__name__, model)
+            )
 
     def _assert_geometry_valid(self, hyp_data):
         super()._assert_geometry_valid(hyp_data)
@@ -263,13 +307,15 @@ class Point(HyperbolicObject):
 
         return self.space.kleinian_to_poincare(self.kleinian_coords())
 
-    def coords(self, coords, hyp_data=None):
-        if coords.lower() in ["klein", "kleinian"]:
-            return self.kleinian_coords(hyp_data)
-        if coords.lower() == "poincare":
-            return self.poincare_coords(hyp_data)
-        if coords.lower() == "hyperboloid":
-            return self.hyperboloid_coords(hyp_data)
+    def coords(self, model, hyp_data=None):
+        try:
+            return HyperbolicObject.coords(self, model, hyp_data)
+        except GeometryError as e:
+            if model == Model.POINCARE:
+                return self.poincare_coords(hyp_data)
+            if model == Model.HYPERBOLOID:
+                return self.hyperboloid_coords(hyp_data)
+            raise e
 
     def distance(self, other):
         """compute elementwise distances (with respect to last two dimensions)
@@ -339,17 +385,19 @@ class Subspace(IdealPoint):
         HyperbolicObject.set(self, hyp_data)
         self.ideal_basis = hyp_data
 
-    def ideal_basis_coords(self, coords="kleinian"):
+    def ideal_basis_coords(self, model=Model.KLEIN):
         """Get coordinates for a basis of this subspace lying on the ideal
         boundary of H^n.
 
         """
-        if coords == "kleinian":
-            return self.space.kleinian_coords(self.ideal_basis)
 
-        return self.ideal_basis
+        #we don't return hyp_data directly, since we want subclasses
+        #to be able to use this method even if the structure of the
+        #underlying data is different.
 
-    def sphere_parameters(self):
+        return Point(self.space, self.ideal_basis).coords(model)
+
+    def sphere_parameters(self, model=Model.POINCARE):
         """Get parameters describing a k-sphere corresponding to this subspace
         in the Poincare model.
 
@@ -357,6 +405,12 @@ class Subspace(IdealPoint):
         subspace lies on a sphere with these parameters.
 
         """
+        if model != Model.POINCARE:
+            raise GeometryError(
+                ("Cannot compute spherical parameters for an object of type {}"
+                 " in model: '{}'").format(self.__class__.__name__, model)
+            )
+
         klein = self.ideal_basis_coords()
 
         poincare_midpoint = self.space.kleinian_to_poincare(
@@ -371,7 +425,7 @@ class Subspace(IdealPoint):
         return center, radius
 
     def circle_parameters(self, short_arc=True, degrees=True,
-                          coords="poincare"):
+                          model=Model.POINCARE):
         """Get parameters describing a circular arc corresponding to this
         subspace in the Poincare model.
 
@@ -382,11 +436,9 @@ class Subspace(IdealPoint):
         ideal points in this subspace.
 
         """
-        if coords != "poincare":
-            #TODO: don't let this pass silently (issue a warning)
-            pass
 
-        center, radius = self.sphere_parameters()
+
+        center, radius = self.sphere_parameters(model)
         klein = self.ideal_basis_coords()
         thetas = utils.circle_angles(center, klein)
 
@@ -399,6 +451,10 @@ class Subspace(IdealPoint):
         return center, radius, thetas
 
 class PointPair(Point):
+    """Abstract model for a hyperbolic object whose underlying data is
+    determined by a pair of points in R^(n,1)
+
+    """
     def __init__(self, space, endpoint1, endpoint2=None):
         self.unit_ndims = 2
         self.aux_ndims = 0
@@ -444,10 +500,13 @@ class PointPair(Point):
             return (Point(self.space, p1), Point(self.space, p2))
         return (self.endpoints[..., 0, :], self.endpoints[..., 1, :])
 
-    def endpoint_coords(self, coords="kleinian"):
+    def endpoint_coords(self, coords=Model.KLEIN):
         return self.get_endpoints().coords(coords)
 
 class Geodesic(PointPair, Subspace):
+    """Model for a bi-infinite gedoesic in hyperbolic space.
+
+    """
     def set(self, hyp_data):
         HyperbolicObject.set(self, hyp_data)
         self.endpoints = self.hyp_data[..., :2, :]
@@ -464,8 +523,6 @@ class Geodesic(PointPair, Subspace):
 
 class Segment(Geodesic):
     """Model a geodesic segment in hyperbolic space."""
-
-    #TODO: reimplement ideal endpoints as auxiliary data?
 
     def __init__(self, space, endpoint1, endpoint2=None):
         self.unit_ndims = 2
@@ -558,10 +615,16 @@ class Segment(Geodesic):
         self.set(hyp_data)
 
     def get_ideal_endpoints(self):
-        return Subspace(self.space, self.ideal_basis)
+        return Geodesic(self.space, self.ideal_basis)
+
+    def ideal_endpoint_coords(self, model=Model.KLEIN):
+        """Alias for Subspace.ideal_basis_coords.
+
+        """
+        return self.ideal_basis_coords(model)
 
     def circle_parameters(self, short_arc=True, degrees=True,
-                          coords="poincare"):
+                          model=Model.POINCARE):
         """Get parameters describing a circular arc corresponding to this
         segment in the Poincare model.
 
@@ -572,7 +635,7 @@ class Segment(Geodesic):
         endpoints of the segment.
 
         """
-        center, radius = self.sphere_parameters()
+        center, radius = self.sphere_parameters(model)
 
         klein = self.space.kleinian_coords(self.endpoints)
         poincare = self.space.kleinian_to_poincare(klein)
@@ -802,7 +865,7 @@ class TangentVector(HyperbolicObject):
         kleinian_pt = np.zeros(kleinian_shape)
         kleinian_pt[..., 0] = self.space.hyp_to_affine_dist(distance)
 
-        basepoint = Point(self.space, kleinian_pt, coords="kleinian")
+        basepoint = Point(self.space, kleinian_pt, model=Model.KLEIN)
 
         return self.origin_to().apply(basepoint, "elementwise")
 
@@ -839,16 +902,22 @@ class Horosphere(HyperbolicObject):
 
         self.set(hyp_data)
 
-    def circle_parameters(self, coords="poincare"):
+    def sphere_parameters(self, model=Model.POINCARE):
+        """Get the center and radius of a sphere giving this horosphere in
+        poincare coordinates.
+
+        """
         ideal_coords = self.space.kleinian_coords(self.center)
         interior_coords = self.space.kleinian_coords(self.reference)
 
-        if coords == "poincare":
+        if model == Model.POINCARE:
             ideal_coords = self.space.kleinian_to_poincare(ideal_coords)
             interior_coords = self.space.kleinian_to_poincare(interior_coords)
         else:
-            #TODO: do some kleinian horosphere computations
-            pass
+            raise GeometryError(
+                "Computing spherical parameters for a horosphere in non-Poincare"
+                " coordinates is not yet supported"
+            )
 
         model_radius = (utils.normsq(ideal_coords - interior_coords) /
                         (2 * (1 - utils.apply_bilinear(ideal_coords,
@@ -859,25 +928,26 @@ class Horosphere(HyperbolicObject):
         return model_center, model_radius
 
     def intersect_geodesic(self, geodesic, p2=None):
+        """Compute the intersection points of a geodesic with this horosphere
+
+        """
         segment = Segment(self.space, geodesic, p2)
-        geodesic_endpts = IdealPoint(self.space,
-                                     segment.ideal_basis).kleinian_coords()
+        geodesic_endpts = segment.ideal_endpoint_coords(Model.KLEIN)
 
         # compute an isometry taking this geodesic to one which passes
         # through the origin (so we can do intersection calculations
         # in Euclidean geometry)
         midpt = Point(self.space,
                       (geodesic_endpts[..., 0, :] + geodesic_endpts[..., 1, :]) / 2.,
-                       coords="kleinian")
+                       model=Model.KLEIN)
         coord_change = midpt.origin_to()
         coord_inv = coord_change.inv()
 
         c_hsph = coord_inv @ self
         c_seg = coord_inv @ segment
 
-        p_center, p_radius = c_hsph.circle_parameters(coords="poincare")
-        geodesic_endpts = IdealPoint(self.space,
-                                     c_seg.ideal_basis).kleinian_coords()
+        p_center, p_radius = c_hsph.sphere_parameters()
+        geodesic_endpts = c_seg.ideal_endpoint_coords(Model.KLEIN)
 
         u = geodesic_endpts[..., 0, :]
         v = geodesic_endpts[..., 1, :]
@@ -898,7 +968,7 @@ class Horosphere(HyperbolicObject):
         poincare_pts = np.stack([p1_poincare, p2_poincare], axis=-2)
         klein_pts = self.space.poincare_to_kleinian(poincare_pts)
 
-        return coord_change @ Point(self.space, klein_pts, coords="kleinian")
+        return coord_change @ Point(self.space, klein_pts, model=Model.KLEIN)
 
 class HorosphereArc(Horosphere):
     """Model for an arc lying along a horosphere
@@ -947,12 +1017,12 @@ class HorosphereArc(Horosphere):
         self.reference = self.hyp_data[..., 1, :]
         self.endpoints = self.hyp_data[..., 1:, :]
 
-    def circle_parameters(self, coords="poincare", degrees=True):
-        center, radius = Horosphere.circle_parameters(self, coords=coords)
+    def circle_parameters(self, model=Model.POINCARE, degrees=True):
+        """Get parameters for a circle describing this horospherical arc.
 
-        model_coords = self.space.kleinian_coords(self.endpoints)
-        if coords == "poincare":
-            model_coords = self.space.kleinian_to_poincare(model_coords)
+        """
+        center, radius = Horosphere.sphere_parameters(self, model=model)
+        model_coords = Point(self.space, self.endpoints).coords(model)
 
         thetas = utils.circle_angles(center, model_coords)
 
@@ -968,6 +1038,9 @@ class HorosphereArc(Horosphere):
         return center, radius, thetas
 
 class BoundaryArc(Geodesic):
+    """Model for an arc sitting in the boundary of hyperbolic space.
+
+    """
     def __init__(self, space, endpoint1, endpoint2=None):
         PointPair.__init__(self, space, endpoint1, endpoint2)
 
@@ -1011,13 +1084,20 @@ class BoundaryArc(Geodesic):
         self.set(point_data)
 
 
-    def circle_parameters(self, coords="poincare", degrees=True):
+    def circle_parameters(self, model=Model.POINCARE, degrees=True):
+        """Compute parameters (center, radius) for this boundary arc.
+
+        """
+        if model != Model.POINCARE and model != Model.KLEIN:
+            raise GeometryError(
+                ("Cannot compute circular parameters for a boundary arc in model: '{}'"
+                 ).format(model)
+            )
         center = np.zeros(self.hyp_data.shape[:-2] + (2,))
         radius = np.ones(self.hyp_data.shape[:-2])
 
-        klein_coords = self.space.kleinian_coords(self.endpoints)
-
-        thetas = utils.circle_angles(center, klein_coords)
+        coords = Point(self.space, self.endpoints).coords(model)
+        thetas = utils.circle_angles(center, coords)
 
         if degrees:
             thetas *= 180 / np.pi
@@ -1030,6 +1110,12 @@ class BoundaryArc(Geodesic):
         return center, radius, thetas
 
 class Polygon(Point):
+    """Model for a geodesic polygon in hyperbolic space.
+
+    Underlying data consists of the vertices of the polygon. We also
+    keep track of auxiliary data, namely the hyp_data of the segments
+    making up the edges of the polygon.
+    """
     def __init__(self, space, vertices, aux_data=None):
         HyperbolicObject.__init__(self, space, vertices, aux_data,
                                   unit_ndims=2, aux_ndims=3)
@@ -1050,12 +1136,12 @@ class Polygon(Point):
         return Point(self.space, self.hyp_data)
 
     def circle_parameters(self, short_arc=True, degrees=True,
-                          coords="poincare", flatten=False):
+                          model=Model.POINCARE, flatten=False):
         if not flatten:
-            return self.get_edges().circle_parameters(short_arc, degrees, coords)
+            return self.get_edges().circle_parameters(short_arc, degrees, model)
 
         flat_segments = self.get_edges().flatten_to_unit()
-        return flat_segments.circle_parameters(short_arc, degrees, coords)
+        return flat_segments.circle_parameters(short_arc, degrees, model)
 
 class Isometry(HyperbolicObject):
     """Model for an isometry of hyperbolic space.
@@ -1281,8 +1367,8 @@ class HyperbolicSpace:
 
         return TangentVector(self, origin, vector)
 
-    def get_point(self, point, coords="kleinian"):
-        return Point(self, point, coords)
+    def get_point(self, point, model=Model.KLEIN):
+        return Point(self, point, model)
 
     def hyp_to_affine_dist(self, r):
         """Convert distance in hyperbolic space to distance from the origin in

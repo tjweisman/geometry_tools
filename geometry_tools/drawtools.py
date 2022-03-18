@@ -17,9 +17,7 @@ from matplotlib.transforms import Affine2D
 from matplotlib.path import Path
 
 from geometry_tools import hyperbolic, utils
-
-#TODO: make a robust way to handle different coordinate systems
-KLEIN_NAMES = ["klein", "kleinian"]
+from geometry_tools.hyperbolic import Model
 
 #I played around with this a bit, but it's an eyeball test
 #TBH. Determines the radius at which we start approximating circular
@@ -30,6 +28,13 @@ RADIUS_THRESHOLD = 80
 #polygon wrong
 DISTANCE_THRESHOLD = 1e-5
 
+class DrawingError(Exception):
+    """Thrown if we try and draw an object in a model which we haven't
+    implemented yet.
+
+    """
+    pass
+
 class HyperbolicDrawing:
     def __init__(self, figsize=8,
                  ax=None,
@@ -37,7 +42,7 @@ class HyperbolicDrawing:
                  facecolor="aliceblue",
                  edgecolor="lightgray",
                  linewidth=1,
-                 model="poincare"):
+                 model=Model.POINCARE):
         if ax is None or fig is None:
             fig, ax = plt.subplots(figsize=(figsize, figsize))
 
@@ -56,6 +61,10 @@ class HyperbolicDrawing:
         self.model = model
 
     def draw_plane(self, **kwargs):
+        if not (self.model == Model.POINCARE or self.model == Model.KLEIN):
+            raise DrawingError(
+                "Drawing in model '{}' is not implemented".format(self.model)
+            )
         plane = Circle((0., 0.), 1.0, facecolor=self.facecolor,
                        edgecolor=self.edgecolor,
                        linewidth=self.linewidth, zorder=0, **kwargs)
@@ -72,12 +81,12 @@ class HyperbolicDrawing:
         for key, value in kwargs.items():
             default_kwargs[key] = value
 
-        if self.model == "klein":
-            lines = LineCollection(seglist.get_endpoints().kleinian_coords(),
+        if self.model == Model.KLEIN:
+            lines = LineCollection(seglist.endpoint_coords(self.model),
                                    **default_kwargs)
             self.ax.add_collection(lines)
 
-        elif self.model == "poincare":
+        elif self.model == Model.POINCARE:
             centers, radii, thetas = seglist.circle_parameters(degrees=True)
             endpt_coords = seglist.get_endpoints().coords(self.model)
 
@@ -91,6 +100,11 @@ class HyperbolicDrawing:
                 else:
                     x,y = endpts.T
                     self.ax.plot(x, y, **default_kwargs)
+        else:
+            raise DrawingError(
+                "Drawing geodesics in model '{}' is not implemented".format(
+                    self.model)
+            )
 
     def draw_point(self, point, **kwargs):
         pointlist = point.flatten_to_unit()
@@ -102,29 +116,22 @@ class HyperbolicDrawing:
         for key, value in kwargs.items():
             default_kwargs[key] = value
 
-        if self.model == "klein":
-            x, y = pointlist.kleinian_coords().T
-
-        elif self.model == "poincare":
-            x, y = pointlist.poincare_coords().T
-
+        x, y = pointlist.coords(self.model).T
         plt.plot(x, y, **default_kwargs)
 
-    def get_circle_arcpath(self, circle_params,
-                           radius_threshold=RADIUS_THRESHOLD):
+    def get_circle_arcpath(self, center, radius, theta):
         """Get a matplotlib path object for the circular arc representing this
         geometric object.
 
         """
-        center, radius, theta = circle_params
-        if not np.isnan(radius) and radius < radius_threshold:
-            cx, cy = center
-            transform = Affine2D()
-            transform.scale(radius)
-            transform.translate(cx, cy)
-            return transform.transform_path(Path.arc(theta[0], theta[1]))
+        cx, cy = center
+        transform = Affine2D()
+        transform.scale(radius)
+        transform.translate(cx, cy)
+        return transform.transform_path(Path.arc(theta[0], theta[1]))
 
-        vertices = arc.endpoint_coords(coords=self.model)
+    def get_straight_arcpath(self, segment):
+        vertices = segment.endpoint_coords(model=self.model)
         codes = [Path.MOVETO, Path.LINETO]
         return Path(vertices, codes)
 
@@ -137,11 +144,14 @@ class HyperbolicDrawing:
         first_segment = True
 
         polysegs = polygon.get_edges()
-        centers, radii, thetas = polysegs.circle_parameters(coords=self.model)
+        centers, radii, thetas = polysegs.circle_parameters(model=self.model)
 
         for center, radius, theta, segment in zip(centers, radii, thetas, polysegs):
-            g_path = self.get_circle_arcpath((center, radius, theta),
-                                             radius_threshold)
+            if not np.isnan(radius) and radius < radius_threshold:
+                g_path = self.get_circle_arcpath(center, radius, theta)
+            else:
+                g_path = self.get_straight_arcpath(segment)
+
             g_verts = g_path.vertices
             p1, p2 = segment.get_end_pair(as_points=True)
 
@@ -168,14 +178,19 @@ class HyperbolicDrawing:
 
         polylist = polygon.flatten_to_unit()
 
-        if self.model == "klein":
+        if self.model == Model.KLEIN:
             polys = PolyCollection(polylist.coords("klein"), **default_kwargs)
             self.ax.add_collection(polys)
 
-        elif self.model == "poincare":
+        elif self.model == Model.POINCARE:
             for poly in polylist:
                 path = self.get_polygon_arcpath(poly)
                 self.ax.add_patch(PathPatch(path, **default_kwargs))
+        else:
+            raise DrawingError(
+                "Drawing polygons in model '{}' is not implemented".format(
+                    self.model)
+            )
 
     def draw_horosphere(self, horoball, **kwargs):
         default_kwargs = {
@@ -185,22 +200,41 @@ class HyperbolicDrawing:
         for key, value in kwargs.items():
             default_kwargs[key] = value
 
+        if self.model != Model.POINCARE:
+            raise DrawingError(
+                "Drawing horospheres in model '{}' is not implemented.".format(
+                    self.model)
+            )
+
         horolist = horoball.flatten_to_unit()
 
-        circle_params = horolist.circle_parameters(coords=self.model)
-        if len(circle_params) == 2:
-            center, radius = circle_params
-            self.ax.add_collection(EllipseCollection(radius * 2, radius * 2,
-                                                     0, units="xy",
-                                                     offsets=center,
-                                                     transOffset = self.ax.transData,
-                                                     **default_kwargs))
+        center, radius = horolist.sphere_parameters(model=self.model)
+        self.ax.add_collection(EllipseCollection(radius * 2, radius * 2,
+                                                 0, units="xy",
+                                                 offsets=center,
+                                                 transOffset = self.ax.transData,
+                                                 **default_kwargs))
 
-        elif len(circle_params) == 3:
-            centers, radii, thetas = circle_params
-            #in the half-plane model this will involve radius checking
-            for center, radius, theta in zip(centers, radii, thetas):
-                arc = Arc(center, radius * 2, radius * 2,
-                          theta1=theta[0], theta2=theta[1],
-                          **kwargs)
-                self.ax.add_patch(arc)
+    def draw_horoarc(self, horoarc, **kwargs):
+        default_kwargs = {
+            "facecolor": "none",
+            "edgecolor": "black"
+        }
+        for key, value in kwargs.items():
+            default_kwargs[key] = value
+
+        if self.model != Model.POINCARE:
+            raise DrawingError(
+                "Drawing horoarcs in model '{}' is not implemented.".format(
+                    self.model)
+            )
+
+        horolist = horoarc.flatten_to_unit()
+        centers, radii, thetas = horolist.circle_parameters(model=self.model)
+
+        #in the half-plane model this will involve radius checking
+        for center, radius, theta in zip(centers, radii, thetas):
+            arc = Arc(center, radius * 2, radius * 2,
+                      theta1=theta[0], theta2=theta[1],
+                      **kwargs)
+            self.ax.add_patch(arc)
