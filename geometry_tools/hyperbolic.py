@@ -369,7 +369,7 @@ class DualPoint(HyperbolicObject):
             raise GeometryError("Dual point data must consist of vectors"
                                 " in the complement of the Minkowski light cone")
 
-class IdealPoint(HyperbolicObject):
+class IdealPoint(Point):
     """Model for an ideal point in hyperbolic space (lying on the boundary
     of the projectivization of the Minkowski light cone)
 
@@ -923,23 +923,27 @@ class Horosphere(HyperbolicObject):
         poincare coordinates.
 
         """
-        ideal_coords = self.space.kleinian_coords(self.center)
-        interior_coords = self.space.kleinian_coords(self.reference)
+        ideal_coords = Point(self.space, self.center).coords(model)
+        ref_coords = Point(self.space, self.reference).coords(model)
 
         if model == Model.POINCARE:
-            ideal_coords = self.space.kleinian_to_poincare(ideal_coords)
-            interior_coords = self.space.kleinian_to_poincare(interior_coords)
+            model_radius = (utils.normsq(ideal_coords - ref_coords) /
+                            (2 * (1 - utils.apply_bilinear(ideal_coords,
+                                                           ref_coords))))
+            model_center = ideal_coords * (1 - model_radius[..., np.newaxis])
+        elif model == Model.HALFSPACE:
+            ideal_euc = ideal_coords[..., :-1]
+            ref_euc = ref_coords[..., :-1]
+            ref_z = ref_coords[..., -1]
+
+            model_radius = 0.5 * (utils.normsq(ideal_euc - ref_euc) / ref_z + ref_z)
+            model_center = ideal_coords[:]
+            model_center[..., -1] = model_radius
         else:
             raise GeometryError(
-                "Computing spherical parameters for a horosphere in non-Poincare"
-                " coordinates is not yet supported"
+                "No implementation for spherical parameters for a horosphere in"
+                " model: '{}'".format(model)
             )
-
-        model_radius = (utils.normsq(ideal_coords - interior_coords) /
-                        (2 * (1 - utils.apply_bilinear(ideal_coords,
-                                                       interior_coords))))
-
-        model_center = ideal_coords * (1 - model_radius[..., np.newaxis])
 
         return model_center, model_radius
 
@@ -1466,9 +1470,10 @@ class HyperbolicSpace:
         #we apply a conjugation so coordinates for RP^1 are what we
         #expect
 
-        conj = np.array([[1, -1], [1, 1]])
-        cmat = conj @ matrix @ np.linalg.inv(conj)
-        return Isometry(self, representation.sl2_to_so21(cmat),
+        #conj = np.array([[1, -1], [1, 1]])
+        #cmat = conj @ matrix @ np.linalg.inv(conj)
+
+        return Isometry(self, representation.sl2_to_so21(np.array(matrix)),
                         column_vectors=True)
 
     def regular_polygon(self, n, hyp_radius):

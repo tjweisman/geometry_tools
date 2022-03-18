@@ -238,20 +238,27 @@ class HyperbolicDrawing:
         for key, value in kwargs.items():
             default_kwargs[key] = value
 
-        if self.model != Model.POINCARE:
+        horolist = horoball.flatten_to_unit()
+        if self.model == Model.POINCARE or self.model == Model.HALFSPACE:
+            center, radius = horolist.sphere_parameters(model=self.model)
+
+            circle_ctrs = center[radius<RADIUS_THRESHOLD]
+            circle_radii = radius[radius<RADIUS_THRESHOLD]
+
+            self.ax.add_collection(EllipseCollection(circle_radii * 2, circle_radii * 2,
+                                                     0, units="xy",
+                                                     offsets=circle_ctrs,
+                                                     transOffset=self.ax.transData,
+                                                     **default_kwargs))
+
+            #TODO: draw lines for horospheres in halfspace model
+
+
+        else:
             raise DrawingError(
                 "Drawing horospheres in model '{}' is not implemented.".format(
-                    self.model)
+                self.model)
             )
-
-        horolist = horoball.flatten_to_unit()
-
-        center, radius = horolist.sphere_parameters(model=self.model)
-        self.ax.add_collection(EllipseCollection(radius * 2, radius * 2,
-                                                 0, units="xy",
-                                                 offsets=center,
-                                                 transOffset = self.ax.transData,
-                                                 **default_kwargs))
 
     def draw_horoarc(self, horoarc, **kwargs):
         default_kwargs = {
