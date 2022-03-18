@@ -33,7 +33,6 @@ class Model(Enum):
     alias name (case insensitive).
 
     """
-    #NOTE: have not implemented the halfspace model yet!
     POINCARE = "poincare"
     KLEIN = "klein"
     KLEINIAN = "klein"
@@ -307,6 +306,15 @@ class Point(HyperbolicObject):
 
         return self.space.kleinian_to_poincare(self.kleinian_coords())
 
+    def halfspace_coords(self, hyp_data=None):
+        poincare = None
+
+        if hyp_data is not None:
+            poincare = self.space.halfspace_to_poincare(np.array(hyp_data))
+
+        poincare_coords = self.poincare_coords(poincare)
+        return self.space.poincare_to_halfspace(poincare_coords)
+
     def coords(self, model, hyp_data=None):
         try:
             return HyperbolicObject.coords(self, model, hyp_data)
@@ -315,6 +323,8 @@ class Point(HyperbolicObject):
                 return self.poincare_coords(hyp_data)
             if model == Model.HYPERBOLOID:
                 return self.hyperboloid_coords(hyp_data)
+            if model == Model.HALFSPACE:
+                return self.halfspace_coords(hyp_data)
             raise e
 
     def distance(self, other):
@@ -1328,6 +1338,30 @@ class HyperbolicSpace:
         mult_factor = 2. / (1. + euc_norms)
 
         return (points.T * mult_factor.T).T
+
+    def poincare_to_halfspace(self, points):
+        y = points[..., 0]
+        v = points[..., 1:]
+        x2 = utils.normsq(v)
+
+        halfspace_coords = np.zeros_like(poincare_coords)
+        denom = (x2 + (y - 1)*(y - 1))
+        halfspace_coords[..., :-1] = (2 * v) / denom[..., np.newaxis]
+        halfspace_coords[..., -1] = (1 - x2 - y * y) / denom
+
+        return halfspace_coords
+
+    def halfspace_to_poincare(self, points):
+        y = points[..., -1]
+        v = points[..., :-1]
+        x2 = utils.normsq(v)
+
+        poincare_coords = np.zeros_like(points)
+        denom = (x2 + (y + 1)*(y + 1))
+        poincare_coords[..., 1:] = (2 * v) / denom[..., np.newaxis]
+        poincare_coords[..., 0] = (x2 + y * y - 1) / denom
+
+        return poincare_coords
 
     def get_elliptic(self, block_elliptic):
         """Get an elliptic isometry stabilizing the origin in the
