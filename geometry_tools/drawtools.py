@@ -11,7 +11,7 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 from matplotlib.patches import Circle, Arc, PathPatch
-from matplotlib.collections import LineCollection, PolyCollection
+from matplotlib.collections import LineCollection, PolyCollection, EllipseCollection
 
 from matplotlib.transforms import Affine2D
 from matplotlib.path import Path
@@ -34,8 +34,8 @@ class HyperbolicDrawing:
     def __init__(self, figsize=8,
                  ax=None,
                  fig=None,
-                 facecolor="lightgray",
-                 edgecolor="black",
+                 facecolor="aliceblue",
+                 edgecolor="lightgray",
                  linewidth=1,
                  model="poincare"):
         if ax is None or fig is None:
@@ -79,7 +79,7 @@ class HyperbolicDrawing:
 
         elif self.model == "poincare":
             centers, radii, thetas = seglist.circle_parameters(degrees=True)
-            endpt_coords = seglist.get_endpoints().poincare_coords()
+            endpt_coords = seglist.get_endpoints().coords(self.model)
 
             for center, radius, theta, endpts in zip(centers, radii,
                                                      thetas, endpt_coords):
@@ -177,5 +177,30 @@ class HyperbolicDrawing:
                 path = self.get_polygon_arcpath(poly)
                 self.ax.add_patch(PathPatch(path, **default_kwargs))
 
-    def draw_horoball(self, horoball, **kwargs):
-        pass
+    def draw_horosphere(self, horoball, **kwargs):
+        default_kwargs = {
+            "facecolor": "none",
+            "edgecolor": "black"
+        }
+        for key, value in kwargs.items():
+            default_kwargs[key] = value
+
+        horolist = horoball.flatten_to_unit()
+
+        circle_params = horolist.circle_parameters(coords=self.model)
+        if len(circle_params) == 2:
+            center, radius = circle_params
+            self.ax.add_collection(EllipseCollection(radius * 2, radius * 2,
+                                                     0, units="xy",
+                                                     offsets=center,
+                                                     transOffset = self.ax.transData,
+                                                     **default_kwargs))
+
+        elif len(circle_params) == 3:
+            centers, radii, thetas = circle_params
+            #in the half-plane model this will involve radius checking
+            for center, radius, theta in zip(centers, radii, thetas):
+                arc = Arc(center, radius * 2, radius * 2,
+                          theta1=theta[0], theta2=theta[1],
+                          **kwargs)
+                self.ax.add_patch(arc)

@@ -426,7 +426,7 @@ class PointPair(Point):
 
         """
         if endpoint2 is None:
-            self.set(endpoint1)
+            self.set(Point(self.space, endpoint1).hyp_data)
             return
 
         pt1 = Point(self.space, endpoint1)
@@ -822,12 +822,6 @@ class Horosphere(HyperbolicObject):
             except TypeError:
                 pass
 
-            try:
-                self.set(center)
-                return
-            except (AttributeError, GeometryError):
-                pass
-
         self.set_center_ref(center, reference_point)
 
     def set(self, hyp_data):
@@ -835,11 +829,14 @@ class Horosphere(HyperbolicObject):
         self.center = hyp_data[..., 0, :]
         self.reference = hyp_data[..., 1, :]
 
-    def set_center_ref(self, center, reference_point):
-        centers = IdealPoint(self.space, center)
-        refs = Point(self.space, reference_point)
+    def set_center_ref(self, center, reference_point=None):
+        if reference_point is None:
+            hyp_data = Point(self.space, center).hyp_data
+        else:
+            center = IdealPoint(self.space, center)
+            ref = Point(self.space, reference_point)
+            hyp_data = np.stack([center.hyp_data, ref.hyp_data], axis=-2)
 
-        hyp_data = np.stack([centers.hyp_data, refs.hyp_data], axis=-2)
         self.set(hyp_data)
 
     def circle_parameters(self, coords="poincare"):
@@ -857,7 +854,7 @@ class Horosphere(HyperbolicObject):
                         (2 * (1 - utils.apply_bilinear(ideal_coords,
                                                        interior_coords))))
 
-        model_center = ideal_coords * (1 - model_radius)
+        model_center = ideal_coords * (1 - model_radius[..., np.newaxis])
 
         return model_center, model_radius
 
@@ -907,64 +904,48 @@ class HorosphereArc(Horosphere):
     """Model for an arc lying along a horosphere
 
     """
-    def __init__(self, space, p1, p2=None, center=None):
+    def __init__(self, space, center, p1=None, p2=None):
         self.unit_ndims = 2
         self.aux_ndims = 0
         self.space = space
 
-        if p2 is None and center is None:
+        if p1 is None and p2 is None:
             try:
-                self._construct_from_object(p1)
+                self._construct_from_object(center)
                 return
             except TypeError:
                 pass
             try:
-                self.set(p1)
+                self.set(center)
                 return
             except (AttributeError, GeometryError):
                 pass
 
-        if center is None:
-            self.set_endpoints(p1, p2)
-            return
+        self.set_center_endpoints(center, p1, p2)
 
-        self.set_data(p1, p2, center)
+    def set_center_endpoints(self, center, p1=None, p2=None):
+        if ((p1 is None and p2 is not None) or
+            (p1 is not None and p2 is None)):
+            raise GeometryError(
+                "Horospherical arc determined by two endpoints and a centerpoint, but"
+                " this was not provided"
+            )
 
-    def _compute_center(self, endpoints):
-        #TODO: actually compute the center, given endpoints
-        pass
-
-    def set_endpoints(self, p1, p2=None):
         if p2 is None:
-            self._compute_center(p1)
-            return
+            hyp_data = Point(self.space, center).hyp_data
+        else:
+            center_data = Point(self.space, center).hyp_data
+            p1_data = Point(self.space, p1).hyp_data
+            p2_data = Point(self.space, p2).hyp_data
+            hyp_data = np.stack([center_data, p1_data, p2_data], axis=-2)
 
-        endpts = np.stack(p1, p2, axis=-2)
-        self._compute_center(endpts)
+        self.set(hyp_data)
 
     def set(self, hyp_data):
         HyperbolicObject.set(self, hyp_data)
         self.center = self.hyp_data[..., 0, :]
         self.reference = self.hyp_data[..., 1, :]
         self.endpoints = self.hyp_data[..., 1:, :]
-
-
-    def set_data(self, p1, p2, center):
-        if p2 is None:
-            pt_data = Point(self.space, p1)
-            pt_1 = pt_data[..., 0, :]
-            pt_2 = pt_data[..., 1, :]
-        else:
-            pt_1 = Point(self.space, p1)
-            pt_2 = Point(self.space, p2)
-
-        center_pt = IdealPoint(self.space, center)
-
-        hyp_data = np.stack([center_pt.hyp_data,
-                             pt_1.hyp_data,
-                             pt_2.hyp_data], axis=-2)
-
-        self.set(hyp_data)
 
     def circle_parameters(self, coords="poincare", degrees=True):
         center, radius = Horosphere.circle_parameters(self, coords=coords)
@@ -997,7 +978,7 @@ class BoundaryArc(Geodesic):
 
     def set_endpoints(self, endpoint1, endpoint2):
         if endpoint2 is None:
-            endpoint_data = endpoint1
+            endpoint_data = Point(self.space, endpoint1).hyp_data
         else:
             pt1 = Point(self.space, endpoint1)
             pt2 = Point(self.space, endpoint2)
@@ -1382,7 +1363,7 @@ class HyperbolicSpace:
         mats = cyclic_rep.isometries(words)
 
         vertices = mats.apply(start_vertex, "pairwise_reversed")
-        return vertices
+        return Polygon(self, vertices)
 
     def regular_polygon_radius(self, n, interior_angle):
         """Find r such that a regular n-gon inscribed on a circle of radius r
