@@ -1344,7 +1344,7 @@ class HyperbolicSpace:
         v = points[..., 1:]
         x2 = utils.normsq(v)
 
-        halfspace_coords = np.zeros_like(poincare_coords)
+        halfspace_coords = np.zeros_like(points)
         denom = (x2 + (y - 1)*(y - 1))
         halfspace_coords[..., :-1] = (2 * v) / denom[..., np.newaxis]
         halfspace_coords[..., -1] = (1 - x2 - y * y) / denom

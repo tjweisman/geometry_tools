@@ -10,7 +10,7 @@ import copy
 import numpy as np
 
 import matplotlib.pyplot as plt
-from matplotlib.patches import Circle, Arc, PathPatch
+from matplotlib.patches import Circle, Arc, PathPatch, Rectangle
 from matplotlib.collections import LineCollection, PolyCollection, EllipseCollection
 
 from matplotlib.transforms import Affine2D
@@ -28,6 +28,18 @@ RADIUS_THRESHOLD = 80
 #polygon wrong
 DISTANCE_THRESHOLD = 1e-5
 
+DRAW_NEIGHBORHOOD = 0.1
+
+#this is a bit unpythonic since these are meant to be constants
+def default_model_limits(model):
+    if model == Model.POINCARE or model == Model.KLEIN:
+        return ((-1 - DRAW_NEIGHBORHOOD, 1 + DRAW_NEIGHBORHOOD),
+                (-1 - DRAW_NEIGHBORHOOD, 1 + DRAW_NEIGHBORHOOD))
+
+    if model == Model.HALFSPACE:
+        return ((-8., 8.),
+                (-1 * DRAW_NEIGHBORHOOD, 10.))
+
 class DrawingError(Exception):
     """Thrown if we try and draw an object in a model which we haven't
     implemented yet.
@@ -42,17 +54,28 @@ class HyperbolicDrawing:
                  facecolor="aliceblue",
                  edgecolor="lightgray",
                  linewidth=1,
-                 model=Model.POINCARE):
+                 model=Model.POINCARE,
+                 xlim=None,
+                 ylim=None):
+
         if ax is None or fig is None:
             fig, ax = plt.subplots(figsize=(figsize, figsize))
+
+        default_x, default_y = default_model_limits(model)
+
+        self.xlim, self.ylim = xlim, ylim
+        if xlim is None:
+            self.xlim = default_x
+        if ylim is None:
+            self.ylim = default_y
 
         self.ax, self.fig = ax, fig
 
         plt.tight_layout()
         self.ax.axis("off")
         self.ax.set_aspect("equal")
-        self.ax.set_xlim((-1.1, 1.1))
-        self.ax.set_ylim((-1.1, 1.1))
+        self.ax.set_xlim(self.xlim)
+        self.ax.set_ylim(self.ylim)
 
         self.facecolor = facecolor
         self.edgecolor = edgecolor
@@ -61,16 +84,30 @@ class HyperbolicDrawing:
         self.model = model
 
     def draw_plane(self, **kwargs):
-        if not (self.model == Model.POINCARE or self.model == Model.KLEIN):
+        if self.model == Model.POINCARE or self.model == Model.KLEIN:
+            plane = Circle((0., 0.), 1.0, facecolor=self.facecolor,
+                           edgecolor=self.edgecolor,
+                           linewidth=self.linewidth, zorder=0, **kwargs)
+
+            self.ax.add_patch(plane)
+        elif self.model == Model.HALFSPACE:
+            xmin, xmax = self.xlim
+            ymin, ymax = self.ylim
+            plane = Rectangle((xmin, 0.), xmax - xmin, ymax,
+                              facecolor=self.facecolor,
+                              edgecolor=None,
+                              zorder=0,
+                              **kwargs)
+            self.ax.add_patch(plane)
+
+            #plot boundary
+            plt.plot((xmin, xmax), (0., 0.), color=self.edgecolor,
+                     linewidth=self.linewidth)
+
+        else:
             raise DrawingError(
                 "Drawing in model '{}' is not implemented".format(self.model)
             )
-        plane = Circle((0., 0.), 1.0, facecolor=self.facecolor,
-                       edgecolor=self.edgecolor,
-                       linewidth=self.linewidth, zorder=0, **kwargs)
-
-        self.ax.add_patch(plane)
-
     def draw_geodesic(self, segment,
                       radius_threshold=RADIUS_THRESHOLD, **kwargs):
         seglist = segment.flatten_to_unit()
