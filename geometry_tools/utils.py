@@ -139,11 +139,27 @@ def short_arc(thetas):
     shifted_thetas[shifted_thetas < 0] += 2 * np.pi
     shifted_thetas.sort(axis=-1)
 
-    shifted_thetas[shifted_thetas[...,1] - shifted_thetas[...,0] > np.pi] = np.flip(
-        shifted_thetas[shifted_thetas[...,1] - shifted_thetas[...,0] > np.pi], axis=-1
-    )
+    to_flip = shifted_thetas[...,1] - shifted_thetas[...,0] > np.pi
+    shifted_thetas[to_flip] = np.flip(shifted_thetas[to_flip], axis=-1)
 
     return shifted_thetas
+
+def right_to_left(thetas):
+    """reorder angles so that the counterclockwise arc goes right to left.
+
+    thetas: ndarray of pairs of angles
+
+    return: ndarray of pairs of angles. a subset of the pairs have
+    been swapped.
+
+    """
+    flipped_thetas = np.copy(thetas)
+
+    to_flip = np.cos(thetas[..., 0]) < np.cos(thetas[..., 1])
+    flipped_thetas[to_flip] = np.flip(thetas[to_flip], axis=-1)
+
+    return flipped_thetas
+
 
 def arc_include(thetas, reference_theta):
     """reorder angles so that the counterclockwise arc between them always
@@ -173,7 +189,8 @@ def arc_include(thetas, reference_theta):
     return s_thetas
 
 def sphere_inversion(points):
-    return (points.T / (normsq(points)).T).T
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return (points.T / (normsq(points)).T).T
 
 def swap_matrix(i, j, n):
     permutation = list(range(n))

@@ -26,7 +26,7 @@ RADIUS_THRESHOLD = 80
 
 #how far apart points can be before we decide that we ordered the
 #polygon wrong
-DISTANCE_THRESHOLD = 1e-5
+DISTANCE_THRESHOLD = 1e-4
 
 #the default amount of "room" we leave outside the boundary of our model
 DRAW_NEIGHBORHOOD = 0.1
@@ -111,19 +111,35 @@ class HyperbolicDrawing:
             plane = Rectangle((self.left_infinity, 0.),
                               self.h_infinity, self.up_infinity,
                               facecolor=self.facecolor,
-                              edgecolor=None,
+                              edgecolor=self.edgecolor,
                               zorder=0,
                               **kwargs)
             self.ax.add_patch(plane)
-
-            #plot boundary
-            plt.plot((xmin, xmax), (0., 0.), color=self.edgecolor,
-                     linewidth=self.linewidth)
 
         else:
             raise DrawingError(
                 "Drawing in model '{}' is not implemented".format(self.model)
             )
+
+    def get_vertical_segment(self, endpts):
+        ordered_endpts = endpts[:]
+        if (np.isnan(endpts[0,0]) or
+            endpts[0, 0] < self.left_infinity or
+            endpts[0, 0] > self.right_infinity):
+            ordered_endpts = np.flip(endpts, axis=0)
+
+        if (np.isnan(ordered_endpts[1, 0]) or
+            ordered_endpts[1, 0] < self.left_infinity or
+            ordered_endpts[1, 0] > self.right_infinity):
+
+            ordered_endpts[1, 1] = self.up_infinity
+
+        ordered_endpts[1, 0] = ordered_endpts[0, 0]
+
+        return ordered_endpts
+
+
+
     def draw_geodesic(self, segment,
                       radius_threshold=RADIUS_THRESHOLD, **kwargs):
         seglist = segment.flatten_to_unit()
@@ -134,33 +150,33 @@ class HyperbolicDrawing:
         for key, value in kwargs.items():
             default_kwargs[key] = value
 
-        if self.model == Model.KLEIN:
-            lines = LineCollection(seglist.endpoint_coords(self.model),
-                                   **default_kwargs)
-            self.ax.add_collection(lines)
-
-        elif self.model == Model.POINCARE or self.model == Model.HALFSPACE:
-            centers, radii, thetas = seglist.circle_parameters(model=self.model,
-                                                               degrees=True)
-            endpt_coords = seglist.endpoint_coords(self.model)
-
-            for center, radius, theta, endpts in zip(centers, radii,
-                                                     thetas, endpt_coords):
-                if radius < radius_threshold:
-                    arc = Arc(center, radius * 2, radius * 2,
-                              theta1=theta[0], theta2=theta[1],
-                              **kwargs)
-                    self.ax.add_patch(arc)
-                else:
-                    arc = PathPatch(Path(endpts, [Path.MOVETO, Path.LINETO]),
-                                    **default_kwargs)
-
-                    self.ax.add_patch(arc)
-        else:
+        if self.model not in [Model.KLEIN, Model.POINCARE, Model.HALFSPACE]:
             raise DrawingError(
                 "Drawing geodesics in model '{}' is not implemented".format(
                     self.model)
             )
+
+        if self.model == Model.KLEIN:
+            lines = LineCollection(seglist.endpoint_coords(self.model),
+                                   **default_kwargs)
+            self.ax.add_collection(lines)
+            return
+
+        centers, radii, thetas = seglist.circle_parameters(model=self.model,
+                                                               degrees=True)
+        for center, radius, theta, segment in zip(centers, radii,
+                                                  thetas, seglist):
+            if np.isnan(radius) or radius > radius_threshold:
+                arcpath = self.get_straight_arcpath(segment)
+                arc = PathPatch(arcpath, **default_kwargs)
+                self.ax.add_patch(arc)
+                continue
+
+            arc = Arc(center, radius * 2, radius * 2,
+                      theta1=theta[0], theta2=theta[1],
+                      **kwargs)
+            self.ax.add_patch(arc)
+
 
     def draw_point(self, point, **kwargs):
         pointlist = point.flatten_to_unit()
@@ -187,9 +203,13 @@ class HyperbolicDrawing:
         return transform.transform_path(Path.arc(theta[0], theta[1]))
 
     def get_straight_arcpath(self, segment):
-        vertices = segment.endpoint_coords(model=self.model)
-        codes = [Path.MOVETO, Path.LINETO]
-        return Path(vertices, codes)
+        endpts = segment.endpoint_coords(self.model)
+
+        if self.model == Model.POINCARE:
+            return Path(endpts, [Path.MOVETO, Path.LINETO])
+        if self.model == Model.HALFSPACE:
+            v_endpts = self.get_vertical_segment(endpts)
+            return Path(v_endpts, [Path.MOVETO, Path.LINETO])
 
     def get_polygon_arcpath(self, polygon,
                             radius_threshold=RADIUS_THRESHOLD,
@@ -211,7 +231,10 @@ class HyperbolicDrawing:
             g_verts = g_path.vertices
             p1, p2 = segment.get_end_pair(as_points=True)
 
-            if np.linalg.norm(p1.coords(self.model) - g_verts[0]) > distance_threshold:
+            p1_opp_dist = np.linalg.norm(p1.coords(self.model) - g_verts[-1])
+            p2_opp_dist = np.linalg.norm(p2.coords(self.model) - g_verts[0])
+            if (p1_opp_dist < distance_threshold or
+                p2_opp_dist < distance_threshold):
                 g_verts = g_verts[::-1]
 
             g_codes = copy.deepcopy(g_path.codes)

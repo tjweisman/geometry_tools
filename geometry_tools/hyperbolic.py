@@ -433,8 +433,7 @@ class Subspace(IdealPoint):
 
         return center, radius
 
-    def circle_parameters(self, short_arc=True, degrees=True,
-                          model=Model.POINCARE):
+    def circle_parameters(self, degrees=True, model=Model.POINCARE):
         """Get parameters describing a circular arc corresponding to this
         subspace in the Poincare or halfspace models.
 
@@ -449,8 +448,11 @@ class Subspace(IdealPoint):
         endpoints = self.ideal_basis_coords(model)
         thetas = utils.circle_angles(center, endpoints)
 
-        if short_arc:
+        if model == Model.POINCARE:
             thetas = utils.short_arc(thetas)
+
+        if model == Model.HALFSPACE:
+            thetas = utils.right_to_left(thetas)
 
         if degrees:
             thetas *= 180 / np.pi
@@ -630,8 +632,7 @@ class Segment(Geodesic):
         """
         return self.ideal_basis_coords(model)
 
-    def circle_parameters(self, short_arc=True, degrees=True,
-                          model=Model.POINCARE):
+    def circle_parameters(self, degrees=True, model=Model.POINCARE):
         """Get parameters describing a circular arc corresponding to this
         segment in the Poincare or halfspace models.
 
@@ -647,8 +648,11 @@ class Segment(Geodesic):
         endpoints = self.endpoint_coords(model)
 
         thetas = utils.circle_angles(center, endpoints)
-        if short_arc:
+
+        if model == Model.POINCARE:
             thetas = utils.short_arc(thetas)
+        elif model == Model.HALFSPACE:
+            thetas = utils.right_to_left(thetas)
 
         if degrees:
             thetas *= 180 / np.pi
@@ -922,13 +926,14 @@ class Horosphere(HyperbolicObject):
                                                            ref_coords))))
             model_center = ideal_coords * (1 - model_radius[..., np.newaxis])
         elif model == Model.HALFSPACE:
-            ideal_euc = ideal_coords[..., :-1]
-            ref_euc = ref_coords[..., :-1]
-            ref_z = ref_coords[..., -1]
+            with np.errstate(divide="ignore", invalid="ignore"):
+                ideal_euc = ideal_coords[..., :-1]
+                ref_euc = ref_coords[..., :-1]
+                ref_z = ref_coords[..., -1]
 
-            model_radius = 0.5 * (utils.normsq(ideal_euc - ref_euc) / ref_z + ref_z)
-            model_center = ideal_coords[:]
-            model_center[..., -1] = model_radius
+                model_radius = 0.5 * (utils.normsq(ideal_euc - ref_euc) / ref_z + ref_z)
+                model_center = ideal_coords[:]
+                model_center[..., -1] = model_radius
         else:
             raise GeometryError(
                 "No implementation for spherical parameters for a horosphere in"
@@ -1352,8 +1357,10 @@ class HyperbolicSpace:
 
         halfspace_coords = np.zeros_like(points)
         denom = (x2 + (y - 1)*(y - 1))
-        halfspace_coords[..., :-1] = (2 * v) / denom[..., np.newaxis]
-        halfspace_coords[..., -1] = (1 - x2 - y * y) / denom
+
+        with np.errstate(divide="ignore", invalid="ignore"):
+            halfspace_coords[..., :-1] = (2 * v) / denom[..., np.newaxis]
+            halfspace_coords[..., -1] = (1 - x2 - y * y) / denom
 
         return halfspace_coords
 
