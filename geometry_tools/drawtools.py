@@ -28,7 +28,12 @@ RADIUS_THRESHOLD = 80
 #polygon wrong
 DISTANCE_THRESHOLD = 1e-5
 
+#the default amount of "room" we leave outside the boundary of our model
 DRAW_NEIGHBORHOOD = 0.1
+
+#when drawing objects "to infinity", how far offscreen we draw them
+#(as a % of the width/height)
+OFFSCREEN_FACTOR = 0.1
 
 #this is a bit unpythonic since these are meant to be constants
 def default_model_limits(model):
@@ -37,8 +42,8 @@ def default_model_limits(model):
                 (-1 - DRAW_NEIGHBORHOOD, 1 + DRAW_NEIGHBORHOOD))
 
     if model == Model.HALFSPACE:
-        return ((-8., 8.),
-                (-1 * DRAW_NEIGHBORHOOD, 10.))
+        return ((-6., 6.),
+                (-1 * DRAW_NEIGHBORHOOD, 8.))
 
 class DrawingError(Exception):
     """Thrown if we try and draw an object in a model which we haven't
@@ -69,6 +74,16 @@ class HyperbolicDrawing:
         if ylim is None:
             self.ylim = default_y
 
+        self.width = self.xlim[1] - self.xlim[0]
+        self.height = self.ylim[1] - self.ylim[0]
+
+        self.left_infinity = self.xlim[0] - OFFSCREEN_FACTOR * self.width
+        self.right_infinity = self.xlim[1] + OFFSCREEN_FACTOR * self.width
+        self.up_infinity = self.ylim[1] + OFFSCREEN_FACTOR * self.height
+        self.down_infinity = self.ylim[0] - OFFSCREEN_FACTOR * self.height
+        self.h_infinity = self.right_infinity - self.left_infinity
+        self.v_infinity = self.up_infinity - self.down_infinity
+
         self.ax, self.fig = ax, fig
 
         plt.tight_layout()
@@ -93,7 +108,8 @@ class HyperbolicDrawing:
         elif self.model == Model.HALFSPACE:
             xmin, xmax = self.xlim
             ymin, ymax = self.ylim
-            plane = Rectangle((xmin, 0.), xmax - xmin, ymax,
+            plane = Rectangle((self.left_infinity, 0.),
+                              self.h_infinity, self.up_infinity,
                               facecolor=self.facecolor,
                               edgecolor=None,
                               zorder=0,
@@ -126,7 +142,7 @@ class HyperbolicDrawing:
         elif self.model == Model.POINCARE or self.model == Model.HALFSPACE:
             centers, radii, thetas = seglist.circle_parameters(model=self.model,
                                                                degrees=True)
-            endpt_coords = seglist.get_endpoints().coords(self.model)
+            endpt_coords = seglist.endpoint_coords(self.model)
 
             for center, radius, theta, endpts in zip(centers, radii,
                                                      thetas, endpt_coords):
@@ -136,8 +152,10 @@ class HyperbolicDrawing:
                               **kwargs)
                     self.ax.add_patch(arc)
                 else:
-                    x,y = endpts.T
-                    self.ax.plot(x, y, **default_kwargs)
+                    arc = PathPatch(Path(endpts, [Path.MOVETO, Path.LINETO]),
+                                    **default_kwargs)
+
+                    self.ax.add_patch(arc)
         else:
             raise DrawingError(
                 "Drawing geodesics in model '{}' is not implemented".format(
@@ -242,18 +260,30 @@ class HyperbolicDrawing:
         if self.model == Model.POINCARE or self.model == Model.HALFSPACE:
             center, radius = horolist.sphere_parameters(model=self.model)
 
-            circle_ctrs = center[radius<RADIUS_THRESHOLD]
-            circle_radii = radius[radius<RADIUS_THRESHOLD]
+            good_indices = ((radius < RADIUS_THRESHOLD) &
+                            ~np.isnan(radius) &
+                            ~(np.isnan(center).any(axis=-1)))
 
-            self.ax.add_collection(EllipseCollection(circle_radii * 2, circle_radii * 2,
-                                                     0, units="xy",
-                                                     offsets=circle_ctrs,
-                                                     transOffset=self.ax.transData,
-                                                     **default_kwargs))
+            circle_ctrs = center[good_indices]
+            circle_radii = radius[good_indices]
 
-            #TODO: draw lines for horospheres in halfspace model
+            if len(circle_ctrs) > 0:
+                self.ax.add_collection(
+                    EllipseCollection(circle_radii * 2, circle_radii * 2,
+                                      0, units="xy", offsets=circle_ctrs,
+                                      transOffset=self.ax.transData,
+                                      **default_kwargs)
+                )
 
+            if self.model == Model.HALFSPACE:
+                for horoball in horolist[~good_indices]:
+                    height = horoball.ref_coords(self.model)[1]
+                    h_rect = Rectangle((self.left_infinity, height),
+                                       self.h_infinity,
+                                       self.up_infinity - height,
+                                       **default_kwargs)
 
+                    self.ax.add_patch(h_rect)
         else:
             raise DrawingError(
                 "Drawing horospheres in model '{}' is not implemented.".format(
@@ -268,18 +298,23 @@ class HyperbolicDrawing:
         for key, value in kwargs.items():
             default_kwargs[key] = value
 
-        if self.model != Model.POINCARE:
+        if self.model != Model.POINCARE and self.model != Model.HALFSPACE:
             raise DrawingError(
                 "Drawing horoarcs in model '{}' is not implemented.".format(
                     self.model)
             )
 
         horolist = horoarc.flatten_to_unit()
+        endpts = horolist.endpoint_coords(model=self.model)
         centers, radii, thetas = horolist.circle_parameters(model=self.model)
 
-        #in the half-plane model this will involve radius checking
-        for center, radius, theta in zip(centers, radii, thetas):
-            arc = Arc(center, radius * 2, radius * 2,
-                      theta1=theta[0], theta2=theta[1],
-                      **kwargs)
-            self.ax.add_patch(arc)
+        for center, radius, theta, endpt in zip(centers, radii, thetas, endpts):
+            if np.isnan(radius) or radius > RADIUS_THRESHOLD:
+                path = Path(endpt, [Path.MOVETO, Path.LINETO])
+                pathpatch = PathPatch(path, **default_kwargs)
+                self.ax.add_patch(pathpatch)
+            else:
+                arc = Arc(center, radius * 2, radius * 2,
+                          theta1=theta[0], theta2=theta[1],
+                          **kwargs)
+                self.ax.add_patch(arc)

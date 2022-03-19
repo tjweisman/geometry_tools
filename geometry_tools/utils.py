@@ -164,7 +164,7 @@ def arc_include(thetas, reference_theta):
     s_reference = np.expand_dims(reference_theta - thetas[..., 0],
                                  axis=-1)
 
-    s_thetas[s_theta1 < 0] += 2 * np.pi
+    s_theta1[s_theta1 < 0] += 2 * np.pi
     s_reference[s_reference < 0] += 2 * np.pi
 
     to_swap = (s_theta1 < s_reference[..., 0])

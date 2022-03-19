@@ -156,7 +156,7 @@ class HyperbolicObject:
             else:
                 self.set(hyp_array, aux_data=aux_array)
             return
-        except (TypeError, AttributeError):
+        except (TypeError, AttributeError, IndexError):
             pass
 
         raise TypeError
@@ -268,17 +268,7 @@ class Point(HyperbolicObject):
         except TypeError:
             pass
 
-        if model == Model.KLEIN:
-            self.kleinian_coords(point)
-        elif model == Model.POINCARE:
-            self.poincare_coords(point)
-        elif model == Model.PROJECTIVE:
-            self.set(point)
-        else:
-            raise GeometryError(
-                "Cannot initialize an object of type {} using model: '{}'".format(
-                    self.__class__.__name__, model)
-            )
+        self.coords(model, point)
 
     def _assert_geometry_valid(self, hyp_data):
         super()._assert_geometry_valid(hyp_data)
@@ -517,8 +507,8 @@ class PointPair(Point):
             return (Point(self.space, p1), Point(self.space, p2))
         return (self.endpoints[..., 0, :], self.endpoints[..., 1, :])
 
-    def endpoint_coords(self, coords=Model.KLEIN):
-        return self.get_endpoints().coords(coords)
+    def endpoint_coords(self, model=Model.KLEIN):
+        return self.get_endpoints().coords(model)
 
 class Geodesic(PointPair, Subspace):
     """Model for a bi-infinite gedoesic in hyperbolic space.
@@ -947,6 +937,12 @@ class Horosphere(HyperbolicObject):
 
         return model_center, model_radius
 
+    def center_coords(self, model=Model.KLEIN):
+        return Point(self.space, self.center).coords(model)
+
+    def ref_coords(self, model):
+        return Point(self.space, self.reference).coords(model)
+
     def intersect_geodesic(self, geodesic, p2=None):
         """Compute the intersection points of a geodesic with this horosphere
 
@@ -990,7 +986,7 @@ class Horosphere(HyperbolicObject):
 
         return coord_change @ Point(self.space, klein_pts, model=Model.KLEIN)
 
-class HorosphereArc(Horosphere):
+class HorosphereArc(Horosphere, PointPair):
     """Model for an arc lying along a horosphere
 
     """
@@ -1042,12 +1038,12 @@ class HorosphereArc(Horosphere):
 
         """
         center, radius = Horosphere.sphere_parameters(self, model=model)
-        model_coords = Point(self.space, self.endpoints).coords(model)
+        model_coords = self.endpoint_coords(model)
 
         thetas = utils.circle_angles(center, model_coords)
 
         center_theta = utils.circle_angles(
-            center, self.space.kleinian_coords(self.center)
+            center, self.center_coords(model=model)
         )[..., 0]
 
         thetas = np.flip(utils.arc_include(thetas, center_theta), axis=-1)
