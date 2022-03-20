@@ -1089,6 +1089,14 @@ class BoundaryArc(Geodesic):
         self.hyp_data[..., 2, :] *= -1
         self.set(self.hyp_data)
 
+    def endpoint_coords(self, model, ordered=True):
+        endpoints = Geodesic.endpoint_coords(self, model)
+        endpoints[self.orientation() < 0] = np.flip(
+            endpoints[self.orientation() < 0],
+            axis=-2
+        )
+        return endpoints
+
     def _build_orientation_point(self, endpoints):
         orientation_pt_1 = np.zeros(endpoints.shape[:-2] +
                                     (1, self.space.dimension + 1))
@@ -1101,6 +1109,9 @@ class BoundaryArc(Geodesic):
 
         dets = np.linalg.det(point_data)
         point_data[np.abs(dets) < ERROR_THRESHOLD, 2] = orientation_pt_2
+
+        signs = np.linalg.det(point_data)
+        point_data[signs < 0, 2] *= -1
 
         self.set(point_data)
 
@@ -1117,16 +1128,13 @@ class BoundaryArc(Geodesic):
         center = np.zeros(self.hyp_data.shape[:-2] + (2,))
         radius = np.ones(self.hyp_data.shape[:-2])
 
-        coords = Point(self.space, self.endpoints).coords(model)
+        coords = self.endpoint_coords(model, ordered=True)
         thetas = utils.circle_angles(center, coords)
 
         if degrees:
             thetas *= 180 / np.pi
 
-        orientation = self.orientation()
-        thetas[orientation < 0] = np.flip(
-            thetas[orientation < 0], axis=-1
-        )
+
 
         return center, radius, thetas
 
@@ -1359,7 +1367,7 @@ class HyperbolicSpace:
         denom = (x2 + (y - 1)*(y - 1))
 
         with np.errstate(divide="ignore", invalid="ignore"):
-            halfspace_coords[..., :-1] = (2 * v) / denom[..., np.newaxis]
+            halfspace_coords[..., :-1] = (-2. * v) / denom[..., np.newaxis]
             halfspace_coords[..., -1] = (1 - x2 - y * y) / denom
 
         return halfspace_coords
@@ -1371,7 +1379,7 @@ class HyperbolicSpace:
 
         poincare_coords = np.zeros_like(points)
         denom = (x2 + (y + 1)*(y + 1))
-        poincare_coords[..., 1:] = (2 * v) / denom[..., np.newaxis]
+        poincare_coords[..., 1:] = (-2. * v) / denom[..., np.newaxis]
         poincare_coords[..., 0] = (x2 + y * y - 1) / denom
 
         return poincare_coords

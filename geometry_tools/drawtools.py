@@ -339,5 +339,58 @@ class HyperbolicDrawing:
             else:
                 arc = Arc(center, radius * 2, radius * 2,
                           theta1=theta[0], theta2=theta[1],
-                          **kwargs)
+                          **default_kwargs)
                 self.ax.add_patch(arc)
+
+    def draw_boundary_arc(self, boundary_arc, **kwargs):
+        default_kwargs = {
+            "edgecolor": "black",
+            "linewidth": 3
+        }
+        for key, value in kwargs.items():
+            default_kwargs[key] = value
+
+        arclist = boundary_arc.flatten_to_unit()
+
+        if self.model == Model.POINCARE or self.model == Model.KLEIN:
+            centers, radii, thetas = arclist.circle_parameters(model=self.model)
+            for center, radius, theta in zip(centers, radii, thetas):
+                arc = Arc(center, radius * 2, radius * 2,
+                          theta1=theta[0], theta2=theta[1],
+                          **default_kwargs)
+
+                self.ax.add_patch(arc)
+
+        elif self.model == Model.HALFSPACE:
+            endpoints = arclist.endpoint_coords(self.model, ordered=True)
+
+            endpoints[..., 1] = 0.
+            endpoints[np.isnan(endpoints)[..., 0], 0] = np.inf
+
+            #first, draw all the lines where we go left to right
+            leftright = (endpoints[..., 0, 0] < endpoints[..., 1, 0])
+            leftright_endpts = endpoints[leftright]
+
+            leftright_arcs = LineCollection(leftright_endpts, **default_kwargs)
+            self.ax.add_collection(leftright_arcs)
+
+            infty_right = np.array([self.right_infinity, 0.])
+            infty_left = np.array([self.left_infinity, 0.])
+
+            to_right = np.broadcast_to(infty_right, endpoints[~leftright, 0].shape)
+            left_to = np.broadcast_to(infty_left, endpoints[~leftright, 1].shape)
+
+            coords1 = np.stack([endpoints[~leftright, 0], to_right], axis=-2)
+            coords2 = np.stack([endpoints[~leftright, 1], left_to], axis=-2)
+
+            right_arcs = LineCollection(coords1, **default_kwargs)
+            left_arcs = LineCollection(coords2, **default_kwargs)
+
+            self.ax.add_collection(right_arcs)
+            self.ax.add_collection(left_arcs)
+
+        else:
+            raise DrawingError(
+                "Drawing boundary arcs in model '{}' is not implemented.".format(
+                    self.model)
+            )
