@@ -1,7 +1,5 @@
-"""geometry_tools.representation
-
-Module to work with group representations into finite-dim vector
-spaces, using numerical matrices.
+"""Provide functionality to work with group representations into
+finite-dimensional vector spaces, using numerical matrices.
 
 """
 

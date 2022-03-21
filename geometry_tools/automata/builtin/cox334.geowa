@@ -1,0 +1,39 @@
+_RWS.geowa := rec(
+           isFSA := true,
+        alphabet := rec(
+                type := "identifiers",
+                size := 3,
+              format := "dense",
+               names := [a,b,c]
+               ),
+          states := rec(
+                type := "simple",
+                size := 18
+               ),
+           flags := ["DFA","minimized","BFS","accessible","trim"],
+         initial := [1],
+       accepting := [1..18],
+           table := rec(
+              format := "dense deterministic",
+      numTransitions := 34,
+         transitions := [[2,3,4],
+                         [0,5,6],
+                         [7,0,8],
+                         [9,10,0],
+                         [11,0,8],
+                         [12,10,0],
+                         [0,11,6],
+                         [9,13,0],
+                         [0,5,14],
+                         [7,0,13],
+                         [0,0,15],
+                         [0,5,16],
+                         [17,0,0],
+                         [16,10,0],
+                         [12,13,0],
+                         [0,18,0],
+                         [0,11,14],
+                         [11,0,13] 
+                        ]
+               )
+);

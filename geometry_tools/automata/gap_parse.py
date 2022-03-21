@@ -9,7 +9,7 @@ class GAPInputException(Exception):
 def parse_record(text):
     record = {}
     identifier_name = ""
-    
+
     i = 0
     while i < len(text):
         c = text[i]
@@ -26,7 +26,7 @@ def parse_record(text):
             identifier_name += c
         i += 1
     return (record, i + 1)
-            
+
 
 def literal_contents(content_str):
     if re.match(r"\d*\.\d+", content_str):
@@ -67,7 +67,7 @@ def parse_list(text):
         current_list = range(int(interval.group(2)),
                              int(interval.group(3)) + 1)
         return (current_list, len(interval.group(1)))
-    
+
     current_list = []
     content = ""
     i = 0

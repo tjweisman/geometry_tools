@@ -1,7 +1,5 @@
-"""geometry_tools.utils
-
-Module to provide utility functions used by the various geometry tools
-in this package.
+"""Provide utility functions used by the various geometry tools in
+this package.
 
 """
 
@@ -9,8 +7,8 @@ import numpy as np
 import scipy
 
 def rotation_matrix(angle):
-    """2x2 rotation matrix rotating counterclockwise by the specified
-    angle.
+    """Get a 2x2 rotation matrix rotating counterclockwise by the
+    specified angle.
 
     """
     return np.array([[np.cos(angle), -1*np.sin(angle)],
@@ -31,7 +29,14 @@ def permutation_matrix(permutation):
     """Return an nxn permutation matrix representing the given
     permutation.
 
-    permutation is a sequence of n numbers (indices).
+    Parameters:
+    -----------
+    permutation: a sequence of n numbers (indices), specifying a
+    permutation of (1, ... n).
+
+    Return:
+    ---------
+    numpy array storing an n * n permutation matrix
 
     """
     n = len(permutation)
@@ -83,16 +88,20 @@ def diagonalize_form(bilinear_form, order_eigenvalues="signed", reverse=False):
     return W
 
 def circle_angles(center, coords):
-    """return angles relative to the center of a circle.
+    """Return angles relative to the center of a circle.
 
-    center is an ndarray of shape (..., 2) representing x,y
-    coordinates the centers of some circles.
+    Parameters:
+    -----------
+    center: ndarray of shape (..., 2) representing x,y coordinates the
+    centers of some circles.
 
-    coords is an ndarray of shape (..., 2) representing x,y
-    coordinates of some points.
+    coords: ndarray of shape (..., 2) representing x,y coordinates of
+    some points.
 
-    Return: ndarray representing angles (relative to x-axis) of each
-    of the pair of points specified by coords.
+    Return:
+    --------
+    ndarray representing angles (relative to x-axis) of each of the
+    pair of points specified by coords.
 
     """
     xs = (coords - np.expand_dims(center, axis=-2))[..., 0]
@@ -128,10 +137,14 @@ def short_arc(thetas):
     """reorder angles so that the counterclockwise arc between them is
     shorter than the clockwise angle.
 
+    Parameters:
+    ------------
     thetas: ndarray of pairs of angles in the range (-2pi, 2pi)
 
-    return: ndarray of pairs of angles. a subset of the pairs in
-    thetas have been swapped.
+    Return:
+    ------------
+    ndarray of pairs of angles. a subset of the pairs in thetas have
+    been swapped.
 
     """
     shifted_thetas = np.copy(thetas)
@@ -147,10 +160,14 @@ def short_arc(thetas):
 def right_to_left(thetas):
     """reorder angles so that the counterclockwise arc goes right to left.
 
-    thetas: ndarray of pairs of angles
+    Parameters:
+    -------------
+    thetas: ndarray of pairs of angles.
 
-    return: ndarray of pairs of angles. a subset of the pairs have
-    been swapped.
+    Return:
+    ----------
+    ndarray of pairs of angles. a subset of the pairs have been
+    swapped.
 
     """
     flipped_thetas = np.copy(thetas)
@@ -162,16 +179,19 @@ def right_to_left(thetas):
 
 
 def arc_include(thetas, reference_theta):
-    """reorder angles so that the counterclockwise arc between them always
+    """Reorder angles so that the counterclockwise arc between them always
     includes some reference point on the circle.
 
+    Parameters:
+    --------------
     thetas: ndarray of pairs of angles in the range (-2pi, 2pi)
 
     reference_theta: ndarray of angles in the range (-2pi, 2pi)
 
-    return: ndarray theta_p of pairs of angles, so that
-    reference_theta lies in the counterclockwise angle between
-    theta_p[0] and theta_p[1].
+    Return:
+    -------------
+    ndarray theta_p of pairs of angles, so that reference_theta lies
+    in the counterclockwise angle between theta_p[0] and theta_p[1].
 
     """
 
@@ -231,6 +251,8 @@ def find_isometry(form, partial_map, force_oriented=False):
     """find a form-preserving matrix agreeing with a specified map on
     the flag defined by the standard basis.
 
+    Parameters:
+    -----------------
     form: the bilinear map to preserve
 
     partial_map: array of shape (..., k , n), representing the images
@@ -239,9 +261,11 @@ def find_isometry(form, partial_map, force_oriented=False):
     force_oriented: whether we should apply a reflection to force the
     resulting map to be orientation-preserving.
 
-    return: ndarray of shape (..., n, n) representing an array of
-    matrices whose rows and columns are "orthonormal" with respect to
-    the bilinear form (may have norm -1).
+    Return:
+    -------------
+    ndarray of shape (..., n, n) representing an array of matrices
+    whose rows and columns are "orthonormal" with respect to the
+    bilinear form (may have norm -1).
 
     For all j < k, the subspace spanned by the first j standard basis
     vectors is sent to the subspace spanned by the first j rows of the
@@ -300,7 +324,7 @@ def squeeze_excess(array, unit_axes, other_unit_axes):
 
     This undoes expand_unit_axes. If array is an ndarray of shape
 
-    ([object axes], [excess axes], [unit axes]),
+    `([object axes], [excess axes], [unit axes])`,
 
     where [unit axes] has length unit_axes, and [excess axes] has
     length other_unit_axes - unit_axes, this function reshapes the

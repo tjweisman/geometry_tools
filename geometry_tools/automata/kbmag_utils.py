@@ -1,24 +1,49 @@
+"""kbmag_utils.py: provide utility functions for working with the
+kbmag command-line tools and their output.
+
+"""
+
 from collections import deque
 from os import path
 import subprocess
 
-
-from . import gap_record_parse
-
+from . import gap_parse
 
 KBMAG_PATH = "/home/teddy/math/tools/kbmag/bin"
 
-def build_dict(v_list, labels, to_filter = []):
+def build_dict(transitions, labels, to_filter=[]):
+    """Build a python dictionary from the data in the GAP record produced
+    by kbmag to describe a finite-state automaton.
+
+    Parameters:
+    -----------
+
+    transitions: list of tuples of length n, where n is the number of
+    possible labels. If the ith entry of tuple j is k, then there is
+    an edge from vertex j to vertex k with label i. Note that this
+    implies that every vertex has outdegree len(labels).
+
+    labels: ordered list of edge labels appearing in transitions.
+
+    to_filter: vertices to discard when building the automaton
+    (i.e. the "failure states" of the automaton).
+
+    Return:
+    -----------
+
+    Dictionary describing the finite-state automaton, in the format
+    expected by the fsa.FSA class.
+
+    """
     v_dict = {}
-    for i,neighbors in enumerate(v_list):
+    for i, neighbors in enumerate(transitions):
         n_dict = {}
         for label, vertex in zip(labels, neighbors):
             if vertex not in to_filter:
-                if vertex not in n_dict:
-                    n_dict[vertex] = []
-                n_dict[vertex].append(label)
+                n_dict[label] = vertex
 
         v_dict[i+1] = n_dict
+
     return v_dict
 
 def dict_to_dot(fsa_dict, name="FSA", newlines=True):
@@ -48,38 +73,3 @@ def run_kbmag(filename):
 
     subprocess.call([autgroup, filename])
     subprocess.call([gpgeowa, filename])
-
-def load_fsa_dict(fsa_file):
-    gap_dict = gap_record_parse.load_record_file(fsa_file)
-    for fsa_dict in gap_dict.values():
-        if fsa_dict["isFSA"] == "true":
-            labels = fsa_dict["alphabet"]["names"]
-            transitions = fsa_dict["table"]["transitions"]
-
-            return build_dict(transitions, labels, to_filter = [0])
-
-def follow_word(graph_dict, word, start_vertex):
-    vertex = start_vertex
-    for letter in word:
-        vertex = graph_dict[vertex][letter]
-
-    return vertex
-
-def enumerate_fixed_length_paths(graph_dict, start_vertex, length):
-    if length <= 0:
-        yield ""
-    else:
-        for word in enumerate_fixed_length_paths(graph_dict, start_vertex, length - 1):
-            vertex = follow_word(graph_dict, word, start_vertex)
-            for label in graph_dict[vertex]:
-                yield word + label
-
-def enumerate_words(fsa, max_length):
-    graph_dict = defaultdict(dict)
-    for vertex, edge_dict in fsa.items():
-        for neighbor, labels in edge_dict.items():
-            graph_dict[vertex][labels[0]] = neighbor
-
-    for i in range(max_length):
-        for word in enumerate_fixed_length_paths(graph_dict, 1, i):
-            yield word

@@ -1,0 +1,26 @@
+_RWS.geowa := rec(
+           isFSA := true,
+        alphabet := rec(
+                type := "identifiers",
+                size := 4,
+              format := "dense",
+               names := [a,A,b,B]
+               ),
+          states := rec(
+                type := "simple",
+                size := 5
+               ),
+           flags := ["DFA","minimized","BFS","accessible","trim"],
+         initial := [1],
+       accepting := [1..5],
+           table := rec(
+              format := "dense deterministic",
+      numTransitions := 16,
+         transitions := [[2,3,4,5],
+                         [2,0,4,5],
+                         [0,3,4,5],
+                         [2,3,4,0],
+                         [2,3,0,5] 
+                        ]
+               )
+);

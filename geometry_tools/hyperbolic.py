@@ -1,6 +1,4 @@
-"""geometry_tools.hyperbolic
-
-Provides classes to model objects in hyperbolic space with numerical
+"""Provide classes to model objects in hyperbolic space with numerical
 coordinates.
 
 """

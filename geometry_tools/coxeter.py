@@ -1,6 +1,4 @@
-"""geometry_tools.coxeter
-
-Module to work with Coxeter groups.
+"""Provide functionality to work with Coxeter groups.
 
 Right now the only useful thing this can do is produce the canonical
 representation of a Coxeter group whose Coxeter matrix has finite
