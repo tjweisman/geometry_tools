@@ -42,6 +42,7 @@ class Model(Enum):
     PROJECTIVE = "projective"
 
     def aliases(self):
+        """List all of the different accepted names for this hyperbolic model."""
         return [name for name, member in Model.__members__.items()
                 if member is self]
 

@@ -367,12 +367,14 @@ class HyperbolicDrawing:
             endpoints[..., 1] = 0.
             endpoints[np.isnan(endpoints)[..., 0], 0] = np.inf
 
-            #first, draw all the lines where we go left to right
+            # first, draw all the lines where we go left to right
             leftright = (endpoints[..., 0, 0] < endpoints[..., 1, 0])
             leftright_endpts = endpoints[leftright]
 
             leftright_arcs = LineCollection(leftright_endpts, **default_kwargs)
             self.ax.add_collection(leftright_arcs)
+
+            # then, draw all the lines that wrap around infinity
 
             infty_right = np.array([self.right_infinity, 0.])
             infty_left = np.array([self.left_infinity, 0.])
