@@ -9,8 +9,6 @@ from copy import copy
 from enum import Enum
 
 import numpy as np
-import scipy
-from scipy.optimize import fsolve
 
 from geometry_tools import projective, representation, utils
 
@@ -1393,7 +1391,9 @@ class HyperbolicSpace:
         diagonally in O(n,1).
 
         """
-        mat = scipy.linalg.block_diag(1.0, block_elliptic)
+        mat = np.zeros((self.dim + 1, self.dim + 1))
+        mat[0,0] = 1.0
+        mat[1:, 1:] = block_elliptic
 
         return Isometry(self, mat, column_vectors=True)
 
@@ -1434,13 +1434,14 @@ class HyperbolicSpace:
         return (np.exp(2 * r) - 1) / (1 + np.exp(2 * r))
 
     def _loxodromic_basis_change(self):
+        mat = np.identity(self.dimension + 1)
         basis_change = np.array([
             [1.0, 1.0],
             [1.0, -1.0]
         ])
-        return scipy.linalg.block_diag(
-            basis_change, np.identity(self.dimension - 1)
-        )
+        mat[0:2, 0:2] = basis_change
+
+        return mat
 
     def get_standard_loxodromic(self, parameter):
         """Get a loxodromic isometry whose axis intersects the origin.
@@ -1465,10 +1466,9 @@ class HyperbolicSpace:
 
         WARNING: not vectorized.
         """
-        affine = scipy.linalg.block_diag(
-            utils.rotation_matrix(angle),
-            np.identity(self.dimension - 2)
-        )
+        affine = np.identity(self.dimension)
+        affine[0:2, 0:2] = utils.rotation_matrix(angle)
+
         return self.get_elliptic(affine)
 
     def sl2r_iso(self, matrix):
