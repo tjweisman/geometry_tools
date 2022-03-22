@@ -1,5 +1,5 @@
-"""kbmag_utils.py: provide utility functions for working with the
-kbmag command-line tools and their output.
+"""Provides utility functions for working with the kbmag command-line
+tools and their output.
 
 """
 
@@ -15,24 +15,27 @@ def build_dict(transitions, labels, to_filter=[]):
     """Build a python dictionary from the data in the GAP record produced
     by kbmag to describe a finite-state automaton.
 
-    Parameters:
+    Parameters
     -----------
 
-    transitions: list of tuples of length n, where n is the number of
-    possible labels. If the ith entry of tuple j is k, then there is
-    an edge from vertex j to vertex k with label i. Note that this
-    implies that every vertex has outdegree len(labels).
+    transitions : list
+        list of tuples of length `n`, where `n` is the number of
+        possible labels. If the `i`th entry of tuple `j` is `k`, then there is
+        an edge from vertex `j` to vertex `k` with label `i`. Note that this
+        implies that every vertex has outdegree `len(labels)`.
 
-    labels: ordered list of edge labels appearing in transitions.
+    labels : list
+        ordered list of edge labels appearing in transitions.
 
-    to_filter: vertices to discard when building the automaton
-    (i.e. the "failure states" of the automaton).
+    to_filter : list
+        vertices to discard when building the automaton
+        (i.e. the "failure states" of the automaton).
 
-    Return:
-    -----------
-
-    Dictionary describing the finite-state automaton, in the format
-    expected by the fsa.FSA class.
+    Returns
+    ------
+    dict
+        Dictionary describing the finite-state automaton, in the format
+        expected by the `geometry_tools.automata.fsa.FSA` class.
 
     """
     v_dict = {}

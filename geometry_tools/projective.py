@@ -1,5 +1,4 @@
-"""This module provides classes and helper functions to work with
-projective space in numerical coordinates.
+"""Work with projective space in numerical coordinates.
 
 The main class provided by this module is ProjectiveSpace, which
 represents a copy of n-dimensional projective space.

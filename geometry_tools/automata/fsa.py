@@ -1,4 +1,4 @@
-"""fsa.py: tools to work with finite-state automata
+"""Work with finite-state automata.
 
 This module provides the FSA class, which can be used to facilitate
 the construction of finite-state automata and perform tasks like
@@ -21,6 +21,7 @@ from . import kbmag_utils, gap_parse
 
 BUILTIN_DIR = "builtin"
 
+
 class FSAException(Exception):
     pass
 
@@ -31,7 +32,8 @@ class FSA:
     python dictionary of the form:
 
     ```
-    { vertex1: {label_a: neighbor_a, label_b: neighbor_b, ...},
+    {
+      vertex1: {label_a: neighbor_a, label_b: neighbor_b, ...},
       vertex2: ....,
     }
     ```
@@ -44,35 +46,32 @@ class FSA:
     built-in methods.
 
     """
-
     def __init__(self, vert_dict={}, start_vertices=[], graph_dict=True):
         """
+
         Parameters
         ----------
-        vert_dict: dictionary of vertices used to build the
-        automaton. By default, this dictionary should have format:
+        vert_dict : dict
+            dictionary of vertices used to build the automaton. By
+            default, this dictionary should have the format specified
+            above.
 
-        ```
-        { vertex1: {label_a: neighbor_a, label_b: neighbor_b, ...},
-          vertex2: ....,
-        }
-        ```
+        start_vertices : list
+            list of vertices which are valid start states
+            for this automaton. Currently, the FSA class will not
+            correctly handle lists of length > 1.
 
-        start_vertices: list of vertices which are valid start states
-        for this automaton. Currently, the FSA class will not
-        correctly handle lists of length > 1.
+        graph_dict : bool
+            If `True` (the default), expect a dictionary of the format
+            listed above. If `False`, instead expect a dictionary with format:
 
-        graph_dict: If True (the default), expect a dictionary of the format
-        listed above. If False, instead expect a dictionary with format:
-
-        ```
-        { vertex1: {neighbor_a: [neighbor_a_label1, neighbor_a_label2, ...],
-                    neighbor_b: [neighbor_b_label1, neighbor_b_label2, ...],
-                    ....},
-          vertex2: ....,
-        }
-        ```
-
+            ```
+            {
+              vertex1: {neighbor_a: [neighbor_a_label1, neighbor_a_label2, ...],
+                        neighbor_b: [neighbor_b_label1, neighbor_b_label2, ...], ....},
+              vertex2: ....,
+            }
+            ```
         """
         if graph_dict:
             self._from_graph_dict(vert_dict)
@@ -152,7 +151,7 @@ class FSA:
         """Get the label of an edge from its tail and head vertex.
 
         This function will raise an exception if there is not a unique
-        edge between this pair of vertices.
+        edge between `tail` and `head`.
 
         """
         if len(self._out_dict[tail][head]) == 1:
@@ -162,8 +161,9 @@ class FSA:
                             " one edge between these vertices!" )
 
     def edge_labels(self, tail, head):
-        """Get the list of labels associated to all the edges between a pair
-        of vertices.
+        """Get the list of labels associated to all the edges between `tail`
+        and `head`.
+
         """
         return self._out_dict[tail][head]
 
@@ -179,13 +179,16 @@ class FSA:
     def add_edges(self, edges, elist=False):
         """Add edges to the FSA.
 
+        Parameters
+        -------------
+        edges : list
+            a list of tuples of the form `(tail, head, label)`,
+            specifying an edge to add.
 
-        edges: a list of tuples of the form `(tail, head, label)`,
-        specifying an edge to add.
-
-        elist: if True, then label should be interpreted as a single
-        edge label. Otherwise, label is interpreted as a list of
-        labels for multiple edges to be added between vertices.
+        elist : bool
+            if `True`, then `label` should be interpreted as a single
+            edge label. Otherwise, `label` is interpreted as a list of
+            labels for multiple edges to be added between vertices.
 
         """
         for e in edges:
@@ -228,22 +231,29 @@ class FSA:
         self._in_dict.pop(vertex)
         self._graph_dict.pop(vertex)
 
-
-
     def vertices(self):
         return self._out_dict.keys()
 
     def edges(self):
         for v, nbrs in self._out_dict.items():
             for w in nbrs:
-                yield (v,w)
+                yield (v, w)
 
     def recurrent(self, inplace=False):
         """Find a version of the automaton which is recurrent, i.e. which has
         no dead ends.
 
-        inplace: if True, modify the automaton in-place. Otherwise,
-        return a recurrent copy.
+        Parameters
+        -----------
+        inplace : bool
+            if `True`, modify the automaton in-place. Otherwise,
+            return a recurrent copy.
+
+        Returns
+        -------
+        FSA or None
+            A recurrent version of the automaton if `inplace` is
+            `True`, otherwise `None`.
 
         """
 
@@ -276,9 +286,12 @@ class FSA:
         It is mostly useful for visualizing the structure of the
         automaton.
 
-        edge_ties: if True, if two edges give rise to paths of the
-        same length, include both of them in the new graph.
+        Parameters
+        --------------
 
+        edge_ties : bool
+            if `True`, if two edges give rise to paths of the
+            same length, include both of them in the new graph.
         """
         H = FSA({})
         H.add_vertices(self.vertices())
@@ -316,7 +329,7 @@ class FSA:
         """Find the final state of the automaton when it tries to accept a
         given word.
 
-        If start_vertex is None, use the default starting state for
+        If `start_vertex` is `None`, use the default starting state for
         the automaton.
 
         """
@@ -334,26 +347,26 @@ class FSA:
         """Enumerate all words of a fixed length accepted by the automaton,
         starting at a given state.
 
-        Required arguments:
-        ------------------
-        length: the length of the words we want to enumerate
+        Parameters
+        -----------
+        length : int
+            the length of the words we want to enumerate
 
-        Keyword arguments:
-        -------------------
-        start_vertex: which vertex to start at. If `None`, use the
-        default starting state for the automaton.
+        start_vertex : object
+            which vertex to start at. If `None`, use the
+            default starting state for the automaton.
 
-        with_states: if True, also yield the state of the
-        automaton at each accepted word.
+        with_states : bool
+            if `True`, also yield the state of the
+            automaton at each accepted word.
 
-        Return:
+        Yields
         -------
-        If `with_states` is false, return a generator yielding the
-        sequence of words accepted (in some arbitrary
-        order). Otherwise, return a generator yielding pairs of the
-        form `(word, end_state)`, where `end_state` is the final state
-        the automaton reaches when accepting `word`.
-
+        string or (string, object)
+            If `with_states` is false, yield the sequence of words
+            accepted (in some arbitrary order). Otherwise, yield pairs
+            of the form `(word, end_state)`, where `end_state` is the
+            final state the automaton reaches when accepting `word`.
         """
         if start_vertex is None:
             start_vertex = self.start_vertices[0]
@@ -372,30 +385,28 @@ class FSA:
                     else:
                         yield word + label
 
-    def enumerate_words(self, max_length, start_vertex=None, with_states=False):
-        """Enumerate all words up to a given length accepted by the
-        automaton.
+    def enumerate_words(self, max_length, start_vertex=None,
+                        with_states=False):
+        """Enumerate all words up to a given length accepted by the automaton.
 
-        Required arguments:
-        -------------------
-        max_length: maximum length of a word to enumerate
+        Parameters
+        ----------
+        max_length : int
+            maximum length of a word to enumerate
+        start_vertex : object
+            the start vertex for accepting words. If `None`, use the
+            automaton's start vertex
+        with_states : bool
+            if `True`, also yield the state of the automaton at each
+            accepted word
 
-        Keyword arguments:
-        ------------------
-        start_vertex: the start vertex for accepting words. If None,
-        use the automaton's starting vertex.
-
-        with_states: if `True`, also yield the state of the
-        automaton at each accepted word.
-
-        Return:
+        Yields
         -------
-        If with_states is false, return a generator yielding the
-        sequence of words accepted (in some arbitrary
-        order). Otherwise, return a generator yielding pairs of the
-        form (word, end_state), where end_state is the final state the
-        automaton reaches when accepting word.
-
+        string or (string, object)
+            If `with_states` is false, yield the sequence of words
+            accepted (in some arbitrary order). Otherwise, yield pairs
+            of the form `(word, end_state)`, where `end_state` is the
+            final state the automaton reaches when accepting `word`.
         """
 
         for i in range(max_length + 1):
@@ -403,24 +414,42 @@ class FSA:
                     i, start_vertex=start_vertex, with_states=with_states):
                 yield word
 
-def from_kbmag_file(filename):
+
+def from_kbmag_file(filename) -> FSA:
     """Build a finite-state automaton from a GAP record file produced by
     the kbmag program.
 
-    Arguments:
-    ------------
-    filename: the GAP record file containing automaton data.
+    Parameters
+    -----------
+    filename : string
+        the GAP record file containing automaton data.
 
-    Return:
+    Returns
     --------
-    An `FSA` object representing the automaton described by the
-    file.
+    FSA
+        The automaton described by the
+        file.
 
     """
     gap_record = gap_parse.load_record_file(filename)
     return _from_gap_record(gap_record)
 
-def _from_gap_record(gap_record):
+
+def _from_gap_record(gap_record) -> FSA:
+    """Load an automaton from a GAP record
+
+    Parameters
+    ----------
+    gap_record : dict
+        Preparsed GAP record to load
+
+    Returns
+    -------
+    FSA
+        finite-state automaton represented by this record
+
+    """
+
     for fsa_dict in gap_record.values():
         if fsa_dict["isFSA"] == "true":
             labels = fsa_dict["alphabet"]["names"]
@@ -433,17 +462,19 @@ def _from_gap_record(gap_record):
 
             return FSA(out_dict, start_vertices=initial)
 
-def load_builtin(filename):
-    """Load a finite-state automaton included with the automata
-    subpackage.
 
-    Parameters:
-    -----------
-    filename: the automaton file to use
+def load_builtin(filename) -> FSA:
+    """Load a finite-state automaton built in to the automata subpackage.
 
-    Return:
-    ---------
-    FSA object representing this automaton.
+    Parameters
+    ----------
+    filename : string
+        Name of the automaton file to load
+
+    Returns
+    -------
+    FSA
+        finite-state automaton read from this file
 
     """
     aut_string = pkg_resources.resource_string(
@@ -452,7 +483,8 @@ def load_builtin(filename):
     record, _ = gap_parse.parse_record(aut_string.decode('utf-8'))
     return _from_gap_record(record)
 
-def list_builtins():
+
+def list_builtins() -> list:
     """Return a list of all the automata included with the automata
     subpackage.
 

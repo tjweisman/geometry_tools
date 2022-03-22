@@ -1,6 +1,4 @@
-"""geometry_tools.convexity
-
-Module providing convenience functions for drawing convex polygons.
+"""Work with convex hulls of points in affine space.
 
 Mostly these are convenient wrappers for some of scipy's QHull
 wrappers (which can be kind of inconveninet).

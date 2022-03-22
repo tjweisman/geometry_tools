@@ -1,5 +1,4 @@
-"""Provide classes to model objects in hyperbolic space with numerical
-coordinates.
+"""Model objects in hyperbolic space with numerical coordinates.
 
 """
 
@@ -25,8 +24,8 @@ class Model(Enum):
     """Enumerate implemented models of hyperbolic space.
 
     Models can have different aliases, and can be compared to strings
-    with the == operator, which returns True if the strings match any
-    alias name (case insensitive).
+    with the == operator, which returns `True` if the strings match
+    any alias name (case insensitive).
 
     """
     POINCARE = "poincare"
@@ -67,16 +66,40 @@ class HyperbolicObject:
     which transforms via the action of the indefinite orthogonal group
     O(n,1).
 
-    The last unit_ndims dimensions of this underlying array represent
+    The last `unit_ndims` dimensions of this underlying array represent
     a single object in hyperbolic space, which transforms as a unit
     under the action of O(n,1). The remaining dimensions of the array
     are used to represent an array of such "unit objects."
 
     """
-
     def __init__(self, space, hyp_data, aux_data=None,
                  unit_ndims=1, aux_ndims=0):
+        """Parameters
+        -----------
 
+        space : HyperbolicSpace
+            Hyperbolic space this object belongs to
+
+        hyp_data : ndarray
+            underyling data describing this hyperbolic object
+
+        aux_data : ndarray
+            auxiliary data describing this hyperbolic
+            object. Auxiliary data is any data which is in principle
+            computable from `hyp_data`, but is convenient to keep as
+            part of the object definition for transformation purposes.
+
+        unit_ndims : int
+            number of ndims of an array representing a "unit" version
+            of this object. For example, an object representing a
+            single point in hyperbolic space has `unit_ndims` 1, while
+            an object representing a line segment has `unit_ndims`
+            equal to 2.
+
+        aux_ndims : int
+            like `unit_ndims`, but for auxiliary data.
+
+        """
         self.unit_ndims = unit_ndims
         self.aux_ndims = aux_ndims
 
@@ -162,6 +185,11 @@ class HyperbolicObject:
         """Get the shape of the ndarray of "unit objects" this
         HyperbolicObject represents.
 
+        Returns
+        ---------
+        tuple
+
+
         """
         return self.hyp_data.shape[:-1 * self.unit_ndims]
 
@@ -170,6 +198,15 @@ class HyperbolicObject:
 
         Subclasses may override this method to give special names to
         portions of the underlying data.
+
+        Parameters
+        -------------
+        hyp_data : ndarray
+            underyling data representing this hyperbolic object.
+
+        aux_data : ndarray
+            underyling auxiliary data for this hyperbolic object.
+
 
         """
         self._assert_geometry_valid(hyp_data)
@@ -183,6 +220,13 @@ class HyperbolicObject:
 
     def flatten_to_unit(self, unit=None):
         """return a flattened version of the hyperbolic object.
+
+        Parameters
+        ----------
+
+        unit : int
+            the number of ndims to treat as a "unit" when flattening
+            this object into units.
         """
 
         aux_unit = unit
@@ -222,6 +266,27 @@ class HyperbolicObject:
         return self.__class__(self.space, self.hyp_data[item])
 
     def coords(self, model, hyp_data=None):
+        """Get or set a representation of this hyperbolic object in
+        coordinates.
+
+        For the base `HyperbolicObject` class, the available models
+        are `Model.KLEIN` and `Model.PROJECTIVE`.
+
+        Parameters
+        ----------
+        model : Model
+            which model to take coordinates in
+        hyp_data : ndarray
+            data for this hyperbolic object, interpreted as
+            coordinates with respect to `model`. If `None`, just
+            return coordinates.
+
+        Raises
+        ------
+        GeometryError
+            Raised if an unsupported model is specified.
+
+    """
         if model == Model.KLEIN:
             return self.kleinian_coords(hyp_data)
         if model == Model.PROJECTIVE:
@@ -241,7 +306,7 @@ class HyperbolicObject:
         return self.hyp_data
 
     def kleinian_coords(self, hyp_data=None):
-        """Get kleinian (affine) coordinates for this object.
+        """Get or set kleinian (affine) coordinates for this object.
         """
         if hyp_data is not None:
             self.set(self.space.projective.affine_to_projective(hyp_data))
@@ -277,7 +342,7 @@ class Point(HyperbolicObject):
                                   "closure of the Minkowski light cone"))
 
     def hyperboloid_coords(self, hyp_data=None):
-        """Get point coordinates on the unit hyperboloid
+        """Get or set point coordinates on the unit hyperboloid.
         """
         if hyp_data is not None:
             self.set(hyp_data)
@@ -285,7 +350,7 @@ class Point(HyperbolicObject):
         return self.space.hyperboloid_coords(self.hyp_data)
 
     def poincare_coords(self, hyp_data=None):
-        """Get point coordinates in the Poincare ball (radius 1)
+        """Get or set point coordinates in the Poincare ball (radius 1)
         """
         if hyp_data is not None:
             klein = self.space.poincare_to_kleinian(np.array(hyp_data))
@@ -294,6 +359,14 @@ class Point(HyperbolicObject):
         return self.space.kleinian_to_poincare(self.kleinian_coords())
 
     def halfspace_coords(self, hyp_data=None):
+        """Get or set point coordinates in the upper half-space model
+
+        Parameters
+        ----------
+        hyp_data : ndarray
+
+        """
+
         poincare = None
 
         if hyp_data is not None:
@@ -303,6 +376,27 @@ class Point(HyperbolicObject):
         return self.space.poincare_to_halfspace(poincare_coords)
 
     def coords(self, model, hyp_data=None):
+        """Get or set a representation of this hyperbolic object in
+        coordinates.
+
+        The available models are `Model.KLEIN`, `Model.PROJECTIVE`,
+        `Model.POINCARE`, `Model.HYPERBOLOID`, and `Model.HALFSPACE`.
+
+        Parameters
+        ----------
+        model : Model
+            which model to take coordinates in
+        hyp_data : ndarray
+            data for this hyperbolic object, interpreted as
+            coordinates with respect to `model`. If `None`, just
+            return coordinates.
+
+        Raises
+        ------
+        GeometryError
+            Raised if an unsupported model is specified.
+
+    """
         try:
             return HyperbolicObject.coords(self, model, hyp_data)
         except GeometryError as e:
@@ -316,7 +410,7 @@ class Point(HyperbolicObject):
 
     def distance(self, other):
         """compute elementwise distances (with respect to last two dimensions)
-        between self and other
+        between `self` and `other`
 
         """
         #TODO: allow for pairwise distances
@@ -326,16 +420,15 @@ class Point(HyperbolicObject):
         return np.arccosh(np.abs(products))
 
     def origin_to(self):
-        """Get an isometry taking the origin to this point.
+        """Get an isometry taking the origin to `self`.
 
         Not guaranteed to be orientation-preserving."""
         return self.space.timelike_to(self.hyp_data)
 
     def unit_tangent_towards(self, other):
-        """Get the unit tangent vector pointing from this point to another
-        point in hyperbolic space.
+        """Get the unit tangent vector pointing from `self` to `other`.
 
-        """
+    """
         diff = other.hyp_data - self.hyp_data
         return TangentVector(self.space, self, diff).normalized()
 
@@ -343,7 +436,7 @@ class Point(HyperbolicObject):
 class DualPoint(HyperbolicObject):
     """Model for a "dual point" in hyperbolic space (a point in the
     complement of the projectivization of the Minkowski light cone,
-    corresponding to a geodesic hyperplane in hyperbolic space)
+    corresponding to a geodesic hyperplane in hyperbolic space).
 
     """
 
@@ -398,10 +491,25 @@ class Subspace(IdealPoint):
         """Get parameters describing a k-sphere corresponding to this subspace
         in the Poincare model.
 
-        Returns a pair (center, radius). In the Poincare model, this
-        subspace lies on a sphere with these parameters.
+        Parameters
+        ----------
+        model : Model
+            hyperbolic model to use. Acceptable values are
+            `Model.POINCARE` and `Model.HALFSPACE`
 
-        """
+        Returns
+        ---------
+        tuple
+            Tuple of the form `(centers, radii)`, where `centers` and
+            `radii` are `ndarray`s respectively holding the centers
+            and radii of spheres corresponding to this subspace in the
+            given hyperbolic model.
+
+        Raises
+        ------
+        GeometryError
+
+    """
 
         if model == Model.POINCARE:
             klein_basis = self.ideal_basis_coords(model=Model.KLEIN)
@@ -434,11 +542,23 @@ class Subspace(IdealPoint):
         """Get parameters describing a circular arc corresponding to this
         subspace in the Poincare or halfspace models.
 
-        Returns a tuple (center, radius, thetas). In the Poincare
-        model, the subspace lies on a circle with this center and
-        radius. thetas is an ndarray with shape (..., 2), giving the
-        angle (with respect to the center of the circle) of two of the
-        ideal points in this subspace.
+        Parameters
+        ----------
+        degrees : bool
+            if `True`, return angles in degrees. Otherwise, return
+            angles in radians
+        model : Model
+            hyperbolic model to use for the computation
+
+        Returns
+        --------
+        tuple
+            tuple `(centers, radii, thetas)`, where `centers`,
+            `radii`, and `thetas` are `ndarray`s representing the
+            centers, radii, and begin/end angles for the circle
+            corresponding to this arc in the given model of hyperbolic
+            space. Angles are always specified in counterclockwise
+            order.
 
         """
         center, radius = self.sphere_parameters(model)
@@ -482,9 +602,9 @@ class PointPair(Point):
     def set_endpoints(self, endpoint1, endpoint2=None):
         """Set the endpoints of a segment.
 
-        If endpoint2 is None, expect endpoint1 to be an array of
-        points with shape (..., 2, n). Otherwise, expect endpoint1 and
-        endpoint2 to be arrays of points with the same shape.
+        If `endpoint2` is `None`, expect `endpoint1` to be an array of
+        points with shape `(..., 2, n)`. Otherwise, expect `endpoint1`
+        and `endpoint2` to be arrays of points with the same shape.
 
         """
         if endpoint2 is None:
@@ -633,9 +753,9 @@ class Segment(Geodesic):
         """Get parameters describing a circular arc corresponding to this
         segment in the Poincare or halfspace models.
 
-        Returns a tuple (center, radius, thetas). In the Poincare
+        Returns a tuple `(center, radius, thetas)`. In the Poincare
         model, the segment lies on a circle with this center and
-        radius. thetas is an ndarray with shape (..., 2), giving the
+        radius. thetas is an ndarray with shape `(..., 2)`, giving the
         angle (with respect to the center of the circle) of the
         endpoints of the segment.
 

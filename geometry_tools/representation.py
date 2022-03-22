@@ -1,5 +1,5 @@
-"""Provide functionality to work with group representations into
-finite-dimensional vector spaces, using numerical matrices.
+"""Work with group representations into finite-dimensional vector
+spaces, using numerical matrices.
 
 """
 

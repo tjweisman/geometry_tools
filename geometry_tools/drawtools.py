@@ -1,7 +1,4 @@
-"""geometry_tools.drawtools
-
-Provides some useful functions for turning objects from the hyperbolic
-module into matplotlib figures.
+"""Turn objects from the hyperbolic module into matplotlib figures.
 
 """
 

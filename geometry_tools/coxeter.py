@@ -1,4 +1,4 @@
-"""Provide functionality to work with Coxeter groups.
+"""Work with Coxeter groups and their representations.
 
 Right now the only useful thing this can do is produce the canonical
 representation of a Coxeter group whose Coxeter matrix has finite
