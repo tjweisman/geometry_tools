@@ -1509,7 +1509,7 @@ class HyperbolicSpace:
         diagonally in O(n,1).
 
         """
-        mat = np.zeros((self.dim + 1, self.dim + 1))
+        mat = np.zeros((self.dimension + 1, self.dimension + 1))
         mat[0,0] = 1.0
         mat[1:, 1:] = block_elliptic
 
@@ -1606,16 +1606,24 @@ class HyperbolicSpace:
         return Isometry(self, representation.sl2_to_so21(np.array(matrix)),
                         column_vectors=True)
 
-    def regular_polygon(self, n, hyp_radius):
+    def regular_polygon(self, n, radius=None, angle=None):
         """Get a regular polygon with n vertices, inscribed on a circle of
         radius hyp_radius.
 
         (This is actually vectorized.)
 
         """
-        radius = np.array(hyp_radius)
-        tangent = self.get_base_tangent(radius.shape).normalized()
-        start_vertex = tangent.point_along(radius)
+        if radius is None and angle is None:
+            raise ValueError(
+                "Must provide either an angle or a radius to regular_polygon"
+            )
+
+        if radius is None:
+            radius = self.regular_polygon_radius(n, angle)
+
+        hyp_radius = np.array(radius)
+        tangent = self.get_base_tangent(hyp_radius.shape).normalized()
+        start_vertex = tangent.point_along(hyp_radius)
 
         cyclic_rep = HyperbolicRepresentation(self)
         cyclic_rep["a"] = self.get_standard_rotation(2 * np.pi / n)

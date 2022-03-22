@@ -1,4 +1,3 @@
-r"""
 geometry_tools
 ==============
 
@@ -18,24 +17,24 @@ None of the functionality of this package is (mathematically) very deep. Mostly,
 
 ## Example usage
 
-```python
-import matplotlib.pyplot as plt
-from numpy import pi
+To draw a picture of a right-angled pentagon in the hyperbolic plane:
 
+```python
 from geometry_tools import hyperbolic, drawtools
+from numpy import pi
 
 # make a copy of the hyperbolic plane
 plane = hyperbolic.HyperbolicPlane()
 
 # make a right-pentagon
-pentagon = plane.regular_polygon(5, pi / 2)
+pentagon = plane.regular_polygon(5, angle=pi/2)
 
 # draw the pentagon
 figure = drawtools.HyperbolicDrawing()
 figure.draw_plane()
 figure.draw_polygon(pentagon, facecolor="lightblue")
 
-plt.show()
+figure.show()
 
 ```
 
@@ -43,4 +42,5 @@ This code produces:
 
 ![A right-angled pentagon in the Poincare disc model for the hyperbolic plane](right_angled_pentagon.png)
 
-"""
+## Drawing plane tilings using `geometry_tools.automata`
+

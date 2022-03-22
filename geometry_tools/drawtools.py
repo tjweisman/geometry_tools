@@ -393,3 +393,6 @@ class HyperbolicDrawing:
                 "Drawing boundary arcs in model '{}' is not implemented.".format(
                     self.model)
             )
+
+    def show(self):
+        plt.show()
