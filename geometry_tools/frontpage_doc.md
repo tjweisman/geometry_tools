@@ -1,7 +1,4 @@
-geometry_tools
-==============
-
-`geometry_tools` is a small Python package meant to ease the process of working with group actions on hyperbolic and projective space.
+`geometry_tools` is a Python package meant to help you work with and visualize group actions on hyperbolic space and projective space.
 
 The package is mostly built on top of [numpy](invalid_url) and [matplotlib](invalid_url), and provides modules to:
 
@@ -15,7 +12,7 @@ The package is mostly built on top of [numpy](invalid_url) and [matplotlib](inva
 
 None of the functionality of this package is (mathematically) very deep. Mostly, the package just wraps more sophisticated tools in a way intended to make it easy to quickly draw good pictures in H^2 and H^3. Eventually I hope to extend some of the picture-drawing functionality to real projective space, but we're not there yet.
 
-## Example usage
+## A quick example
 
 To draw a picture of a right-angled pentagon in the hyperbolic plane:
 
@@ -42,5 +39,16 @@ This code produces:
 
 ![A right-angled pentagon in the Poincare disc model for the hyperbolic plane](right_angled_pentagon.png)
 
-## Drawing plane tilings using `geometry_tools.automata`
+# Installation
+
+Right now, the easiest way to install `geometry_tools` is to download or clone the project from the [git repository](NOTAURL), and run
+
+```shell
+python setup.py install
+```
+from the directory where you've downloaded it.
+
+At some point in the (very near) future, I hope to upload the package to PyPI so you can install it via `pip`.
+
+# Getting started
 
