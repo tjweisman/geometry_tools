@@ -480,12 +480,33 @@ class Subspace(IdealPoint):
         boundary of H^n.
 
         """
-
         #we don't return hyp_data directly, since we want subclasses
         #to be able to use this method even if the structure of the
         #underlying data is different.
-
         return Point(self.space, self.ideal_basis).coords(model)
+
+    def spacelike_complement(self):
+        orthed = self._data_with_dual()
+        return DualPoint(self.space, orthed[..., 0, :])
+
+    def _data_with_dual(self):
+        midpoints = np.sum(self.ideal_basis, axis=-2) / self.ideal_basis.shape[-2]
+
+        spacelike_guess = np.ones(
+            self.ideal_basis.shape[:-2] + (1, self.ideal_basis.shape[-1])
+        )
+        spacelike_guess[..., 0] = 0.
+
+        to_orthogonalize = np.concatenate([
+            np.expand_dims(midpoints, axis=-2),
+            self.ideal_basis[..., 1:, :],
+            spacelike_guess], axis=-2)
+
+        orthed = utils.indefinite_orthogonalize(self.space.minkowski(),
+                                                to_orthogonalize)
+        return np.concatenate([
+            np.expand_dims(orthed[..., -1, :], axis=-2),
+            self.ideal_basis], axis=-2)
 
     def sphere_parameters(self, model=Model.POINCARE):
         """Get parameters describing a k-sphere corresponding to this subspace
@@ -575,6 +596,28 @@ class Subspace(IdealPoint):
             thetas *= 180 / np.pi
 
         return center, radius, thetas
+
+    def reflection_across(self):
+        """Get a hyperbolic isometry reflecting across this hyperplane.
+
+        Returns
+        --------
+        Isometry
+            Isometry reflecting across this hyperplane.
+
+        """
+        dual_data = self._data_with_dual()
+        if self.space.dimension + 1 != dual_data.shape[-2]:
+            raise GeometryError(
+                ("Cannot compute a reflection across a subspace of "
+                 "dimension {}").format(dual_data.shape[-2])
+            )
+
+        refdata = (np.linalg.inv(dual_data) @
+                   self.space.minkowski() @
+                   dual_data)
+
+        return Isometry(self.space, refdata, column_vectors=False)
 
 class PointPair(Point):
     """Abstract model for a hyperbolic object whose underlying data is
@@ -820,6 +863,9 @@ class Hyperplane(Subspace):
         if not self.space.all_lightlike(hyp_data[..., 1:, :]):
             raise GeometryError( ("Hyperplane data at index [..., 1, :]"
                                   " must consist of lightlike vectors") )
+
+    def _data_with_dual(self):
+        return self.hyp_data
 
     def set(self, hyp_data):
         HyperbolicObject.set(self, hyp_data)
@@ -1403,6 +1449,10 @@ class Isometry(HyperbolicObject):
     def axis(self):
         return Geodesic(self.space, self.fixed_point_pair())
 
+    def isometry_type(self):
+        fixpoint_data = self._fixpoint_data(sort_eigvals=True)
+        fixpoint
+
     def fixed_point_pair(self, sort_eigvals=True):
         """Find fixed points for this isometry in the closure of hyperbolic space.
 
@@ -1419,7 +1469,7 @@ class Isometry(HyperbolicObject):
 
         """
         fixpoint_data = np.real(self._fixpoint_data(sort_eigvals))
-        return PointPair(self.space, fixpoint_data)
+        return PointPair(self.space, fixpoint_data[..., :2, :])
 
     def fixed_point(self, max_eigval=True):
         """Find a fixed point for this isometry in the closure of hyperbolic
