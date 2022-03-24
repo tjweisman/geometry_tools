@@ -39,24 +39,43 @@ def orthogonal_transform(v1, v2=None):
         sign = R[0,0] / np.abs(R[0,0])
         return np.linalg.inv(Q * sign)
 
-def affine_coords(points, chart_index=None):
-    """get affine coordinates for an array of points in projective space
+def affine_coords(points, chart_index=None, column_vectors=False):
+    """Get affine coordinates for an array of points in projective space
     in one of the standard affine charts.
 
-    points: ndarray of points in projective space. the last dimension
-    is assumed to be the same as the dimension of the underlying
-    vector space.
+    Parameters
+    -----------
+    points: ndarray
+        `ndarray` of points in projective space. the last dimension is
+        assumed to be the same as the dimension of the underlying
+        vector space.
 
-    chart_index: which of the n affine charts to take coordinates
-    in. If None, determine the chart automatically.
+    chart_index: int
+        which of the n affine charts to take coordinates in. If
+        `None`, determine the chart automatically.
 
-    Return value: If chart_index is specified, return an array of
-    points in affine coordinates in that chart. Otherwise, return a
-    tuple (affine, chart_index), where chart_index is the affine chart
-    used.
+    column_vectors: bool
+        if `True`, interpret the second-to-last index as the dimension
+        of the underlying vector space.
+
+    Returns
+    --------
+    ndarray:
+        If chart_index is specified, return an array of points in
+        affine coordinates in that chart. Otherwise, return a tuple
+        `(affine, chart_index)`, where `chart_index` is the affine
+        chart used.
+
+        If `column_vectors` is `False` (the default), then the last
+        index of the returned array is the dimension of the affine
+        space. Otherwise, the second-to-last index is the dimension of
+        affine space.
 
     """
     apoints = np.array(points)
+
+    if column_vectors:
+        apoints = apoints.swapaxes(-1, -2)
 
     _chart_index = chart_index
 
@@ -66,7 +85,7 @@ def affine_coords(points, chart_index=None):
             np.min(np.abs(apoints), axis=tuple(range(len(apoints.shape) - 1)))
         )
 
-    if (apoints.T[_chart_index] == 0).any():
+    if (apoints[..., _chart_index] == 0).any():
         if chart_index is not None:
             raise ProjectivizationException(
                 "points don't lie in the specified affine chart"
@@ -81,10 +100,55 @@ def affine_coords(points, chart_index=None):
         _chart_index, axis=-1
     )
 
+    if column_vectors:
+        affine = affine.swapaxes(-1, -2)
+
     if chart_index is None:
         return (affine, _chart_index)
     else:
         return affine
+
+def projective_coords(points, chart_index=0, column_vectors=False):
+    """Get projective coordinates for points in affine space
+
+    Parameters
+    ----------
+    points : ndarray or sequence
+        Points in affine coordinates. The last dimension of the array
+        is the dimension of affine space.
+
+    chart_index: int
+        Index of the affine chart we assume these points are lying in
+
+    column_vectors: bool
+        If `True`, interpret the second-to-last index as the dimension
+        of affine space.
+
+    Returns
+    --------
+    ndarray:
+        Projective coordinates of the given points. The last dimension
+        of the array is the dimension of the underlying vector space
+        (or the second-to-last dimension, if `column_vectors` is
+        `True`).
+
+    """
+    coords = np.array(points)
+
+    if column_vectors:
+        coords = coords.swapaxes(-1, -2)
+
+    result = np.zeros(coords.shape[:-1] + (coords.shape[-1] + 1,))
+    indices = np.arange(coords.shape[-1])
+    indices[chart_index:] += 1
+
+    result[..., indices] = coords
+    result[..., chart_index] = 1.
+
+    if column_vectors:
+        result = result.swapaxes(-1, -2)
+
+    return result
 
 class ProjectiveSpace:
     """class to model a copy of projective space.

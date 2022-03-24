@@ -130,8 +130,7 @@ def normsq(vectors, bilinear_form=None):
 
 def normalize(vectors, bilinear_form=None):
     norms = normsq(vectors, bilinear_form)
-
-    return (vectors.T / np.sqrt(np.abs(norms.T))).T
+    return vectors / np.sqrt(np.abs(np.expand_dims(norms, axis=-1)))
 
 def short_arc(thetas):
     """reorder angles so that the counterclockwise arc between them is
