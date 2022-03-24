@@ -96,10 +96,17 @@ class HyperbolicDrawing:
         self.model = model
 
     def draw_plane(self, **kwargs):
+        default_kwargs = {
+            "facecolor": self.facecolor,
+            "edgecolor": self.edgecolor,
+            "linewidth": self.linewidth,
+            "zorder": 0
+        }
+        for key, value in kwargs.items():
+            default_kwargs[key] = value
+
         if self.model == Model.POINCARE or self.model == Model.KLEIN:
-            plane = Circle((0., 0.), 1.0, facecolor=self.facecolor,
-                           edgecolor=self.edgecolor,
-                           linewidth=self.linewidth, zorder=0, **kwargs)
+            plane = Circle((0., 0.), 1.0, **default_kwargs)
 
             self.ax.add_patch(plane)
         elif self.model == Model.HALFSPACE:

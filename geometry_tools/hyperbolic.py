@@ -396,7 +396,7 @@ class Point(HyperbolicObject):
         GeometryError
             Raised if an unsupported model is specified.
 
-    """
+        """
         try:
             return HyperbolicObject.coords(self, model, hyp_data)
         except GeometryError as e:
@@ -1373,6 +1373,72 @@ class Isometry(HyperbolicObject):
     def inv(self):
         """invert the isometry"""
         return Isometry(self.space, np.linalg.inv(self.matrix))
+
+    def _fixpoint_data(self, sort_eigvals=True):
+
+        # find fixpoints in projective space, and their eigenvalues and minkowski norms
+
+        eigvals, eigvecs = np.linalg.eig(self.hyp_data.swapaxes(-1, -2))
+        norms = utils.normsq(eigvecs.swapaxes(-1, -2),  self.space.minkowski())
+
+        # 1 for eigenvectors which actually lie in H^n, 0 for outside vectors
+        in_plane = np.where(norms > ERROR_THRESHOLD, 0, 1)
+
+        # primary sort key is whether or not we're in the plane,
+        # secondary is the eigenvalue modulus
+        if sort_eigvals:
+            sort_order = np.stack([np.abs(eigvals), -1 * np.abs(np.imag(eigvals)), in_plane])
+            sort_indices = np.lexsort(sort_order, axis=-1)
+            sort_indices = np.expand_dims(sort_indices, axis=-2)
+        else:
+            sort_indices = np.argsort(in_plane, axis=-1)
+
+        # we want a descending sort to put maximum modulus eigenvalues first
+        sort_indices = np.flip(sort_indices, axis=-1)
+
+        pt_data = np.take_along_axis(eigvecs, sort_indices, axis=-1).swapaxes(-1, -2)
+
+        return pt_data
+
+    def axis(self):
+        return Geodesic(self.space, self.fixed_point_pair())
+
+    def fixed_point_pair(self, sort_eigvals=True):
+        """Find fixed points for this isometry in the closure of hyperbolic space.
+
+        Parameters
+        ----------
+        sort_eigvals : bool
+            If `True`, guarantee that the fixpoints are ordered in
+            order of descending eigenvalue moduli
+
+        Returns
+        --------
+        Point
+            Points fixed by this isometry object.
+
+        """
+        fixpoint_data = np.real(self._fixpoint_data(sort_eigvals))
+        return PointPair(self.space, fixpoint_data)
+
+    def fixed_point(self, max_eigval=True):
+        """Find a fixed point for this isometry in the closure of hyperbolic
+           space.
+
+        Parameters
+        ----------
+        max_eigval : bool
+            If `True`, guarantee that the eigenvalue for this fixed
+            point has maximum modulus
+
+        Returns
+        --------
+        Point
+            A point (possibly ideal) fixed by this isometry object.
+
+        """
+        fixpoint_data = np.real(self._fixpoint_data(max_eigval))
+        return Point(self.space, fixpoint_data[..., 0, :])
 
     def __matmul__(self, other):
         return self.apply(other)
