@@ -5,12 +5,449 @@ represents a copy of n-dimensional projective space.
 
 """
 
+from copy import copy
+
 import numpy as np
 
 from . import utils
+from . import representation
+from . import log
 
-class ProjectivizationException(Exception):
+
+class GeometryError(Exception):
+    """Thrown if there's an attempt to construct a geometric object with
+    numerical data that doesn't make sense for that type of object.
+
+    """
     pass
+
+class ProjectiveObject:
+    def __init__(self, proj_data, aux_data=None, unit_ndims=1,
+                 aux_ndims=0):
+        """Parameters
+        -----------
+
+        proj_data : ndarray
+            underyling data describing this hyperbolic object
+
+        aux_data : ndarray
+            auxiliary data describing this hyperbolic
+            object. Auxiliary data is any data which is in principle
+            computable from `proj_data`, but is convenient to keep as
+            part of the object definition for transformation purposes.
+
+        unit_ndims : int
+            number of ndims of an array representing a "unit" version
+            of this object. For example, an object representing a
+            single point in hyperbolic space has `unit_ndims` 1, while
+            an object representing a line segment has `unit_ndims`
+            equal to 2.
+
+        aux_ndims : int
+            like `unit_ndims`, but for auxiliary data.
+
+        """
+        self.unit_ndims = unit_ndims
+        self.aux_ndims = aux_ndims
+
+        try:
+            self._construct_from_object(proj_data)
+        except TypeError:
+            log.log(
+                "Constructing from object failed, viewing data as ndarray ({})".format(
+                    self.__class__))
+            if aux_data is None:
+                self.set(proj_data)
+            else:
+                self.set(proj_data, aux_data)
+
+    @property
+    def dimension(self):
+        return self.proj_data.shape[-1] - 1
+
+    def _assert_geometry_valid(self, proj_data):
+        if proj_data.ndim < self.unit_ndims:
+            raise GeometryError(
+                ("{} expects an array with ndim at least {}, got array of shape {}"
+                ).format(
+                    self.__class__.__name__, self.unit_ndims, proj_data.shape
+                )
+            )
+    def _assert_aux_valid(self, aux_data):
+        if aux_data is None and self.aux_ndims == 0:
+            return
+
+        if aux_data.ndim < self.aux_ndims:
+            raise GeometryError(
+                ("{} expects an auxiliary array with ndim at least {}, got array of shape"
+                ).format(
+                    self.__class__.__name__, self.unit_ndims, proj_data.shape
+                )
+            )
+
+    def _compute_aux_data(self, proj_data):
+        return None
+
+    def _construct_from_object(self, hyp_obj):
+        """if we're passed a hyperbolic object or an array of hyperbolic
+        objects, build a new one out of them
+
+        """
+
+        try:
+            log.log("trying to construct flat object ({})".format(self.__class__))
+            if hyp_obj.aux_data is None:
+                self.set(hyp_obj.proj_data)
+            else:
+                self.set(hyp_obj.proj_data, aux_data=hyp_obj.aux_data)
+            return
+        except AttributeError:
+            log.log("could not construct flat object of type {}".format(self.__class__))
+            pass
+
+        try:
+            log.log("trying to construct list of objects ({})".format(self.__class__))
+            unrolled_obj = list(hyp_obj)
+
+            if len(unrolled_obj) == 0:
+                log.log("list has length zero, which causes weird errors")
+                raise IndexError
+
+            hyp_array = np.array([obj.proj_data for obj in unrolled_obj])
+            aux_array = np.array([obj.aux_data for obj in unrolled_obj])
+
+            if (aux_array == None).any():
+                aux_array = None
+
+            #we don't require subclasses to take kwargs (maybe this is
+            #bad practice...)
+            if aux_array is None:
+                self.set(hyp_array)
+            else:
+                self.set(hyp_array, aux_data=aux_array)
+            return
+        except (TypeError, AttributeError, IndexError) as e:
+            log.log("could not construct object from list ({})".format(self.__class__))
+            pass
+
+        raise TypeError
+
+    def obj_shape(self):
+        """Get the shape of the ndarray of "unit objects" this
+        HyperbolicObject represents.
+
+        Returns
+        ---------
+        tuple
+
+
+        """
+        return self.proj_data.shape[:-1 * self.unit_ndims]
+
+    def set(self, proj_data, aux_data=None):
+        """set the underlying data of the hyperbolic object.
+
+        Subclasses may override this method to give special names to
+        portions of the underlying data.
+
+        Parameters
+        -------------
+        proj_data : ndarray
+            underyling data representing this hyperbolic object.
+
+        aux_data : ndarray
+            underyling auxiliary data for this hyperbolic object.
+
+
+        """
+
+        log.log("checking geometric validity of underlying data")
+        self._assert_geometry_valid(proj_data)
+        if aux_data is None:
+            log.log("computing auxiliary data since it was not provided")
+            aux_data = self._compute_aux_data(proj_data)
+
+        log.log("checking validity of computed auxiliary data")
+        self._assert_aux_valid(aux_data)
+
+        self.proj_data = proj_data
+        self.aux_data = aux_data
+
+    def flatten_to_unit(self, unit=None):
+        """return a flattened version of the hyperbolic object.
+
+        Parameters
+        ----------
+
+        unit : int
+            the number of ndims to treat as a "unit" when flattening
+            this object into units.
+        """
+
+        aux_unit = unit
+        if unit is None:
+            unit = self.unit_ndims
+            aux_unit = self.aux_ndims
+
+        flattened = copy(self)
+        new_shape = (-1,) + self.proj_data.shape[-1 * unit:]
+        new_proj_data = np.reshape(self.proj_data, new_shape)
+
+        new_aux_data = None
+        if self.aux_data is not None:
+            new_aux_shape = (-1,) + self.aux_data.shape[-1 * aux_unit:]
+            new_aux_data = np.reshape(self.aux_data, new_aux_shape)
+            flattened.set(new_proj_data, new_aux_data)
+        else:
+            flattened.set(new_proj_data)
+
+        return flattened
+
+    def flatten_to_aux(self):
+        return self.flatten_to_unit(self.aux_ndims)
+
+    def __repr__(self):
+        return "({}, {})".format(
+            self.__class__,
+            self.proj_data.__repr__()
+        )
+
+    def __str__(self):
+        return "{} with data:\n{}".format(
+            self.__class__.__name__, self.proj_data.__str__()
+        )
+
+    def __getitem__(self, item):
+        return self.__class__(self.proj_data[item])
+
+    def projective_coords(self, proj_data=None):
+        """wrapper for ProjectiveObject.set, since underlying coordinates are
+        projective."""
+        if proj_data is not None:
+            self.set(proj_data)
+
+        return self.proj_data
+
+    def affine_coords(self, aff_data=None, chart_index=0):
+        """Get or set affine coordinates for this object.
+        """
+        if aff_data is not None:
+            self.set(projective_coords(aff_data, chart_index=chart_index))
+
+        return affine_coords(self.proj_data, chart_index=chart_index,
+                             column_vectors=False)
+
+class Point(ProjectiveObject):
+    def __init__(self, point, chart_index=None):
+        self.unit_ndims = 1
+        self.aux_ndims = 0
+
+        try:
+            self._construct_from_object(point)
+            return
+        except TypeError:
+            pass
+
+        if chart_index is None:
+            self.projective_coords(point)
+        else:
+            self.affine_coords(point, chart_index)
+
+class PointPair(Point):
+    def __init__(self, endpoint1, endpoint2=None):
+        self.unit_ndims = 2
+        self.aux_ndims = 0
+
+        if endpoint2 is None:
+            try:
+                self._construct_from_object(endpoint1)
+                return
+            except (AttributeError, TypeError, GeometryError):
+                pass
+
+        self.set_endpoints(endpoint1, endpoint2)
+
+    def set(self, proj_data):
+        ProjectiveObject.set(self, proj_data)
+        self.endpoints = self.proj_data[..., :2, :]
+
+    def set_endpoints(self, endpoint1, endpoint2=None):
+        """Set the endpoints of a segment.
+
+        If `endpoint2` is `None`, expect `endpoint1` to be an array of
+        points with shape `(..., 2, n)`. Otherwise, expect `endpoint1`
+        and `endpoint2` to be arrays of points with the same shape.
+
+        """
+        if endpoint2 is None:
+            self.set(Point(endpoint1).proj_data)
+            return
+
+        pt1 = Point(endpoint1)
+        pt2 = Point(endpoint2)
+        self.set(np.stack([pt1.proj_data, pt2.proj_data], axis=-2))
+
+    def get_endpoints(self):
+        return Point(self.endpoints)
+
+    def get_end_pair(self, as_points=False):
+        """Return a pair of point objects, one for each endpoint
+        """
+        if as_points:
+            p1, p2 = self.get_end_pair(as_points=False)
+            return (Point(p1), Point(p2))
+
+        return (self.endpoints[..., 0, :], self.endpoints[..., 1, :])
+
+    def endpoint_coords(self, chart_index=None):
+        return self.get_endpoints().coords(chart_index=chart_index)
+
+class Polygon(Point):
+    def __init__(self, vertices, aux_data=None):
+        ProjectiveObject.__init__(self, vertices, aux_data,
+                                  unit_ndims=2, aux_ndims=3)
+
+    def set(self, proj_data, aux_data=None):
+        ProjectiveObject.set(self, proj_data, aux_data)
+        self.vertices = self.proj_data
+        self.edges = self.aux_data
+
+    def _compute_aux_data(self, proj_data):
+        log.log("making segments for {}".format(self.__class__))
+        segments = PointPair(proj_data, np.roll(proj_data, -1, axis=-2))
+        return segments.proj_data
+
+    def get_edges(self):
+        return PointPair(self.edges)
+
+    def get_vertices(self):
+        return (self.proj_data)
+
+class Transformation(ProjectiveObject):
+    def __init__(self, proj_data, column_vectors=False):
+        """Constructor for projective transformation.
+
+        Underlying data is stored as row vectors, but by default the
+        constructor accepts matrices acting on columns, since that's
+        how my head thinks.
+
+        """
+        self.unit_ndims = 2
+        self.aux_ndims = 0
+        self.generic_obj_class = ProjectiveObject
+
+        try:
+            self._construct_from_object(proj_data)
+        except TypeError:
+            if column_vectors:
+                self.set(proj_data.swapaxes(-1,-2))
+            else:
+                self.set(proj_data)
+
+    def _assert_geometry_valid(self, proj_data):
+        ProjectiveObject._assert_geometry_valid(self, proj_data)
+        if (len(proj_data.shape) < 2 or
+            proj_data.shape[-2] != proj_data.shape[-1]):
+            log.log("invalid geometry for object {}".format(proj_data))
+            raise GeometryError(
+                ("Projective transformation must be ndarray of n x n"
+                 " matrices, got array with shape {}").format(
+                     proj_data.shape))
+
+    def set(self, proj_data):
+        ProjectiveObject.set(self, proj_data)
+        self.matrix = proj_data
+        self.proj_data = proj_data
+
+    def _apply_to_data(self, proj_data, broadcast, unit_ndims=1):
+        return utils.matrix_product(proj_data,
+                                    self.matrix,
+                                    unit_ndims, self.unit_ndims,
+                                    broadcast=broadcast)
+
+    def apply(self, proj_obj, broadcast="elementwise"):
+        """Apply this isometry to another object in hyperbolic space.
+
+        Broadcast is either "elementwise" or "pairwise", treating self
+        and hyp_obj as ndarrays of isometries and hyperbolic objects,
+        respectively.
+
+        hyp_obj may be either a HyperbolicObject instance or the
+        underlying data of one. In either case, this function returns
+        a HyperbolicObject (of the same subclass as hyp_obj, if
+        applicable).
+
+        """
+        new_obj = copy(proj_obj)
+
+        try:
+            proj_data = new_obj.proj_data
+            proj_product = self._apply_to_data(new_obj.proj_data, broadcast,
+                                               new_obj.unit_ndims)
+            aux_data = new_obj.aux_data
+            aux_product = None
+
+            if aux_data is not None:
+                aux_product = self._apply_to_data(new_obj.aux_data, broadcast,
+                                                  new_obj.aux_ndims)
+                new_obj.set(proj_product, aux_product)
+            else:
+                new_obj.set(proj_product)
+
+            return new_obj
+        except AttributeError:
+            pass
+
+        #otherwise, it's an array of vectors which we'll interpret as
+        #some kind of hyperbolic object
+        product = self._apply_to_data(proj_obj, broadcast)
+        return self._generic_obj_class(product)
+
+    def inv(self):
+        """invert the isometry"""
+        return self.__class__(np.linalg.inv(self.matrix))
+
+    def __matmul__(self, other):
+        return self.apply(other)
+
+class ProjectiveRepresentation(representation.Representation):
+    def __init__(self, generator_names=[], normalization_step=-1):
+        representation.Representation.__init__(self, generator_names,
+                                               normalization_step)
+        self.transform_class = Transformation
+
+    def __getitem__(self, word):
+        matrix = self._word_value(word)
+        return Isometry(matrix, column_vectors=True)
+
+    def __setitem__(self, generator, isometry):
+        try:
+            super().__setitem__(generator, isometry.matrix.T)
+            return
+        except AttributeError:
+            super().__setitem__(generator, isometry)
+
+    @classmethod
+    def from_matrix_rep(cls, rep, **kwargs):
+        """Construct a hyperbolic representation from a matrix
+        representation"""
+        hyp_rep = cls(**kwargs)
+        for g, matrix in rep.generators.items():
+            hyp_rep[g] = matrix
+
+        return hyp_rep
+
+    def transformations(self, words):
+        """Get an Isometry object holding the matrices which are the images of
+        a sequence of words in the generators.
+
+        """
+        matrix_array = np.array(
+            [representation.Representation.__getitem__(self, word)
+             for word in words]
+        )
+        return self.transform_class(matrix_array, column_vectors=True)
+
 
 def hyperplane_coordinate_transform(normal):
     """find an orthogonal matrix taking the the affine chart "x . normal
@@ -87,11 +524,11 @@ def affine_coords(points, chart_index=None, column_vectors=False):
 
     if (apoints[..., _chart_index] == 0).any():
         if chart_index is not None:
-            raise ProjectivizationException(
+            raise GeometryError(
                 "points don't lie in the specified affine chart"
             )
         else:
-            raise ProjectivizationException(
+            raise GeometryError(
                 "points don't lie in any standard affine chart"
             )
 
@@ -247,7 +684,7 @@ translation"""
         pts = pts @ self.coordinates.T
         return affine_coords(pts, chart).swapaxes(dim_index, -1)
 
-    def affine_to_projective(self, point_list, type="rows"):
+    def affine_to_projective(self, point_list, column_vectors=True):
         """return standard lifts of points in affine coordinates to R^(n+1).
 
         If type = "rows," then point_list is an ndarray where the last
