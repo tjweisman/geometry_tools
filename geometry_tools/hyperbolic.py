@@ -1632,6 +1632,9 @@ def kleinian_coords(points, column_vectors=False):
     return projective.affine_coords(points, chart_index=0,
                                     column_vectors=column_vectors)
 
+def get_point(coords, model="klein"):
+    return Point(coords, model)
+
 def hyperboloid_coords(points, column_vectors=False):
     """Project an ndarray of points to the unit hyperboloid defined by the
     Minkowski quadratic form."""
