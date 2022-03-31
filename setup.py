@@ -17,6 +17,7 @@ setup(
     install_requires=[
         "numpy",
         "matplotlib",
+        "scipy"
     ],
 
     author="Teddy Weisman",

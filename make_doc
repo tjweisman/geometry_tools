@@ -1,0 +1,7 @@
+#!/bin/bash
+
+SCRIPT_DIR=$(dirname $(realpath $0))
+
+awk 'BEGIN {printf "r\"\"\"\n"} {print} END {printf "\n\"\"\""}' $SCRIPT_DIR/geometry_tools/frontpage_doc.md > $SCRIPT_DIR/geometry_tools/__init__.py
+
+pdoc --config latex_math=True --html -o $SCRIPT_DIR/doc --force geometry_tools
