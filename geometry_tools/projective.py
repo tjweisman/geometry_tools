@@ -401,7 +401,10 @@ class Transformation(ProjectiveObject):
         #otherwise, it's an array of vectors which we'll interpret as
         #some kind of hyperbolic object
         product = self._apply_to_data(proj_obj, broadcast)
-        return self._generic_obj_class(product)
+        return self._data_to_object(product)
+
+    def _data_to_object(self, data):
+        return ProjectiveObject(data)
 
     def inv(self):
         """invert the isometry"""
@@ -414,11 +417,9 @@ class ProjectiveRepresentation(representation.Representation):
     def __init__(self, generator_names=[], normalization_step=-1):
         representation.Representation.__init__(self, generator_names,
                                                normalization_step)
-        self.transform_class = Transformation
-
     def __getitem__(self, word):
         matrix = self._word_value(word)
-        return Isometry(matrix, column_vectors=True)
+        return Transformation(matrix, column_vectors=True)
 
     def __setitem__(self, generator, isometry):
         try:
@@ -446,7 +447,7 @@ class ProjectiveRepresentation(representation.Representation):
             [representation.Representation.__getitem__(self, word)
              for word in words]
         )
-        return self.transform_class(matrix_array, column_vectors=True)
+        return Transformation(matrix_array, column_vectors=True)
 
 
 def hyperplane_coordinate_transform(normal):

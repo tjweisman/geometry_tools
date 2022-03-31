@@ -1149,8 +1149,6 @@ class Isometry(projective.Transformation, HyperbolicObject):
     """
     def __init__(self, proj_data, column_vectors=False):
         projective.Transformation.__init__(self, proj_data, column_vectors)
-        self.generic_obj_class = HyperbolicObject
-
 
     def _fixpoint_data(self, sort_eigvals=True):
 
@@ -1179,6 +1177,9 @@ class Isometry(projective.Transformation, HyperbolicObject):
         pt_data = np.take_along_axis(eigvecs, sort_indices, axis=-1).swapaxes(-1, -2)
 
         return pt_data
+
+    def _data_to_object(self, data):
+        return HyperbolicObject(data)
 
     def axis(self):
         return Geodesic(self.fixed_point_pair())
@@ -1274,6 +1275,10 @@ class HyperbolicRepresentation(projective.ProjectiveRepresentation):
     being done here at all.
 
     """
+    def __getitem__(self, word):
+        matrix = self._word_value(word)
+        return Isometry(matrix, column_vectors=True)
+
     def normalize(self, matrix):
         dimension = np.array(matrix).shape[-1]
         return utils.indefinite_orthogonalize(minkowski(dimension), matrix)
@@ -1283,7 +1288,7 @@ class HyperbolicRepresentation(projective.ProjectiveRepresentation):
         a sequence of words in the generators.
 
         """
-        return self.transformations(words)
+        return Isometry(self.transformations(words))
 
 def minkowski(dimension):
     return np.diag(np.concatenate(([-1.0], np.ones(dimension - 1))))

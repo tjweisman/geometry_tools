@@ -12,6 +12,7 @@ from collections import defaultdict
 import numpy as np
 
 from geometry_tools.representation import Representation
+from geometry_tools import hyperbolic
 from geometry_tools import utils
 
 GENERATOR_NAMES = "abcdefghijklmnopqrstuvwxyz"
@@ -77,6 +78,11 @@ class CoxeterGroup:
             rep[g] = np.linalg.inv(W) @ rep[g] @ W
 
         return rep
+
+    def hyperbolic_rep(self):
+        matrix_rep = self.diagonal_rep(order_eigenvalues="signed")
+        return hyperbolic.HyperbolicRepresentation.from_matrix_rep(matrix_rep)
+
 
 class TriangleGroup(CoxeterGroup):
     """Convenience class for building a triangle group.
