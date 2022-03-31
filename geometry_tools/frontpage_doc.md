@@ -232,6 +232,8 @@ fig = drawtools.HyperbolicDrawing(model="poincare")
 fig.draw_plane()
 fig.draw_polygon(pos_isometries @ fund_triangle, 
                  facecolor="royalblue", edgecolor="none")
+
+fig.show()
 ```
 
 
