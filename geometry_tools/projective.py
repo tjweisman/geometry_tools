@@ -243,6 +243,24 @@ class Point(ProjectiveObject):
 
 class PointPair(Point):
     def __init__(self, endpoint1, endpoint2=None):
+        """If `endpoint2` is `None`, interpret `endpoint1` as either a (2
+        x...x n) `ndarray` (where n is the dimension of the underlying
+        vector space), or else a composite `Point` object which can be
+        unpacked into two Points (which may themselves be composite).
+
+        If `endpoint2` is given, then both `endpoint1` and `endpoint2`
+        can be used to construct `Point` objects, which serve as the
+        endpoints for this pair of points.
+
+        Parameters
+        ----------
+        endpoint1 : Point or ndarray
+            One (or both) endpoints of the point pair
+        endpoint2 : Point or ndarray
+            The other endpoint of the point pair. If `None`,
+            `endpoint1` contains the data for both points in the pair.
+
+    """
         self.unit_ndims = 2
         self.aux_ndims = 0
 

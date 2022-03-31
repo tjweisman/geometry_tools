@@ -1,9 +1,5 @@
 """Work with finite-state automata.
 
-This module provides the FSA class, which can be used to facilitate
-the construction of finite-state automata and perform tasks like
-enumerating accepted words.
-
 Finite-state automata are really just finite directed labeled graphs,
 subject to the constraint that each vertex v has at most one outgoing
 edge with a given label. One or more of the vertices are "start
@@ -11,7 +7,43 @@ states;" a word w in the set of edge labels is "accepted" if there is
 an edge path in the graph (starting at a start state) whose sequence
 of edge labels gives w.
 
-"""
+This module provides the `FSA` class, which can be used to perform
+simple tasks with finite-state automata. A common use-case is
+enumerating the list of words accepted by a particular automaton:
+
+```python
+
+from geometry_tools.automata import fsa
+
+# load a word-acceptor automaton for the (3,3,4) triangle group
+cox_aut = fsa.load_builtin("cox334.wa")
+
+# list all the words accepted by this automaton with length at most 3.
+list(cox_aut.enumerate_words(3))
+
+```
+     ['',
+     'a',
+     'b',
+     'c',
+     'ab',
+     'ac',
+     'ba',
+     'bc',
+     'ca',
+     'cb',
+     'aba',
+     'abc',
+     'aca',
+     'acb',
+     'bac',
+     'bca',
+     'bcb',
+     'cab',
+     'cac',
+     'cba']
+
+    """
 
 import pkg_resources
 import copy
@@ -168,7 +200,7 @@ class FSA:
         return self._out_dict[tail][head]
 
     def add_vertices(self, vertices):
-        """Add an isolated vertex to the FSA.
+        """Add vertices to the FSA.
         """
         for v in vertices:
             if v not in self._out_dict:
@@ -216,7 +248,7 @@ class FSA:
             self.delete_vertex(v)
 
     def delete_vertex(self, vertex):
-        """Delete a vertex from the FSA.
+        """Delete a single vertex from the FSA.
         """
         for w in self.neighbors_out(vertex):
             self._in_dict[w].pop(vertex)
@@ -235,6 +267,14 @@ class FSA:
         return self._out_dict.keys()
 
     def edges(self):
+        """Get all of the edges of this FSA
+
+        Yields
+        --------
+            An ordered pair of the form `(tail, head)` for each edge
+            in the automaton
+
+        """
         for v, nbrs in self._out_dict.items():
             for w in nbrs:
                 yield (v, w)
@@ -288,7 +328,6 @@ class FSA:
 
         Parameters
         --------------
-
         edge_ties : bool
             if `True`, if two edges give rise to paths of the
             same length, include both of them in the new graph.
@@ -326,13 +365,24 @@ class FSA:
         return H
 
     def follow_word(self, word, start_vertex=None):
-        """Find the final state of the automaton when it tries to accept a
-        given word.
+        """Find the final state of the automaton when it tries to accept a word
 
-        If `start_vertex` is `None`, use the default starting state for
-        the automaton.
+        Parameters
+        ----------
+        word : string
+            The word the automaton should try to accept
+
+        start_vertex: object
+            The start state for the automaton. If `None` (the
+            default), use the automaton's default start state.
+
+        Returns
+        -------
+        object :
+            The state of the automaton when it accepts `word`
 
         """
+
         if start_vertex is None:
             start_vertex = start_vertices[0]
         vertex = start_vertex
@@ -415,7 +465,7 @@ class FSA:
                 yield word
 
 
-def from_kbmag_file(filename) -> FSA:
+def load_kbmag_file(filename) -> FSA:
     """Build a finite-state automaton from a GAP record file produced by
     the kbmag program.
 
@@ -463,7 +513,7 @@ def _from_gap_record(gap_record) -> FSA:
             return FSA(out_dict, start_vertices=initial)
 
 
-def load_builtin(filename) -> FSA:
+def load_builtin(filename):
     """Load a finite-state automaton built in to the automata subpackage.
 
     Parameters
@@ -484,7 +534,7 @@ def load_builtin(filename) -> FSA:
     return _from_gap_record(record)
 
 
-def list_builtins() -> list:
+def list_builtins():
     """Return a list of all the automata included with the automata
     subpackage.
 

@@ -1,6 +1,123 @@
-"""Model objects in hyperbolic space with numerical coordinates.
+r"""Model objects in hyperbolic space with numerical coordinates.
+
+This module provides abstract versions of various objects in hyperbolic
+geometry (points, line segments, polygons, isometries, etc.) and gives a
+unified framework for *translating those objects by isometries* and *getting
+their coordinates in various models of hyperbolic space.*
+
+For instance, to get a single point in the hyperbolic plane, use the `Point`
+class:
+
+```python
+from geometry_tools import hyperbolic
+
+# get a point by providing kleinian coordinates
+point = hyperbolic.Point([0.1, 0.0], model=hyperbolic.Model.KLEIN)
+# or equivalently:
+point = hyperbolic.get_point([0.1, 0.0], model="klein")
+
+# get the poincare coordinates of this point.
+point.coords(model="poincare")
+```
+    array([0.05012563, 0.        ])
+
+The `Isometry` class models isometries of hyperbolic space. The easiest way to
+obtain an isometry of the hyperbolic plane is to use the isomorphism from
+\(\mathrm{PSL}(2, \mathbb{R})\) to the (orientation-preserving) isometry group
+ of \(\mathbb{H}^2\).
+
+```python
+from geometry_tools import hyperbolic
+
+# get a loxodromic isometry and a point in H^2
+hyp_iso = hyperbolic.sl2r_iso([[2., 0.], [0., -1./2]])
+point = hyperbolic.get_point([0., 0.])
+
+# apply the isometry to the point
+(hyp_iso @ point).coords(model="halfplane")
+```
+    array([-0.  ,  0.25])
+
+
+Most of the power of the `geometry_tools.hyperbolic` module comes from the
+fact that you can easily and efficiently build *composite* hyperbolic objects
+out of arrays of subobjects, and then translate the entire composite object
+at once. For instance, we can build an array of points, and translate all of
+those points by an isometry:
+
+```python
+from geometry_tools import hyperbolic
+
+# make two points in Klein coordinates
+p1 = hyperbolic.Point([0., 0.1], model="klein")
+p2 = hyperbolic.Point([0.1, 0.], model="klein")
+
+# package these two points together into a single hyperbolic object
+# (an array of points)
+pts = hyperbolic.Point([p1, p2])
+
+# get a parabolic isometry
+iso = hyperbolic.sl2r_iso([[1., 1.], [0., 1.]])
+
+(iso @ pts).coords(model="klein")
+```
+    array([[-0.375     ,  0.6875    ],
+           [-0.29032258,  0.70967742]])
+
+The data is returned as a 2x2 numpy array, giving x,y Kleinian coordinates for
+the translated points.
+
+Working with composite objects can be nice because it's a convenient way to
+handle *orbits* of hyperbolic objects under groups of isometries. To see
+this, we can use the `HyperbolicRepresentation` class to make a representation of
+a free group, and then translate a pair of points by some words in the group.
+
+```python
+from geometry_tools import hyperbolic
+from numpy import pi
+
+# make a free group representation by mapping the generators to loxodromic
+# isometries with perpendicular axes
+free_rep = hyperbolic.HyperbolicRepresentation()
+free_rep["a"] = hyperbolic.sl2r_iso([[3., 0], [0., 1./3]])
+rot = hyperbolic.Isometry.standard_rotation(pi / 2)
+free_rep["b"] = rot @ free_rep["a"] @ rot.inv()
+
+# make a pair of points in hyperbolic space
+pt = hyperbolic.Point([[0., 0.3],
+                       [0.1, 0.0]], model="klein")
+
+# get image of reduced words of length at most 3
+words = free_rep.free_words_less_than(2)
+isos = free_rep.isometries(words)
+
+# get coordinates of points translated by these isometries.
+# we have to specify "pairwise" argument because we want each
+# isometry to apply to each point in our composite Point object.
+(isos.apply(pt, "pairwise")).coords(model="klein")
+```
+    array([[[ 0.00000000e+00,  3.00000000e-01],
+        [ 1.00000000e-01,  0.00000000e+00]],
+
+       [[-9.75609756e-01,  6.58536585e-02],
+        [-9.70270270e-01,  0.00000000e+00]],
+
+       [[ 9.75609756e-01,  6.58536585e-02],
+        [ 9.80000000e-01,  0.00000000e+00]],
+
+       [[-6.41883840e-17, -9.55172414e-01],
+        [ 2.19512195e-02, -9.75609756e-01]],
+
+       [[ 5.73042276e-17,  9.86792453e-01],
+        [ 2.19512195e-02,  9.75609756e-01]]])
+
+The coordinate data is returned as a 5x2x2 numpy array, since there are 5
+isometries being applied to 2 points, each of which has 2 coordinates. To
+flatten the output to a 10x2 array (representing an array of 10 points), we
+could use `HyperbolicObject.flatten_to_unit()`.
 
 """
+
 
 from copy import copy
 from enum import Enum
@@ -117,6 +234,24 @@ class Point(HyperbolicObject, projective.Point):
 
     """
     def __init__(self, point, model=Model.PROJECTIVE):
+        """
+
+        Parameters
+        ----------
+        point : HyperbolicObject or iterable or ndarray
+            Data used to construct a point or an array of points. If
+            `point` is a `HyperbolicObject`, then use the underlying
+            coordinate data to build an array of points. If `point` is
+            an iterable of `HyperbolicObject`s, build a composite `Point`
+            object out of this array. If `point` is an `ndarray`, then
+            interpret this as coordinate data for an array of points
+            in some hyperbolic model.
+        model : Model
+            if `point` is numerical data, then what model of
+            hyperbolic space we should use to interpret `point` as
+            coordinates.
+
+        """
         self.unit_ndims = 1
         self.aux_ndims = 0
 
@@ -129,7 +264,22 @@ class Point(HyperbolicObject, projective.Point):
         self.coords(model, point)
 
     def hyperboloid_coords(self, proj_data=None):
-        """Get or set point coordinates on the unit hyperboloid.
+        """Get or set point coordinates in the hyperboloid model.
+
+        Parameters
+        ----------
+        proj_data : ndarray
+            Data to set coordinates to, in the hyperboloid
+            model. The last dimension of the array is the
+            dimension of the vector space R^(n,1). If `None`, do not
+            update coordinates.
+
+        Returns
+        --------
+        ndarray :
+            Hyperboloid coordinates for this point (or array of
+            points).
+
         """
         if proj_data is not None:
             self.set(proj_data)
@@ -137,7 +287,22 @@ class Point(HyperbolicObject, projective.Point):
         return hyperboloid_coords(self.proj_data)
 
     def poincare_coords(self, proj_data=None):
-        """Get or set point coordinates in the Poincare ball (radius 1)
+        """Get or set point coordinates in the hyperboloid model.
+
+        Parameters
+        ----------
+        proj_data : ndarray
+            Data to set coordinates to, as points in projective space.
+            The last dimension of the array is the dimension of the
+            vector space R^(n,1). If `None`, do not update
+            coordinates.
+
+        Returns
+        --------
+        ndarray :
+            Projective coordinates for this point (or array of
+            points).
+
         """
         if proj_data is not None:
             klein = poincare_to_kleinian(np.array(proj_data))
@@ -146,14 +311,22 @@ class Point(HyperbolicObject, projective.Point):
         return kleinian_to_poincare(self.kleinian_coords())
 
     def halfspace_coords(self, proj_data=None):
-        """Get or set point coordinates in the upper half-space model
+        """Get or set point coordinates in the half-space model.
 
         Parameters
         ----------
         proj_data : ndarray
+            Data to set coordinates to, as points in half-space.  The
+            last dimension of the array is the dimension of hyperbolic
+            space H^n. If `None`, do not update coordinates.
+
+        Returns
+        --------
+        ndarray :
+            Half-space coordinates for this point (or array of
+            points).
 
         """
-
         poincare = None
 
         if proj_data is not None:
@@ -196,8 +369,18 @@ class Point(HyperbolicObject, projective.Point):
             raise e
 
     def distance(self, other):
-        """compute elementwise distances (with respect to last two dimensions)
-        between `self` and `other`
+        """Compute hyperbolic distances between pairs of points, or pairs of
+            arrays of points.
+
+        Parameters
+        ----------
+        other : Point
+            The point to compute distances to
+
+        Returns
+        --------
+        ndarray(float) :
+            distances in hyperbolic space between self and other
 
         """
         #TODO: allow for pairwise distances
@@ -207,22 +390,55 @@ class Point(HyperbolicObject, projective.Point):
         return np.arccosh(np.abs(products))
 
     def origin_to(self):
-        """Get an isometry taking the origin to `self`.
+        """Get an isometry taking an "origin" point to this point
 
-        Not guaranteed to be orientation-preserving."""
+        Returns
+        --------
+        Isometry :
+            Some isometry taking the point with Kleinian/Poincare
+            coordinates (0, 0, ...) to this point. This isometry is
+            not uniquely determined and is not guaranteed to be
+            orientation-preserving.
+
+        """
         return timelike_to(self.proj_data)
 
     def unit_tangent_towards(self, other):
-        """Get the unit tangent vector pointing from `self` to `other`.
+        """Get a unit tangent vector with this basepoint, pointing at another point
+
+        Parameters
+        ----------
+        other : Point
+            another point in hyperbolic space where the unit tangent
+            vector points
+
+        Returns
+        --------
+        TangentVector:
+            A tangent vector with this point at its base and pointing
+            towards `other`.
 
         """
         diff = other.proj_data - self.proj_data
         return TangentVector(self, diff).normalized()
 
     def get_origin(dimension, shape=()):
-        """Get a Point mapping to the origin of the Poincare/Klein models.
+        """Get a point (or ndarray of points) at the "origin" of hyperbolic
+           space
 
+        Parameters
+        ----------
+        dimension : int
+            Dimension of hyperbolic space where this point lives
+        shape : tuple(int)
+            Shape of array of origin points to get
+
+        Returns
+        --------
+        Point :
+            Point object with Kleinian/Poincare coords (0, 0, ...)
         """
+
         return Point(np.zeros(shape + (dimension,)), model="klein")
 
 class DualPoint(Point):
@@ -237,7 +453,7 @@ class DualPoint(Point):
         if not CHECK_LIGHT_CONE:
             return
 
-        if not all_spacelike(proj_data):
+        if not spacelike(proj_data).all():
             raise GeometryError("Dual point data must consist of vectors"
                                 " in the complement of the Minkowski light cone")
 
@@ -252,7 +468,7 @@ class IdealPoint(Point):
         if not CHECK_LIGHT_CONE:
             return
 
-        if not all_lightlike(proj_data):
+        if not lightlike(proj_data).all():
             raise GeometryError("Ideal point data must consist of vectors"
                                 "in the boundary of the Minkowski light cone")
 
@@ -265,6 +481,18 @@ class Subspace(IdealPoint):
 
     """
     def __init__(self, proj_data):
+        """
+        Parameters
+        ----------
+        proj_data : HyperbolicObject or ndarray
+            Data used to construct a subspace (or array of
+            subspaces). If `proj_data` is a `HyperbolicObject`, then
+            use underlying coordinate data to build an array of
+            subspaces. If `proj_data` is an `ndarray`, then interpret
+            this as coordinate data for an array of subspaces in the
+            projective model.
+
+        """
         HyperbolicObject.__init__(self, proj_data, unit_ndims=2)
 
     def set(self, proj_data):
@@ -272,8 +500,19 @@ class Subspace(IdealPoint):
         self.ideal_basis = proj_data
 
     def ideal_basis_coords(self, model=Model.KLEIN):
-        """Get coordinates for a basis of this subspace lying on the ideal
-        boundary of H^n.
+        """Get coordinates for a basis of this subspace lying in the ideal
+           boundary of hyperbolic space
+
+        Parameters
+        ----------
+        model : Model
+            Model of hyperbolic space in which to compute coordinates
+
+        Returns
+        --------
+        ndarray :
+            Coordinates for k vectors in the ideal boundary of
+            hyperbolic space, giving a basis for this subspace.
 
         """
         #we don't return proj_data directly, since we want subclasses
@@ -282,6 +521,18 @@ class Subspace(IdealPoint):
         return Point(self.ideal_basis).coords(model)
 
     def spacelike_complement(self):
+        """Get a spacelike point in the orthogonal complement to this subspace
+
+        Returns
+        --------
+        DualPoint :
+            A spacelike (i.e. Minkowski-positive) point which is
+            Minkowski-orthogonal to this subspace. This is not
+            uniquely determined (as a point in projective space)
+            unless the subspace is a hyperplane.
+
+        """
+
         orthed = self._data_with_dual()
         return DualPoint(orthed[..., 0, :])
 
@@ -326,7 +577,7 @@ class Subspace(IdealPoint):
         ------
         GeometryError
 
-    """
+        """
 
         if model == Model.POINCARE:
             klein_basis = self.ideal_basis_coords(model=Model.KLEIN)
@@ -355,9 +606,123 @@ class Subspace(IdealPoint):
 
         return center, radius
 
+
+
+    def reflection_across(self):
+        """Get a hyperbolic isometry reflecting across this hyperplane.
+
+        Returns
+        --------
+        Isometry
+            Isometry reflecting across this hyperplane.
+
+        """
+        dual_data = self._data_with_dual()
+        if self.dimension + 1 != dual_data.shape[-2]:
+            raise GeometryError(
+                ("Cannot compute a reflection across a subspace of "
+                 "dimension {}").format(dual_data.shape[-2])
+            )
+
+        refdata = (np.linalg.inv(dual_data) @
+                   self.minkowski @
+                   dual_data)
+
+        return Isometry(refdata, column_vectors=False)
+
+class PointPair(Point, projective.PointPair):
+    """Abstract model for a hyperbolic object whose underlying data is
+    determined by a pair of points in R^(n,1)
+
+    """
+    def __init__(self, endpoint1, endpoint2=None):
+        """If `endpoint2` is `None`, interpret `endpoint1` as either a (2
+        x...x n) `ndarray` (where n is the dimension of the underlying
+        vector space), or else a composite `Point` object which can be
+        unpacked into two Points (which may themselves be composite).
+
+        If `endpoint2` is given, then both `endpoint1` and `endpoint2`
+        can be used to construct `Point` objects, which serve as the
+        endpoints for this pair of points.
+
+        Parameters
+        ----------
+        endpoint1 : Point or ndarray
+            One (or both) endpoints of the point pair
+        endpoint2 : Point or ndarray
+            The other endpoint of the point pair. If `None`,
+            `endpoint1` contains the data for both points in the pair.
+
+        """
+
+        projective.PointPair.__init__(self, endpoint1, endpoint2)
+
+    def endpoint_coords(self, model=Model.KLEIN):
+        """Get coordinates for the endpoints of this point pair
+
+        Parameters
+        ----------
+        model : Model
+            model to compute coordinates in
+
+        Returns
+        --------
+        ndarray :
+            Coordinates for the endpoints of this PointPair, as an
+            ndarray with shape `(2, ... n)` (where `n` is the
+            dimension of the hyperbolic space).
+
+        """
+        return self.get_endpoints().coords(model)
+
+    def get_endpoints(self):
+        """Convert this pair of points to a composite `Point` object
+
+        Returns
+        --------
+        Point:
+            Composite `Point` object with the same underlying data as
+            this point pair.
+
+        """
+        return Point(self.endpoints)
+
+    def get_end_pair(self, as_points=False):
+        """Get a pair of `Point` objects, one for each endpoint of this PointPair
+
+        Parameters
+        ----------
+        as_points : bool
+            If `True`, return a pair of `Point` objects. Otherwise,
+            return a pair of `ndarray`s with projective coordinates
+            for these points.
+
+        Returns
+        --------
+        tuple :
+            A tuple `(p1, p2)`, where `p1` and `p2` are either both
+            `Point`s or both `ndarrays`, representing the endpoints of
+            this pair.
+
+    """
+        if as_points:
+            p1, p2 = self.get_end_pair(as_points=False)
+            return (Point(p1), Point(p2))
+
+        return (self.endpoints[..., 0, :], self.endpoints[..., 1, :])
+
+class Geodesic(PointPair, Subspace):
+    """Model for a bi-infinite gedoesic in hyperbolic space.
+
+    """
+    def set(self, proj_data):
+        HyperbolicObject.set(self, proj_data)
+        self.endpoints = self.proj_data[..., :2, :]
+        self.ideal_basis = self.proj_data[..., :2, :]
+
     def circle_parameters(self, degrees=True, model=Model.POINCARE):
         """Get parameters describing a circular arc corresponding to this
-        subspace in the Poincare or halfspace models.
+        geodesic in the Poincare or halfspace models.
 
         Parameters
         ----------
@@ -393,61 +758,27 @@ class Subspace(IdealPoint):
 
         return center, radius, thetas
 
-    def reflection_across(self):
-        """Get a hyperbolic isometry reflecting across this hyperplane.
+    @classmethod
+    def from_reflection(cls, reflection):
+        """Construct a geodesic which is the fixpoint set of a reflection.
+
+        Parameters
+        ----------
+        reflection : Isometry or ndarray
+            The reflection to compute the fixed geodesic for
+
+        Raises
+        ------
+        GeometryError :
+            If the given isometry is not a reflection, or if the
+            dimension of the underlying hyperbolic space is not 2.
 
         Returns
         --------
-        Isometry
-            Isometry reflecting across this hyperplane.
-
-        """
-        dual_data = self._data_with_dual()
-        if self.dimension + 1 != dual_data.shape[-2]:
-            raise GeometryError(
-                ("Cannot compute a reflection across a subspace of "
-                 "dimension {}").format(dual_data.shape[-2])
-            )
-
-        refdata = (np.linalg.inv(dual_data) @
-                   self.minkowski @
-                   dual_data)
-
-        return Isometry(refdata, column_vectors=False)
-
-class PointPair(Point, projective.PointPair):
-    """Abstract model for a hyperbolic object whose underlying data is
-    determined by a pair of points in R^(n,1)
+        Geodesic:
+            A `Geodesic` fixed by the given isometry.
 
     """
-    def __init__(self, endpoint1, endpoint2=None):
-        projective.PointPair.__init__(self, endpoint1, endpoint2)
-
-    def endpoint_coords(self, model=Model.KLEIN):
-        return self.get_endpoints().coords(model)
-
-    def get_endpoints(self):
-        return Point(self.endpoints)
-
-    def get_end_pair(self, as_points=False):
-        """Return a pair of point objects, one for each endpoint
-        """
-        if as_points:
-            p1, p2 = self.get_end_pair(as_points=False)
-            return (Point(p1), Point(p2))
-
-        return (self.endpoints[..., 0, :], self.endpoints[..., 1, :])
-
-class Geodesic(PointPair, Subspace):
-    """Model for a bi-infinite gedoesic in hyperbolic space.
-
-    """
-    def set(self, proj_data):
-        HyperbolicObject.set(self, proj_data)
-        self.endpoints = self.proj_data[..., :2, :]
-        self.ideal_basis = self.proj_data[..., :2, :]
-
-    def from_reflection(reflection):
         if reflection.dimension != 2:
             raise GeometryError("Creating segment from reflection expects dimension 2, got dimension {}".format(reflection.dimension))
 
@@ -484,13 +815,7 @@ class Segment(Geodesic):
         self.ideal_basis = self.proj_data[..., 2:, :]
 
     def set_endpoints(self, endpoint1, endpoint2=None):
-        """Set the endpoints of a segment.
-
-        If endpoint2 is None, expect endpoint1 to be an array of
-        points with shape (..., 2, n). Otherwise, expect endpoint1 and
-        endpoint2 to be arrays of points with the same shape.
-
-        """
+        # reimplemented to also compute ideal endpoints
         if endpoint2 is None:
             self.endpoints = Point(endpoint1).proj_data
             self._compute_ideal_endpoints(endpoint1)
@@ -515,11 +840,11 @@ class Segment(Geodesic):
         if not CHECK_LIGHT_CONE:
             return
 
-        if not all_timelike(proj_data[..., 0, :, :]):
+        if not timelike(proj_data[..., 0, :, :]).all():
             raise GeometryError( "segment data at index [..., 0, :,"
             ":] must consist of timelike vectors" )
 
-        if not all_lightlike(proj_data[..., 1, :, :]):
+        if not lightlike(proj_data[..., 1, :, :]).all():
             raise GeometryError( "segment data at index [..., 1, :,"
             ":] must consist of lightlike vectors" )
 
@@ -548,7 +873,14 @@ class Segment(Geodesic):
 
         self.set(proj_data)
 
-    def get_ideal_endpoints(self):
+    def geodesic(self):
+        """Get the bi-infinite geodesic spanned by this segment
+
+        Returns
+        --------
+        Geodesic :
+            Geodesic in hyperbolic space spanned by this segment.
+        """
         return Geodesic(self.ideal_basis)
 
     def ideal_endpoint_coords(self, model=Model.KLEIN):
@@ -561,11 +893,23 @@ class Segment(Geodesic):
         """Get parameters describing a circular arc corresponding to this
         segment in the Poincare or halfspace models.
 
-        Returns a tuple `(center, radius, thetas)`. In the Poincare
-        model, the segment lies on a circle with this center and
-        radius. thetas is an ndarray with shape `(..., 2)`, giving the
-        angle (with respect to the center of the circle) of the
-        endpoints of the segment.
+        Parameters
+        ----------
+        degrees : bool
+            if `True`, return angles in degrees. Otherwise, return
+            angles in radians
+        model : Model
+            hyperbolic model to use for the computation
+
+        Returns
+        --------
+        tuple
+            tuple `(centers, radii, thetas)`, where `centers`,
+            `radii`, and `thetas` are `ndarray`s representing the
+            centers, radii, and begin/end angles for the circle
+            corresponding to this arc in the given model of hyperbolic
+            space. Angles are always specified in counterclockwise
+            order.
 
         """
         center, radius = self.sphere_parameters(model)
@@ -620,11 +964,11 @@ class Hyperplane(Subspace):
         if not CHECK_LIGHT_CONE:
             return
 
-        if not all_spacelike(proj_data[..., 0, :]):
+        if not spacelike(proj_data[..., 0, :]).all():
             raise GeometryError( ("Hyperplane data at index [..., 0, :]"
                                   " must consist of spacelike vectors") )
 
-        if not all_lightlike(proj_data[..., 1:, :]):
+        if not lightlike(proj_data[..., 1:, :]).all():
             raise GeometryError( ("Hyperplane data at index [..., 1, :]"
                                   " must consist of lightlike vectors") )
 
@@ -657,9 +1001,25 @@ class Hyperplane(Subspace):
                                   axis=-2)
         self.set(proj_data)
 
-    def from_reflection(reflection):
-        """construct a hyperplane which is the fixpoint set of a given
-        reflection."""
+    @classmethod
+    def from_reflection(cls, reflection):
+        """Construct a hyperplane which is the fixpoint set of a reflection.
+
+        Parameters
+        ----------
+        reflection : Isometry or ndarray
+            The reflection to compute the fixed plane for
+
+        Raises
+        ------
+        GeometryError :
+            If the given isometry is not a reflection.
+
+        Returns
+        --------
+        Hyperplane:
+            A `Hyperplane` fixed by the given isometry.
+        """
         try:
             matrix = reflection.matrix.swapaxes(-1, -2)
         except AttributeError:
@@ -686,17 +1046,6 @@ class Hyperplane(Subspace):
         )
 
         return Hyperplane(spacelike.swapaxes(-1,-2))
-
-    def boundary_arc_parameters(self, degrees=True):
-        bdry_arcs = BoundaryArc(self.ideal_basis)
-        center, radius, thetas = bdry_arcs.circle_parameters(degrees=degrees)
-
-        signs = np.sign(np.linalg.det(self.proj_data))
-
-        thetas[signs < 0] = np.flip(
-            thetas[signs < 0], axis=-1
-        )
-        return center, radius, thetas
 
 class TangentVector(HyperbolicObject):
     """Model for a tangent vector in hyperbolic space."""
@@ -732,7 +1081,7 @@ class TangentVector(HyperbolicObject):
         point_data = proj_data[..., 0, :]
         vector_data = proj_data[..., 1, :]
 
-        if not all_timelike(point_data):
+        if not timelike(point_data).all():
             raise GeometryError("tangent vector data at index [..., 0, :] must"
                                 " consist of timelike vectors")
 
@@ -1321,43 +1670,64 @@ def hyperboloid_coords(points, column_vectors=False):
 
     return hyperbolized
 
-def close_to_boundary(vectors):
-    """Return true if all of the given vectors have kleinian coords close
-    to the boundary of H^n.
+def spacelike(vectors):
+    """Determine if a vector in R^(n,1) is spacelike.
 
-    """
-    return (np.abs(utils.normsq(kleinian_coords(vectors)) - 1)
-            < ERROR_THRESHOLD).all()
+    Parameters
+    ----------
+    vectors : ndarray
+        Vectors to test for spacelike norms. The last index of the
+        array is the dimension of the vector space.
 
-def all_spacelike(vectors):
-    """Return true if all of the vectors are spacelike.
-
-    Highly susceptible to round-off error, probably don't rely on
-    this.
+    Returns
+    --------
+    ndarray :
+        `True` for vectors which have Minkowski norm above a fixed
+        error threshold.
 
     """
     dim = np.array(vectors).shape[-1]
     return (utils.normsq(vectors, minkowski(dim)) > ERROR_THRESHOLD).all()
 
-def all_timelike(self, vectors):
-    """Return true if all of the vectors are timelike.
+def timelike(self, vectors):
+    """Determine if a vector in R^(n,1) is timelike.
 
-    Highly susceptible to round-off error, probably don't rely on
-    this.
+    Parameters
+    ----------
+    vectors : ndarray
+        Vectors to test for timelike norms. The last index of the
+        array is the dimension of the vector space.
+
+    Returns
+    --------
+    ndarray :
+        `True` for vectors which have Minkowski norm below a fixed
+        error threshold.
 
     """
     dim = np.array(vectors).shape[-1]
-    return (utils.normsq(vectors, minkowski(dim)) < ERROR_THRESHOLD).all()
+    return (utils.normsq(vectors, minkowski(dim)) < ERROR_THRESHOLD)
 
-def all_lightlike(self, vectors):
-    """Return true if all of the vectors are timelike.
+def lightlike(self, vectors):
+    """Determine if a vector in R^(n,1) is lightlike.
 
-    Highly susceptible to round-off error, probably don't rely on
-    this.
+    Parameters
+    ----------
+    vectors : ndarray
+        Vectors to test for lightlike norms. The last index of the
+        array is the dimension of the vector space.
+
+    Returns
+    --------
+    ndarray :
+        `True` for vectors where the absolute value of the Minkowski
+        norm is below a fixed error threshold.
 
     """
+
     dim = np.array(vectors).shape[-1]
-    return (np.abs(utils.normsq(vectors, minkowski(dim))) < ERROR_THRESHOLD).all()
+    return (np.abs(utils.normsq(vectors, minkowski(dim))) < ERROR_THRESHOLD)
+
 
 def kleinian_to_poincare(points):
     euc_norms = utils.normsq(points)
@@ -1405,7 +1775,7 @@ def timelike_to(self, v, force_oriented=False):
     We expect v to be timelike in order for this to make sense.
 
     """
-    if not all_timelike(v):
+    if not timelike(v).all():
         raise GeometryError( "Cannot find isometry taking a"
         " timelike vector to a non-timelike vector."  )
 
@@ -1489,7 +1859,7 @@ def spacelike_to(v, force_oriented=False):
 
     normed = utils.normalize(v, minkowski(dim))
 
-    if not all_spacelike(v):
+    if not spacelike(v).all():
         raise GeometryError( "Cannot find isometry taking a"
         " spacelike vector to a non-spacelike vector.")
 

@@ -50,7 +50,11 @@ At some point in the (very near) future, I hope to upload the package to PyPI so
 
 # Drawing hyperbolic group actions
 
-The `geometry_tools` package is handy for drawing pictures of tilings in \(\mathbb{H}^2\). Here we will work with visualizing a (2,3,7) triangular tiling. You can also [download this example as a Jupyter notebook](triangular_tiling.ipynb).
+The `geometry_tools` package is handy for drawing pictures of tilings in \(\mathbb{H}^2\). Here we will work with visualizing a (2,3,7) triangular tiling:
+
+![png](output_15_0.png)
+
+You can also [download this example as a Jupyter notebook](triangular_tiling.ipynb) or a [python file](triangular_tiling.py).
 
 
 ```python
@@ -103,7 +107,7 @@ fig.draw_polygon(fund_triangle, facecolor="lightgreen")
 ![png](output_5_0.png)
 
 
-If we want to start visualizing the tiling of $\mathbb{H}^2$ we get from this triangle group, we can start drawing translates of this fundamental domain. The easy (but less efficient and appealing) way to do this is to just draw copies of the fundamental domain translated by the images of freely reduced works in the group.
+If we want to start visualizing the tiling of \(\mathbb{H}^2\) we get from this triangle group, we can start drawing translates of this fundamental domain. The easy (but less efficient and appealing) way to do this is to just draw copies of the fundamental domain translated by the images of freely reduced words in the group.
 
 
 ```python
@@ -235,15 +239,6 @@ fig.draw_polygon(pos_isometries @ fund_triangle,
                  facecolor="royalblue", edgecolor="none")
 
 fig.show()
-```
-
-
-![png](output_15_0.png)
-
-
-
-```python
-
 ```
 
 """
