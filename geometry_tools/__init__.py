@@ -1,7 +1,7 @@
 r"""
 `geometry_tools` is a Python package meant to help you work with and visualize group actions on hyperbolic space and projective space.
 
-The package is mostly built on top of [numpy](invalid_url) and [matplotlib](invalid_url), and provides modules to:
+The package is mostly built on top of [numpy](https://numpy.org/) and [matplotlib](https://matplotlib.org/), and provides modules to:
 
 - perform numerical computations with objects in hyperbolic space, in multiple models (namely the Klein, hyperboloid, projective, Poincare, and half-space models)
 
@@ -39,7 +39,7 @@ This code produces:
 
 # Installation
 
-Right now, the easiest way to install `geometry_tools` is to download or clone the project from the [git repository](NOTAURL), and run
+Right now, the easiest way to install `geometry_tools` is to download or clone the project from the [git repository](https://github.com/tjweisman/geometry_tools), and run
 
 ```shell
 python setup.py install
@@ -233,6 +233,8 @@ fig = drawtools.HyperbolicDrawing(model="poincare")
 fig.draw_plane()
 fig.draw_polygon(pos_isometries @ fund_triangle, 
                  facecolor="royalblue", edgecolor="none")
+
+fig.show()
 ```
 
 

@@ -18,11 +18,12 @@ that's probably all they're good for).
 
 3. To check that it worked, run `import geometry_tools` from a python prompt.
 
-## Usage
+## Documentation
 
-There's not an extensive usage guide or anything, but the code has docstrings,
-at least. You can also check out some [example
-usage](https://web.ma.utexas.edu/users/weisman/geometry_tools_usage.html).
+You can find some documentation up at the [project site]
+(https://web.ma.utexas.edu/users/weisman/geometry_tools_usage.html). The URL
+is likely to change in the near future (when I switch institutions), so keep
+an eye out for a new website.
 
 If you have questions or have found bugs, email me at
 [tjweisman@gmail.com](mailto:tjweisman@gmail.com).
