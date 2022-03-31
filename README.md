@@ -20,9 +20,8 @@ that's probably all they're good for).
 
 ## Documentation
 
-You can find some documentation up at the [project site]
-(https://web.ma.utexas.edu/users/weisman/geometry_tools_usage.html). The URL
-is likely to change in the near future (when I switch institutions), so keep
+You can find some documentation up at the [project site](https://web.ma.utexas.edu/users/weisman/geometry_tools_usage.html). 
+The URL is likely to change in the near future (when I switch institutions), so keep
 an eye out for a new website.
 
 If you have questions or have found bugs, email me at
