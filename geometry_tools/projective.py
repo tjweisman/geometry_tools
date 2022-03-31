@@ -9,9 +9,8 @@ from copy import copy
 
 import numpy as np
 
-from . import utils
-from . import representation
-from . import log
+from geometry_tools import utils
+from geometry_tools import representation
 
 
 class GeometryError(Exception):
@@ -53,9 +52,6 @@ class ProjectiveObject:
         try:
             self._construct_from_object(proj_data)
         except TypeError:
-            log.log(
-                "Constructing from object failed, viewing data as ndarray ({})".format(
-                    self.__class__))
             if aux_data is None:
                 self.set(proj_data)
             else:
@@ -95,22 +91,18 @@ class ProjectiveObject:
         """
 
         try:
-            log.log("trying to construct flat object ({})".format(self.__class__))
             if hyp_obj.aux_data is None:
                 self.set(hyp_obj.proj_data)
             else:
                 self.set(hyp_obj.proj_data, aux_data=hyp_obj.aux_data)
             return
         except AttributeError:
-            log.log("could not construct flat object of type {}".format(self.__class__))
             pass
 
         try:
-            log.log("trying to construct list of objects ({})".format(self.__class__))
             unrolled_obj = list(hyp_obj)
 
             if len(unrolled_obj) == 0:
-                log.log("list has length zero, which causes weird errors")
                 raise IndexError
 
             hyp_array = np.array([obj.proj_data for obj in unrolled_obj])
@@ -127,7 +119,6 @@ class ProjectiveObject:
                 self.set(hyp_array, aux_data=aux_array)
             return
         except (TypeError, AttributeError, IndexError) as e:
-            log.log("could not construct object from list ({})".format(self.__class__))
             pass
 
         raise TypeError
@@ -161,13 +152,10 @@ class ProjectiveObject:
 
         """
 
-        log.log("checking geometric validity of underlying data")
         self._assert_geometry_valid(proj_data)
         if aux_data is None:
-            log.log("computing auxiliary data since it was not provided")
             aux_data = self._compute_aux_data(proj_data)
 
-        log.log("checking validity of computed auxiliary data")
         self._assert_aux_valid(aux_data)
 
         self.proj_data = proj_data
@@ -313,7 +301,6 @@ class Polygon(Point):
         self.edges = self.aux_data
 
     def _compute_aux_data(self, proj_data):
-        log.log("making segments for {}".format(self.__class__))
         segments = PointPair(proj_data, np.roll(proj_data, -1, axis=-2))
         return segments.proj_data
 
@@ -348,7 +335,6 @@ class Transformation(ProjectiveObject):
         ProjectiveObject._assert_geometry_valid(self, proj_data)
         if (len(proj_data.shape) < 2 or
             proj_data.shape[-2] != proj_data.shape[-1]):
-            log.log("invalid geometry for object {}".format(proj_data))
             raise GeometryError(
                 ("Projective transformation must be ndarray of n x n"
                  " matrices, got array with shape {}").format(

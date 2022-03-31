@@ -9,7 +9,6 @@ import numpy as np
 
 from geometry_tools import projective, representation, utils
 from geometry_tools.projective import GeometryError
-from geometry_tools import log
 
 #arbitrary
 ERROR_THRESHOLD = 1e-8
