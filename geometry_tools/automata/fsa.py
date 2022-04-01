@@ -1,18 +1,17 @@
 """Work with finite-state automata.
 
 Finite-state automata are really just finite directed labeled graphs,
-subject to the constraint that each vertex v has at most one outgoing
-edge with a given label. One or more of the vertices are "start
-states;" a word w in the set of edge labels is "accepted" if there is
-an edge path in the graph (starting at a start state) whose sequence
-of edge labels gives w.
+subject to the constraint that each vertex `v` has at most one
+outgoing edge with a given label. One or more of the vertices are
+"start states;" a word `w` in the set of edge labels is "accepted" if
+there is an edge path in the graph (starting at a start state) whose
+sequence of edge labels gives `w`.
 
 This module provides the `FSA` class, which can be used to perform
 simple tasks with finite-state automata. A common use-case is
 enumerating the list of words accepted by a particular automaton:
 
 ```python
-
 from geometry_tools.automata import fsa
 
 # load a word-acceptor automaton for the (3,3,4) triangle group

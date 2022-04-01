@@ -1050,6 +1050,26 @@ class Hyperplane(Subspace):
 class TangentVector(HyperbolicObject):
     """Model for a tangent vector in hyperbolic space."""
     def __init__(self, point_data, vector=None):
+        """If `vector` is `None`, interpret `point_data` as either an ndarray
+        of shape `(..., 2, n)` (where `n` is the dimension of the
+        underlying vector space), or else a composite HyperbolicObject
+        whose data can be unpacked into a point in projective space
+        and a tangent vector to a hyperboloid.
+
+        If `vector` is given, then `point_data` is used to construct
+        the basepoint for this tangent vector, and `vector` is used to
+        construct the tangent vector to the hyperboloid.
+
+        Parameters
+        ----------
+        point_data : Point or ndarray
+            The basepoint of the tangent vector, or (if `vector` is
+            `None`) the data of the basepoint and the tangent vector.
+        vector : HyperbolicObject or ndarray
+            The tangent vector data. If `None`, `point_data` contains
+            the data for the basepoint and the tangent vector.
+
+        """
         self.unit_ndims = 2
         self.aux_ndims = 0
 
@@ -1110,15 +1130,36 @@ class TangentVector(HyperbolicObject):
         """Get a unit tangent vector in the same direction as this tangent
         vector.
 
+        Returns
+        -------
+        TangentVector :
+            Normalized version of this tangent vector (with respect to
+            the standard Minkowski inner product)
+
         """
         normed_vec = utils.normalize(self.vector, self.minkowski)
         return TangentVector(self.point, normed_vec)
 
     def origin_to(self, force_oriented=True):
-        """Get an isometry taking the "origin" (a tangent vector pointing
-        along the second standard basis vector) to this vector.
+        """Get an isometry taking the "origin" to this vector.
 
-        """
+        The "origin" is a tangent vector whose basepoint lies at (0,
+        0, ....) in Poincare or Kleinian coordinates, and whose
+        tangent vector is parallel to the second standard basis
+        vector.
+
+        Parameters
+        ----------
+        force_oriented : bool
+            If `True`, force the computed isometry to be
+            orientation-preserving
+
+        Returns
+        -------
+        Isometry :
+            Isometry taking the "origin" to this tangent vector.
+
+    """
         normed = utils.normalize(self.proj_data, self.minkowski)
         isom = utils.find_isometry(self.minkowski, normed,
                                    force_oriented)
@@ -1127,11 +1168,35 @@ class TangentVector(HyperbolicObject):
 
     def isometry_to(self, other, force_oriented=True):
         """Get an isometry taking this tangent vector to a scalar multiple of
-        the other."""
+        the other.
+
+        Parameters
+        ----------
+        other : TangentVector
+            Tangent vector to translate this vector to
+        force_oriented : bool
+            If `True`, force the computed isometry to be
+            orientation-preserving.
+
+        Returns
+        -------
+        Isometry :
+            Isometry this tangent vector to `other`.
+
+        """
         return other.origin_to(force_oriented) @ self.origin_to(force_oriented).inv()
 
     def angle(self, other):
         """Compute the angle between two tangent vectors.
+
+        Parameters
+        ----------
+        other : TangentVector
+
+        Returns
+        -------
+        float or ndarray :
+            The angle between `self` and `other`.
 
         """
         v1 = project_to_hyperboloid(self.point, self.normalized().vector)
@@ -1144,6 +1209,16 @@ class TangentVector(HyperbolicObject):
         """Get a point in hyperbolic space along the geodesic specified by
         this tangent vector.
 
+        Parameters
+        ----------
+        distance : float or ndarray
+
+        Returns
+        -------
+        Point :
+            Point in hyperbolic space along the geodesic ray defined
+            by this tangent vector
+
         """
         kleinian_shape = list(self.point.shape)
         kleinian_shape[-1] -= 1
@@ -1155,10 +1230,25 @@ class TangentVector(HyperbolicObject):
 
         return self.origin_to().apply(basepoint, "elementwise")
 
-    def get_base_tangent(dimension, shape=()):
-        """Get a TangentVector whose basepoint maps to the origin of the
-        Poincare/Klein models, and whose vector is the second standard
-        basis vector in R^(n,1).
+    @classmethod
+    def get_base_tangent(cls, dimension, shape=()):
+        """Get an "origin" tangent vector.
+
+        The basepoint of this tangent vector has coordinates (0, 0,
+        ...) in Poincare/Klein coordinates, and the vector is parallel
+        to the second standard basis vector in R^(n,1).
+
+        Parameters
+        -----------
+        dimension : int
+            Dimension of the hyperbolic space where this tangent vector lives
+        shape : tuple
+            Shape of the composite TangentVector object to return.
+
+        Returns
+        -------
+        TangentVector :
+            An "origin" tangent vector.
 
         """
         origin = Point.get_origin(dimension, shape)
@@ -1168,10 +1258,36 @@ class TangentVector(HyperbolicObject):
         return TangentVector(origin, vector)
 
 class Horosphere(HyperbolicObject):
-    """Model for a horosphere in hyperbolic space
+    """Model for a horosphere in hyperbolic space.
 
     """
     def __init__(self, center, reference_point=None):
+        """If `reference_point` is `None`, interpret `center` as either:
+
+        - a (..., 2, n) `ndarray`, where first row of the last two
+        ndindices gives the (ideal) center point for this horosphere,
+        and the second row gives some reference point on the
+        horosphere itself, or
+
+        - a `HyperbolicObject` whose underlying data has the form above.
+
+        If `reference_point` is given, then `center` can be used to
+        construct an `IdealPoint` giving the center of the horosphere,
+        and `reference_point` can be used to construct a `Point`
+        giving some point on the horosphere.
+
+        Parameters
+        ----------
+        center : Point or ndarray
+            The (ideal) center point for this horosphere, or an object
+            which can be unpacked into all of the data for the
+            horosphere
+        reference_point : Point or ndarray
+            Any point lying on the horosphere itself. If `None`, then
+            `center` contains the data for the reference point as
+            well.
+
+        """
         self.unit_ndims = 2
         self.aux_ndims = 0
 
