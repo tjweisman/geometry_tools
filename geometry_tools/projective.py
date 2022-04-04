@@ -8,6 +8,7 @@ represents a copy of n-dimensional projective space.
 from copy import copy
 
 import numpy as np
+from scipy.spatial import ConvexHull
 
 from geometry_tools import utils
 from geometry_tools import representation
@@ -21,8 +22,8 @@ class GeometryError(Exception):
     pass
 
 class ProjectiveObject:
-    def __init__(self, proj_data, aux_data=None, unit_ndims=1,
-                 aux_ndims=0):
+    def __init__(self, proj_data, aux_data=None, dual_data=None,
+                 unit_ndims=1, aux_ndims=0, dual_ndims=0):
         """Parameters
         -----------
 
@@ -34,6 +35,10 @@ class ProjectiveObject:
             object. Auxiliary data is any data which is in principle
             computable from `proj_data`, but is convenient to keep as
             part of the object definition for transformation purposes.
+
+        dual_data : ndarray
+            data describing this hyperbolic object which transforms
+            covariantly, i.e. as a dual vector in projective space.
 
         unit_ndims : int
             number of ndims of an array representing a "unit" version
@@ -48,14 +53,12 @@ class ProjectiveObject:
         """
         self.unit_ndims = unit_ndims
         self.aux_ndims = aux_ndims
+        self.dual_ndims = dual_ndims
 
         try:
             self._construct_from_object(proj_data)
         except TypeError:
-            if aux_data is None:
-                self.set(proj_data)
-            else:
-                self.set(proj_data, aux_data)
+            self.set(proj_data, aux_data, dual_data)
 
     @property
     def dimension(self):
@@ -91,10 +94,9 @@ class ProjectiveObject:
         """
 
         try:
-            if hyp_obj.aux_data is None:
-                self.set(hyp_obj.proj_data)
-            else:
-                self.set(hyp_obj.proj_data, aux_data=hyp_obj.aux_data)
+            self.set(hyp_obj.proj_data,
+                     aux_data=hyp_obj.aux_data,
+                     dual_data=hyp_obj.dual_data)
             return
         except AttributeError:
             pass
@@ -107,17 +109,18 @@ class ProjectiveObject:
 
             hyp_array = np.array([obj.proj_data for obj in unrolled_obj])
             aux_array = np.array([obj.aux_data for obj in unrolled_obj])
+            dual_array = np.array([obj.dual_data for obj in unrolled_obj])
 
             if (aux_array == None).any():
                 aux_array = None
 
-            #we don't require subclasses to take kwargs (maybe this is
-            #bad practice...)
-            if aux_array is None:
-                self.set(hyp_array)
-            else:
-                self.set(hyp_array, aux_data=aux_array)
+            if (dual_array == None).any():
+                dual_array = None
+
+            self.set(hyp_array, aux_data=aux_array,
+                     dual_data=dual_array)
             return
+
         except (TypeError, AttributeError, IndexError) as e:
             pass
 
@@ -135,7 +138,7 @@ class ProjectiveObject:
         """
         return self.proj_data.shape[:-1 * self.unit_ndims]
 
-    def set(self, proj_data, aux_data=None):
+    def set(self, proj_data, aux_data=None, dual_data=None):
         """set the underlying data of the hyperbolic object.
 
         Subclasses may override this method to give special names to
@@ -144,13 +147,19 @@ class ProjectiveObject:
         Parameters
         -------------
         proj_data : ndarray
-            underyling data representing this hyperbolic object.
+            underyling data representing this projective object.
 
         aux_data : ndarray
-            underyling auxiliary data for this hyperbolic object.
+            underyling auxiliary data for this projective object.
 
+        dual_data : ndarray
+            underlying dual data for this projective object.
 
         """
+
+        # TODO: assert dual geometry valid here as well.  Right now we
+        # don't bother because the only dual geometry we're using is
+        # technically also auxilliary...
 
         self._assert_geometry_valid(proj_data)
         if aux_data is None:
@@ -160,6 +169,7 @@ class ProjectiveObject:
 
         self.proj_data = proj_data
         self.aux_data = aux_data
+        self.dual_data = dual_data
 
     def flatten_to_unit(self, unit=None):
         """return a flattened version of the hyperbolic object.
@@ -173,9 +183,11 @@ class ProjectiveObject:
         """
 
         aux_unit = unit
+        dual_unit = unit
         if unit is None:
             unit = self.unit_ndims
             aux_unit = self.aux_ndims
+            dual_unit = self.dual_ndims
 
         flattened = copy(self)
         new_shape = (-1,) + self.proj_data.shape[-1 * unit:]
@@ -185,9 +197,14 @@ class ProjectiveObject:
         if self.aux_data is not None:
             new_aux_shape = (-1,) + self.aux_data.shape[-1 * aux_unit:]
             new_aux_data = np.reshape(self.aux_data, new_aux_shape)
-            flattened.set(new_proj_data, new_aux_data)
-        else:
-            flattened.set(new_proj_data)
+
+        new_dual_data = None
+        if self.dual_data is not None:
+            new_dual_shape = (-1,) + self.dual_data.shape[-1 * dual_unit:]
+            new_dual_data = np.reshape(self.dual_data, new_dual_shape)
+
+        flattened.set(new_proj_data, aux_data=new_aux_data,
+                      dual_data=new_dual_data)
 
         return flattened
 
@@ -273,7 +290,7 @@ class PointPair(Point):
 
         self.set_endpoints(endpoint1, endpoint2)
 
-    def set(self, proj_data):
+    def set(self, proj_data, **kwargs):
         ProjectiveObject.set(self, proj_data)
         self.endpoints = self.proj_data[..., :2, :]
 
@@ -305,15 +322,18 @@ class PointPair(Point):
 
         return (self.endpoints[..., 0, :], self.endpoints[..., 1, :])
 
-    def endpoint_coords(self, chart_index=None):
-        return self.get_endpoints().coords(chart_index=chart_index)
+    def endpoint_affine_coords(self, chart_index=0):
+        return self.get_endpoints().affine_coords(chart_index=chart_index)
+
+    def endpoint_projective_coords(self):
+        return self.get_endpoints().projective_coords()
 
 class Polygon(Point):
     def __init__(self, vertices, aux_data=None):
         ProjectiveObject.__init__(self, vertices, aux_data,
                                   unit_ndims=2, aux_ndims=3)
 
-    def set(self, proj_data, aux_data=None):
+    def set(self, proj_data, aux_data=None, dual_data=None):
         ProjectiveObject.set(self, proj_data, aux_data)
         self.vertices = self.proj_data
         self.edges = self.aux_data
@@ -328,6 +348,54 @@ class Polygon(Point):
     def get_vertices(self):
         return (self.proj_data)
 
+class ConvexPolygon(Polygon):
+    def __init__(self, vertices, aux_data=None, dual_data=None):
+        ProjectiveObject.__init__(self, vertices, aux_data=aux_data,
+                                  dual_data=dual_data, unit_ndims=2,
+                                  aux_ndims=3, dual_ndims=1)
+    def add_points(self, points, in_place=False):
+        if len(self.proj_data.shape) > 2:
+            raise GeometryError(
+                "Adding new points to a composite ConvexPolygon object is currently"
+                " unsupported."
+            )
+
+        to_add = Point(points)
+        new_data = np.concatenate((self.proj_data, to_add.proj_data), axis=-2)
+
+        if in_place:
+            self.set(new_data)
+            return
+
+        new_poly = ConvexPolygon(new_data)
+        return new_poly
+
+    def _convexify(self):
+        if len(self.proj_data.shape) > 2:
+            raise GeometryError(
+                "Cannot auto-convexify a composite ConvexPolygon object."
+            )
+
+        dim = self.proj_data.shape[-1]
+        self.dual_data = utils.find_positive_functional(self.proj_data)
+
+        to_std_aff = np.linalg.inv(utils.find_isometry(np.identity(dim),
+                                                       self.dual_data))
+
+        standardized_coords = Point(
+            self.proj_data @ to_std_aff
+        ).affine_coords(chart_index=0)
+
+        vertex_indices = ConvexHull(standardized_coords).vertices
+
+        self.proj_data = self.proj_data[vertex_indices]
+        self.aux_data = self._compute_aux_data(self.proj_data)
+
+    def set(self, proj_data, aux_data=None, dual_data=None):
+        ProjectiveObject.set(self, proj_data, aux_data, dual_data)
+        if dual_data is None:
+            self._convexify()
+
 class Transformation(ProjectiveObject):
     def __init__(self, proj_data, column_vectors=False):
         """Constructor for projective transformation.
@@ -339,7 +407,6 @@ class Transformation(ProjectiveObject):
         """
         self.unit_ndims = 2
         self.aux_ndims = 0
-        self.generic_obj_class = ProjectiveObject
 
         try:
             self._construct_from_object(proj_data)
@@ -358,14 +425,17 @@ class Transformation(ProjectiveObject):
                  " matrices, got array with shape {}").format(
                      proj_data.shape))
 
-    def set(self, proj_data):
+    def set(self, proj_data, **kwargs):
         ProjectiveObject.set(self, proj_data)
         self.matrix = proj_data
         self.proj_data = proj_data
 
-    def _apply_to_data(self, proj_data, broadcast, unit_ndims=1):
+    def _apply_to_data(self, proj_data, broadcast, unit_ndims=1, dual=False):
+        matrix = self.matrix
+        if dual:
+            matrix = np.linalg.inv(matrix).swapaxes(-1, -2)
         return utils.matrix_product(proj_data,
-                                    self.matrix,
+                                    matrix,
                                     unit_ndims, self.unit_ndims,
                                     broadcast=broadcast)
 
@@ -394,9 +464,16 @@ class Transformation(ProjectiveObject):
             if aux_data is not None:
                 aux_product = self._apply_to_data(new_obj.aux_data, broadcast,
                                                   new_obj.aux_ndims)
-                new_obj.set(proj_product, aux_product)
-            else:
-                new_obj.set(proj_product)
+
+            dual_data = new_obj.dual_data
+            dual_product = None
+            if dual_data is not None:
+                dual_product = self._apply_to_data(new_obj.dual_data, broadcast,
+                                                   new_obj.dual_ndims)
+
+            new_obj.set(proj_product,
+                        aux_data=aux_product,
+                        dual_data=dual_product)
 
             return new_obj
         except AttributeError:
@@ -591,6 +668,9 @@ def projective_coords(points, chart_index=0, column_vectors=False):
         result = result.swapaxes(-1, -2)
 
     return result
+
+def identity(dimension):
+    return Transformation(np.identity(dimension + 1))
 
 class ProjectiveSpace:
     """class to model a copy of projective space.

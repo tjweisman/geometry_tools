@@ -4,7 +4,8 @@ this package.
 """
 
 import numpy as np
-import scipy
+
+from scipy.optimize import linprog
 
 def rotation_matrix(angle):
     """Get a 2x2 rotation matrix rotating counterclockwise by the
@@ -374,3 +375,24 @@ def matrix_product(array1, array2, unit_axis_1=2, unit_axis_2=2,
         product = squeeze_excess(product, unit_axis_1, unit_axis_2)
 
     return product
+
+def find_positive_functional(positive_points):
+    dim = positive_points.shape[-1]
+    codim = positive_points.shape[-2]
+
+    functionals = np.zeros(positive_points.shape[:-2] +
+                           (positive_points.shape[-1],))
+
+    for ind in np.ndindex(positive_points.shape[:-2]):
+        res = linprog(
+            np.zeros(dim),
+            -1 * positive_points[ind],
+            -1 * np.ones(codim),
+            bounds=(None, None))
+
+        if not res.success:
+            return None
+
+        functionals[ind] = res.x
+
+    return normalize(functionals)

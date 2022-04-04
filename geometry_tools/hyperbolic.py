@@ -495,7 +495,7 @@ class Subspace(IdealPoint):
         """
         HyperbolicObject.__init__(self, proj_data, unit_ndims=2)
 
-    def set(self, proj_data):
+    def set(self, proj_data, **kwargs):
         HyperbolicObject.set(self, proj_data)
         self.ideal_basis = proj_data
 
@@ -715,7 +715,7 @@ class Geodesic(PointPair, Subspace):
     """Model for a bi-infinite gedoesic in hyperbolic space.
 
     """
-    def set(self, proj_data):
+    def set(self, proj_data, **kwargs):
         HyperbolicObject.set(self, proj_data)
         self.endpoints = self.proj_data[..., :2, :]
         self.ideal_basis = self.proj_data[..., :2, :]
@@ -809,7 +809,7 @@ class Segment(Geodesic):
 
         self.set_endpoints(endpoint1, endpoint2)
 
-    def set(self, proj_data):
+    def set(self, proj_data, **kwargs):
         HyperbolicObject.set(self, proj_data)
         self.endpoints = self.proj_data[..., :2, :]
         self.ideal_basis = self.proj_data[..., 2:, :]
@@ -975,7 +975,7 @@ class Hyperplane(Subspace):
     def _data_with_dual(self):
         return self.proj_data
 
-    def set(self, proj_data):
+    def set(self, proj_data, **kwargs):
         HyperbolicObject.set(self, proj_data)
 
         self.spacelike_vector = self.proj_data[..., 0, :]
@@ -1121,7 +1121,7 @@ class TangentVector(HyperbolicObject):
 
         self.set(np.stack([pt.proj_data, projected], axis=-2))
 
-    def set(self, proj_data):
+    def set(self, proj_data, **kwargs):
         HyperbolicObject.set(self, proj_data)
         self.point = self.proj_data[..., 0, :]
         self.vector = self.proj_data[..., 1, :]
@@ -1300,7 +1300,7 @@ class Horosphere(HyperbolicObject):
 
         self.set_center_ref(center, reference_point)
 
-    def set(self, proj_data):
+    def set(self, proj_data, **kwargs):
         HyperbolicObject.set(self, proj_data)
         self.center = proj_data[..., 0, :]
         self.reference = proj_data[..., 1, :]
@@ -1433,7 +1433,7 @@ class HorosphereArc(Horosphere, PointPair):
 
         self.set(proj_data)
 
-    def set(self, proj_data):
+    def set(self, proj_data, **kwargs):
         HyperbolicObject.set(self, proj_data)
         self.center = self.proj_data[..., 0, :]
         self.reference = self.proj_data[..., 1, :]
@@ -1466,7 +1466,7 @@ class BoundaryArc(Geodesic):
     def __init__(self, endpoint1, endpoint2=None):
         PointPair.__init__(self, endpoint1, endpoint2)
 
-    def set(self, proj_data):
+    def set(self, proj_data, **kwargs):
         HyperbolicObject.set(self, proj_data)
         self.endpoints = proj_data[..., :2, :]
         self.orientation_pt = proj_data[..., 2, :]
@@ -2008,3 +2008,6 @@ def spacelike_to(v, force_oriented=False):
         p_iso = utils.make_orientation_preserving(p_iso)
 
     return Isometry(p_iso, column_vectors=False)
+
+def identity(dimension):
+    return Isometry(np.identity(dimension + 1))

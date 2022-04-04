@@ -13,7 +13,7 @@ from matplotlib.collections import LineCollection, PolyCollection, EllipseCollec
 from matplotlib.transforms import Affine2D
 from matplotlib.path import Path
 
-from geometry_tools import hyperbolic, utils
+from geometry_tools import hyperbolic, utils, projective
 from geometry_tools.hyperbolic import Model
 
 #I played around with this a bit, but it's an eyeball test
@@ -49,7 +49,82 @@ class DrawingError(Exception):
     """
     pass
 
-class HyperbolicDrawing:
+class ProjectiveDrawing:
+    def __init__(self, figsize=8,
+                 ax=None,
+                 fig=None,
+                 xlim=(-5., 5.),
+                 ylim=(-5., 5.),
+                 transform=None):
+
+        if ax is None or fig is None:
+            fig, ax = plt.subplots(figsize=(figsize, figsize))
+
+        self.xlim, self.ylim = xlim, ylim
+
+        self.width = self.xlim[1] - self.xlim[0]
+        self.height = self.ylim[1] - self.ylim[0]
+
+        self.ax, self.fig = ax, fig
+
+        plt.tight_layout()
+        self.ax.axis("off")
+        self.ax.set_aspect("equal")
+        self.ax.set_xlim(self.xlim)
+        self.ax.set_ylim(self.ylim)
+
+        self.transform = projective.identity(2)
+        if transform is not None:
+            self.transform = transform
+
+    def draw_point(self, point, **kwargs):
+        pointlist = self.transform @ point.flatten_to_unit()
+        default_kwargs = {
+            "color" : "black",
+            "marker": "o",
+            "linestyle":"none"
+        }
+        for key, value in kwargs.items():
+            default_kwargs[key] = value
+
+        x, y = pointlist.affine_coords().T
+        plt.plot(x, y, **default_kwargs)
+
+    def draw_proj_segment(self, segment, **kwargs):
+        seglist = self.transform @ segment.flatten_to_unit()
+        default_kwargs = {
+            "color":"black",
+            "linewidth":1
+        }
+        for key, value in kwargs.items():
+            default_kwargs[key] = value
+
+        lines = LineCollection(seglist.endpoint_affine_coords(),
+                               **default_kwargs)
+        self.ax.add_collection(lines)
+
+    def draw_polygon(self, polygon, **kwargs):
+        default_kwargs = {
+            "facecolor": "none",
+            "edgecolor": "black"
+        }
+        for key, value in kwargs.items():
+            default_kwargs[key] = value
+
+        polylist = self.transform @ polygon.flatten_to_unit()
+        polys = PolyCollection(polylist.affine_coords(), **default_kwargs)
+        self.ax.add_collection(polys)
+
+    def set_transform(self, transform):
+        self.transform = transform
+
+    def add_transform(self, transform):
+        self.transform = transform @ self.transform
+
+    def precompose_transform(self, transform):
+        self.transform = self.transform @ transform
+
+class HyperbolicDrawing(ProjectiveDrawing):
     def __init__(self, figsize=8,
                  ax=None,
                  fig=None,
@@ -58,7 +133,8 @@ class HyperbolicDrawing:
                  linewidth=1,
                  model=Model.POINCARE,
                  xlim=None,
-                 ylim=None):
+                 ylim=None,
+                 transform=None):
 
         if ax is None or fig is None:
             fig, ax = plt.subplots(figsize=(figsize, figsize))
@@ -94,6 +170,13 @@ class HyperbolicDrawing:
         self.linewidth = linewidth
 
         self.model = model
+
+        self.transform = hyperbolic.identity(2)
+
+        if transform is not None:
+            self.transform = transform
+
+
 
     def draw_plane(self, **kwargs):
         default_kwargs = {
@@ -146,7 +229,7 @@ class HyperbolicDrawing:
 
     def draw_geodesic(self, segment,
                       radius_threshold=RADIUS_THRESHOLD, **kwargs):
-        seglist = segment.flatten_to_unit()
+        seglist = self.transform @ segment.flatten_to_unit()
         default_kwargs = {
             "color":"black",
             "linewidth":1
@@ -183,7 +266,7 @@ class HyperbolicDrawing:
 
 
     def draw_point(self, point, **kwargs):
-        pointlist = point.flatten_to_unit()
+        pointlist = self.transform @ point.flatten_to_unit()
         default_kwargs = {
             "color" : "black",
             "marker": "o",
@@ -218,7 +301,6 @@ class HyperbolicDrawing:
     def get_polygon_arcpath(self, polygon,
                             radius_threshold=RADIUS_THRESHOLD,
                             distance_threshold=DISTANCE_THRESHOLD):
-
         vertices = np.zeros((0, 2))
         codes = np.zeros((0,))
         first_segment = True
@@ -259,7 +341,7 @@ class HyperbolicDrawing:
         for key, value in kwargs.items():
             default_kwargs[key] = value
 
-        polylist = polygon.flatten_to_unit()
+        polylist = self.transform @ polygon.flatten_to_unit()
 
         if self.model == Model.KLEIN:
             polys = PolyCollection(polylist.coords("klein"), **default_kwargs)
@@ -283,7 +365,7 @@ class HyperbolicDrawing:
         for key, value in kwargs.items():
             default_kwargs[key] = value
 
-        horolist = horoball.flatten_to_unit()
+        horolist = self.transform @ horoball.flatten_to_unit()
         if self.model == Model.POINCARE or self.model == Model.HALFSPACE:
             center, radius = horolist.sphere_parameters(model=self.model)
 
@@ -331,7 +413,7 @@ class HyperbolicDrawing:
                     self.model)
             )
 
-        horolist = horoarc.flatten_to_unit()
+        horolist = self.transform @ horoarc.flatten_to_unit()
         endpts = horolist.endpoint_coords(model=self.model)
         centers, radii, thetas = horolist.circle_parameters(model=self.model)
 
@@ -354,7 +436,7 @@ class HyperbolicDrawing:
         for key, value in kwargs.items():
             default_kwargs[key] = value
 
-        arclist = boundary_arc.flatten_to_unit()
+        arclist = self.transform @ boundary_arc.flatten_to_unit()
 
         if self.model == Model.POINCARE or self.model == Model.KLEIN:
             centers, radii, thetas = arclist.circle_parameters(model=self.model)
