@@ -254,6 +254,7 @@ class Point(HyperbolicObject, projective.Point):
         """
         self.unit_ndims = 1
         self.aux_ndims = 0
+        self.dual_ndims = 0
 
         try:
             self._construct_from_object(point)
@@ -793,6 +794,7 @@ class Segment(Geodesic):
     def __init__(self, endpoint1, endpoint2=None):
         self.unit_ndims = 2
         self.aux_ndims = 0
+        self.dual_ndims = 0
 
         if endpoint2 is None:
             try:
@@ -936,6 +938,7 @@ class Hyperplane(Subspace):
     def __init__(self, hyperplane_data):
         self.unit_ndims = 2
         self.aux_ndims = 0
+        self.dual_ndims = 0
 
         try:
             self._construct_from_object(hyperplane_data)
@@ -1072,6 +1075,7 @@ class TangentVector(HyperbolicObject):
         """
         self.unit_ndims = 2
         self.aux_ndims = 0
+        self.dual_ndims = 0
 
         if vector is None:
             try:
@@ -1290,6 +1294,7 @@ class Horosphere(HyperbolicObject):
         """
         self.unit_ndims = 2
         self.aux_ndims = 0
+        self.dual_ndims = 0
 
         if reference_point is None:
             try:
@@ -1400,6 +1405,7 @@ class HorosphereArc(Horosphere, PointPair):
     def __init__(self, center, p1=None, p2=None):
         self.unit_ndims = 2
         self.aux_ndims = 0
+        self.dual_ndims = 0
 
         if p1 is None and p2 is None:
             try:

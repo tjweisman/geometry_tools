@@ -246,6 +246,7 @@ class Point(ProjectiveObject):
     def __init__(self, point, chart_index=None):
         self.unit_ndims = 1
         self.aux_ndims = 0
+        self.dual_ndims = 0
 
         try:
             self._construct_from_object(point)
@@ -280,6 +281,7 @@ class PointPair(Point):
     """
         self.unit_ndims = 2
         self.aux_ndims = 0
+        self.dual_ndims = 0
 
         if endpoint2 is None:
             try:
@@ -407,6 +409,7 @@ class Transformation(ProjectiveObject):
         """
         self.unit_ndims = 2
         self.aux_ndims = 0
+        self.dual_ndims = 0
 
         try:
             self._construct_from_object(proj_data)
