@@ -131,7 +131,7 @@ class ProjectiveObject:
         HyperbolicObject represents.
 
         Returns
-        ---------
+        --------
         tuple
 
 
@@ -172,7 +172,7 @@ class ProjectiveObject:
         self.dual_data = dual_data
 
     def flatten_to_unit(self, unit=None):
-        """return a flattened version of the hyperbolic object.
+        """Get a flattened version of the hyperbolic object.
 
         Parameters
         ----------
@@ -226,7 +226,7 @@ class ProjectiveObject:
         return self.__class__(self.proj_data[item])
 
     def projective_coords(self, proj_data=None):
-        """wrapper for ProjectiveObject.set, since underlying coordinates are
+        """Wrapper for ProjectiveObject.set, since underlying coordinates are
         projective."""
         if proj_data is not None:
             self.set(proj_data)
@@ -235,6 +235,22 @@ class ProjectiveObject:
 
     def affine_coords(self, aff_data=None, chart_index=0):
         """Get or set affine coordinates for this object.
+
+        Parameters
+        ----------
+        aff_data : ndarray
+            if not `None`, coordinate data for this point in an affine
+            chart.
+
+        chart_index : int
+            index of standard affine chart to get/set coordinates in
+
+        Returns
+        -------
+        ndarray :
+            affine coordinates of this Point, in the specified
+            standard affine chart.
+
         """
         if aff_data is not None:
             self.set(projective_coords(aff_data, chart_index=chart_index))
@@ -244,6 +260,24 @@ class ProjectiveObject:
 
 class Point(ProjectiveObject):
     def __init__(self, point, chart_index=None):
+        """Parameters
+        ----------
+        point : ndarray or ProjectiveObject or iterable
+            Data to use to construct a Point object. If `point` is an
+            `ndarray`, then it is interpreted as data in either
+            projective or affine coordinates, depending on whether
+            `chart_index` is specified. If `point` is a
+            `ProjectiveObject`, then construct a `Point` from the
+            underlying data of that object.
+        chart_index : int
+            if `None` (default), then assume that `point` is data in
+            projective coordinates, or a ProjectiveObject. Otherwise,
+            interpret `point` as data in affine coordinates, and use
+            `chart_index` as the index of the standard affine chart
+            those coordinates are in.
+
+        """
+
         self.unit_ndims = 1
         self.aux_ndims = 0
         self.dual_ndims = 0
@@ -261,10 +295,11 @@ class Point(ProjectiveObject):
 
 class PointPair(Point):
     def __init__(self, endpoint1, endpoint2=None):
-        """If `endpoint2` is `None`, interpret `endpoint1` as either a (2
-        x...x n) `ndarray` (where n is the dimension of the underlying
-        vector space), or else a composite `Point` object which can be
-        unpacked into two Points (which may themselves be composite).
+        """If `endpoint2` is `None`, interpret `endpoint1` as either an
+        `ndarray` of shape (2, ..., n) (where n is the dimension of
+        the underlying vector space), or else a composite `Point`
+        object which can be unpacked into two Points (which may
+        themselves be composite).
 
         If `endpoint2` is given, then both `endpoint1` and `endpoint2`
         can be used to construct `Point` objects, which serve as the
@@ -675,136 +710,63 @@ def projective_coords(points, chart_index=0, column_vectors=False):
 def identity(dimension):
     return Transformation(np.identity(dimension + 1))
 
-class ProjectiveSpace:
-    """class to model a copy of projective space.
+def affine_linear_map(linear_map, chart_index=0, column_vectors=True):
+    """Get a projective transformation restricting to a linear map on a
+       standard affine chart.
 
-    The most important functions are affine_coordinates and
-    affine_to_projective, which respectively convert between affine
-    and projective coordinates.
+    Parameters
+    ----------
+    linear_map : ndarray
+        A linear map giving an affine transformation on a standard
+        affine chart
 
-    The class also keeps track of a single coordinate transformation
-    matrix, which is applied automatically when determining
-    affine/projective coordinates.
+    chart_index : int
+        Index of the standard affine chart where this projective
+        transformation acts
+
+    column_vectors :
+        It `True`, interpret `linear_map` as a matrix acting on column
+        vectors (on the left). Otherwise, `linear_map` acts on row
+        vectors (on the right).
+
+    Returns
+    --------
+    Transformation :
+        Projective transformation preserving a standard affine chart
+        and acting by a linear map on that affine space (i.e. fixing a
+        point in that affine space).
 
     """
-    def __init__(self, dim):
-        self.dim = dim
-        self.coordinates = np.identity(dim)
+    h, w = linear_map.shape
 
-    def set_hyperplane_coordinates(self, normal):
-        """set the coordinate transform to put a specified hyperplane at
-        infinity.
+    tf_mat = np.block(
+        [[linear_map[:chart_index, :chart_index],
+          np.zeros((chart_index, 1)), linear_map[:chart_index, chart_index:]],
+         [np.zeros((1, chart_index)), 1., np.zeros((1, w - chart_index))],
+         [linear_map[chart_index:, :chart_index],
+          np.zeros((h - index, 1)), linear_map[chart_index:, chart_index:]]])
 
-        The hyperplane is of the form x . normal = 0, where . is the
-        standard Euclidean inner product on R^n.
-        """
-        self.coordinates = hyperplane_coordinate_transform(normal)
+    return Transformation(tf_mat, column_vectors=column_vectors)
 
-    def postcompose_coordinates(self, coordinates):
-        """postcompose coordinate transformation with a matrix"""
-        self.coordinates = np.matmul(coordinates, self.coordinates)
+def affine_translation(translation, chart_index=0):
+    """Get a translation in a standard affine chart.
 
-    def precompose_coordinates(self, coordinates):
-        """precompose coordinate transformation with a given matrix"""
-        self.coordinates = np.matmul(self.coordinates, coordinates)
+    Parameters
+    ----------
+    translation : ndarray
+        vector to translate along in affine space
+    chart_index : int
+        index of the standard affine chart this translation acts on
 
-    def add_linear_transform(self, affine_transform):
-        """postcompose the coordinate transformation with an affine map"""
-        self.postcompose_coordinates(
-            np.block([[1, np.zeros((1, self.dim - 1))],
-                      [np.zeros((self.dim - 1, 1)), affine_transform]])
-        )
+    Returns
+    --------
+    Transformation :
+        Projective transformation preserving a standard affine chart
+        and acting by an affine translation in that affine space.
 
-    def add_affine_translation(self, translation):
-        """postcompose the coordinate transformation with an affine
-translation"""
-        translation_col = translation.reshape((self.dim - 1,1))
-        self.postcompose_coordinates(
-            np.block([[1, np.zeros((1, self.dim - 1))],
-                     [translation_col, np.identity(self.dim - 1)]])
-        )
+    """
+    tf = np.identity(len(translation) + 1)
+    tf[chart_index, :chart_index] = translation[:chart_index]
+    tf[chart_index, chart_index + 1:] = translation[chart_index:]
 
-    def set_affine_origin(self, origin_vector):
-        """postcompose coordinates with an affine translation which sets the
-        origin to the given point"""
-        s_vector = np.array(origin_vector).reshape((self.dim, 1))
-        loc = affine_coords(
-            np.matmul(self.coordinates, s_vector).T, 0).reshape((self.dim - 1,1))
-        self.add_affine_translation(-1 * loc)
-
-    def set_affine_direction(self, direction_vector, direction):
-        """postcompose coordinates with a Euclidean rotation to get a
-        direction vector pointing in a given direction.
-
-        """
-        s_vector = np.array(direction_vector).reshape((self.dim,1))
-        d_vector = np.array(direction).reshape((self.dim - 1,1))
-
-        loc = affine_coords(
-            np.matmul(self.coordinates, s_vector).T, 0).reshape((self.dim - 1,1))
-        transform = orthogonal_transform(loc, d_vector)
-        self.add_linear_transform(transform)
-
-    def set_coordinate_matrix(self, coordinate_matrix):
-        self.coordinates = coordinate_matrix
-
-    def affine_coordinates(self, point_list, type="rows", chart=0):
-        """return affine coordinates of a set of vectors in R^(n+1)
-
-        If type = "rows," then point_list is an ndarray where the last
-        index is the dimension of underlying vector space. If type =
-        "columns," then the second-to-last index is the dimension of
-        the underlying vector space.
-
-        """
-        coords = np.array(point_list)
-        if type == "rows":
-            #last index is the dimension
-            pts = coords @ self.coordinates.T
-            return affine_coords(pts, chart)
-        elif type == "columns":
-            #second-to-last index is the dimension
-            pts = (self.coordinates @ coords).swapaxes(-1, -2)
-            return affine_coords(pts, chart).swapaxes(-1, -2)
-
-        #guess the dimension axis from the array
-        pts, dim_index = utils.dimension_to_axis(coords, self.dim, -1)
-        pts = pts @ self.coordinates.T
-        return affine_coords(pts, chart).swapaxes(dim_index, -1)
-
-    def affine_to_projective(self, point_list, column_vectors=True):
-        """return standard lifts of points in affine coordinates to R^(n+1).
-
-        If type = "rows," then point_list is an ndarray where the last
-        index is the dimension of the affine space. If type =
-        "columns," then the second-to-last index is the dimension of
-        the affine space.
-
-        """
-        coords = np.array(point_list)
-
-        one_shape = list(coords.shape)
-        if type == "rows":
-            dim_index = -1
-        elif type == "columns":
-            dim_index = -2
-
-        one_shape[dim_index] = 1
-        ones = np.ones(one_shape)
-
-        projective = np.concatenate([ones, coords], axis=dim_index)
-
-        if type == "rows":
-            return projective @ self.coordinates.T
-        elif type == "columns":
-            coords = self.coordinates @ projective.swapaxes(-1, -2)
-            return coords.swapaxes(-1, -2)
-
-class ProjectivePlane(ProjectiveSpace):
-    """Projective space of dimension 2"""
-    def __init__(self):
-        super().__init__(3)
-
-    def xy_coords(self, points):
-        affine_pts = self.affine_coordinates(points)
-        return affine_pts[:, 0], affine_pts[:, 1]
+    return Transformation(tf, column_vectors=False)
