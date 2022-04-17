@@ -11,6 +11,11 @@ from scipy.special import binom
 
 from . import utils
 
+def semi_gens(generators):
+    for gen in generators:
+        if re.match("[a-z]", gen):
+            yield gen
+
 class RepresentationException(Exception):
     pass
 
@@ -54,20 +59,34 @@ class Representation:
                 yield word
 
     def semi_gens(self):
-        for gen in self.generators:
-            if re.match("[a-z]", gen):
-                yield gen
+        return semi_gens(self.generators.items())
 
-    def __init__(self, generator_names=[], normalization_step=-1):
-        self.generators = {name[0].lower():None
-                           for name in generator_names}
-
-        for gen in list(self.generators):
-            self.generators[gen.upper()] = None
-
-        self.normalization_step = normalization_step
+    def __init__(self, representation=None,
+                 generator_names=None, normalization_step=-1):
 
         self._dim = None
+
+        if representation is not None:
+            if generator_names is None:
+                generator_names = list(representation.generators)
+
+            self.generators = {}
+            for gen in semi_gens(generator_names):
+                self[gen] = representation[gen]
+
+            self._dim = representation._dim
+
+        else:
+            if generator_names is None:
+                generator_names = []
+
+            self.generators = {name[0].lower():None
+                               for name in semi_gens(generator_names)}
+
+            for gen in list(self.generators):
+                self.generators[gen.upper()] = None
+
+        self.normalization_step = normalization_step
 
     def normalize(self, matrix):
         """function to force a matrices into a subgroup of GL(d,R)

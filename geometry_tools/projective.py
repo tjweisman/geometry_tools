@@ -22,22 +22,30 @@ class GeometryError(Exception):
     pass
 
 class ProjectiveObject:
+    """Represent some object in projective geometry (possibly a composite
+    object).
+
+    The underlying data of a projective object is stored as a numpy
+    ndarray, whose last `unit_ndims` ndims represent the data needed
+    to represent a *single*
+
+    """
     def __init__(self, proj_data, aux_data=None, dual_data=None,
                  unit_ndims=1, aux_ndims=0, dual_ndims=0):
         """Parameters
         -----------
 
         proj_data : ndarray
-            underyling data describing this hyperbolic object
+            underyling data describing this projective object
 
         aux_data : ndarray
-            auxiliary data describing this hyperbolic
+            auxiliary data describing this projective
             object. Auxiliary data is any data which is in principle
             computable from `proj_data`, but is convenient to keep as
             part of the object definition for transformation purposes.
 
         dual_data : ndarray
-            data describing this hyperbolic object which transforms
+            data describing this projective object which transforms
             covariantly, i.e. as a dual vector in projective space.
 
         unit_ndims : int
@@ -49,6 +57,9 @@ class ProjectiveObject:
 
         aux_ndims : int
             like `unit_ndims`, but for auxiliary data.
+
+        dual_ndims : int
+            like `unit_ndims`, but for covariant (dual) data.
 
         """
         self.unit_ndims = unit_ndims
@@ -128,7 +139,7 @@ class ProjectiveObject:
 
     def obj_shape(self):
         """Get the shape of the ndarray of "unit objects" this
-        HyperbolicObject represents.
+        ProjectiveObject represents.
 
         Returns
         --------
@@ -172,7 +183,15 @@ class ProjectiveObject:
         self.dual_data = dual_data
 
     def flatten_to_unit(self, unit=None):
-        """Get a flattened version of the hyperbolic object.
+        """Get a flattened version of the projective object.
+
+        This method reshapes the underlying data of the projective
+        object to get a "flat" composite list of objects. For example,
+        if called on a Segment object whose underlying array has shape
+        (4, 5, 2, 3), this method uses the `unit_ndims` data member to
+        interprets this array as an array of segments with shape
+        (4,5), and returns a Segment object whose underlying array has
+        shape (20, 2, 3).
 
         Parameters
         ----------
@@ -180,6 +199,7 @@ class ProjectiveObject:
         unit : int
             the number of ndims to treat as a "unit" when flattening
             this object into units.
+
         """
 
         aux_unit = unit
@@ -338,6 +358,14 @@ class PointPair(Point):
         points with shape `(..., 2, n)`. Otherwise, expect `endpoint1`
         and `endpoint2` to be arrays of points with the same shape.
 
+        Parameters
+        ----------
+        endpoint1 : Point or ndarray
+            One (or both) endpoints of the point pair
+        endpoint2 : Point or ndarray
+            The other endpoint of the point pair. If `None`,
+            `endpoint1` contains the data for both points in the pair.
+
         """
         if endpoint2 is None:
             self.set(Point(endpoint1).proj_data)
@@ -348,25 +376,77 @@ class PointPair(Point):
         self.set(np.stack([pt1.proj_data, pt2.proj_data], axis=-2))
 
     def get_endpoints(self):
+        """Get a Point representing the endpoints of this pair
+
+        Returns
+        --------
+        Point :
+            A composite Point object representing the endpoints of
+            this (possibly composite) PointPair
+
+        """
         return Point(self.endpoints)
 
-    def get_end_pair(self, as_points=False):
+    def get_end_pair(self):
         """Return a pair of point objects, one for each endpoint
-        """
-        if as_points:
-            p1, p2 = self.get_end_pair(as_points=False)
-            return (Point(p1), Point(p2))
 
-        return (self.endpoints[..., 0, :], self.endpoints[..., 1, :])
+        Returns
+        -----------
+        tuple :
+            Tuple of the form `(endpoint1, endpoint2)`, where
+            `endpoint1` and `endpoint2` are (possibly composite)
+            `Point` objects representing the endpoints of this pair
+
+        """
+        return (Point(self.endpoints[..., 0, :]),
+                Point(self.endpoints[..., 1, :]))
 
     def endpoint_affine_coords(self, chart_index=0):
+        """Get endpoints of this segment in affine coordinates
+
+        Parameters
+        ----------
+        chart_index : int
+            Index of the standard affine chart to take coordinates in
+
+        Returns
+        --------
+        ndarray:
+            Affine coordinates of the endpoints of this pair of
+            points.
+
+        """
         return self.get_endpoints().affine_coords(chart_index=chart_index)
 
     def endpoint_projective_coords(self):
+        """Get endpoints of this segment in projective coordinates.
+
+        Returns
+        --------
+        ndarray:
+            Projective coordinates of the endpoints of this pair of
+            points.
+
+        """
         return self.get_endpoints().projective_coords()
 
 class Polygon(Point):
+    """A finite-sided polygon in projective space.
+    """
     def __init__(self, vertices, aux_data=None):
+        """
+        Parameters
+        ----------
+        vertices : Point or ndarray
+            vertices of the polygon, as either an ndarray or a
+            composite Point object (provided in the proper order for
+            this polygon).
+
+        aux_data : PointPair or ndarray
+            Data to use to construct the edges of the polygon. If
+            `None`, use the vertex data to compute the edge data.
+
+        """
         ProjectiveObject.__init__(self, vertices, aux_data,
                                   unit_ndims=2, aux_ndims=3)
 
@@ -380,17 +460,92 @@ class Polygon(Point):
         return segments.proj_data
 
     def get_edges(self):
+        """Get the edges of this polygon
+
+        Returns
+        --------
+        PointPair :
+            Edges of this polygon, as a composite PointPair object.
+
+        """
         return PointPair(self.edges)
 
     def get_vertices(self):
+        """Get the vertices of the polygon.
+
+        Returns
+        --------
+        Point :
+            Vertices of this polygon, as a composite Point object.
+
+        """
         return (self.proj_data)
 
 class ConvexPolygon(Polygon):
+    """A finite-sided convex polygon in projective space.
+    """
+
     def __init__(self, vertices, aux_data=None, dual_data=None):
+        """
+        When providing point data for this polygon, non-extreme points
+        (i.e. points in the interior of the convex hull) are
+        discarded. To determine which points lie in the interior of
+        the convex hull, the constructor either:
+
+             - uses the provided `dual_data` to determine an affine
+               chart in which the convex polygon lies (this chart is
+               the complement of the hyperplane specified in
+               `dual_data`), or
+
+             - interprets the projective coordinates of the provided
+               points as preferred lifts of those points in R^n, and
+               computes an affine chart containing the
+               projectivization of the convex hull of those lifts.
+
+        Parameters
+        ----------
+        vertices : Point or ndarray
+            points contained in this polygon
+        aux_data : PointPair or None
+            Data to construct the edges of this polygon. If `None`,
+            use vertex data to construct edge data.
+        dual_data : ProjectiveObject
+            Dual vector specifying an affine chart containing every
+            point in this convex polygon. If `None`, then compute a
+            dual vector using lifts of the vertex data.
+
+    """
+
         ProjectiveObject.__init__(self, vertices, aux_data=aux_data,
                                   dual_data=dual_data, unit_ndims=2,
                                   aux_ndims=3, dual_ndims=1)
     def add_points(self, points, in_place=False):
+        """Add points to an existing convex polygon.
+
+        Parameters
+        ----------
+        points : Point or ndarray
+            Points to add to the convex polygon. Redundant points
+            (lying in the interior of the convex hull) will be
+            discarded.
+        in_place : bool
+            if `True`, modify this convex polygon object in-place
+            instead of returning a new one.
+
+        Raises
+        ------
+        GeometryError
+            Raised if points are added to a composite ConvexPolygon
+            (currently unsupported)
+
+        Returns
+        --------
+        ConvexPolygon :
+            if `in_place` is `False`, return a modified ConvexPolygon
+            object with the new points added.
+
+        """
+
         if len(self.proj_data.shape) > 2:
             raise GeometryError(
                 "Adding new points to a composite ConvexPolygon object is currently"
@@ -435,12 +590,20 @@ class ConvexPolygon(Polygon):
 
 class Transformation(ProjectiveObject):
     def __init__(self, proj_data, column_vectors=False):
-        """Constructor for projective transformation.
+        """A projective transformation.
 
-        Underlying data is stored as row vectors, but by default the
-        constructor accepts matrices acting on columns, since that's
-        how my head thinks.
+        By default, the underlying data for a projective
+        transformation is a *row matrix* (or an ndarray of row
+        matrices), acting on vectors on the *right*.
 
+        Parameters
+        ----------
+        proj_data : ProjectiveObject or ndarray
+            Data to use to construct a projective transformation (or
+            array of projective transformations).
+        column_vectors : bool
+            If `True`, interpret proj_data as a *column matrix* acting
+            on the left. Otherwise proj_data gives a *row matrix*.
         """
         self.unit_ndims = 2
         self.aux_ndims = 0
@@ -478,16 +641,30 @@ class Transformation(ProjectiveObject):
                                     broadcast=broadcast)
 
     def apply(self, proj_obj, broadcast="elementwise"):
-        """Apply this isometry to another object in hyperbolic space.
+        """Apply this transformation to another object in projective space.
 
-        Broadcast is either "elementwise" or "pairwise", treating self
-        and hyp_obj as ndarrays of isometries and hyperbolic objects,
-        respectively.
+        Parameters
+        ----------
+        proj_obj : ProjectiveObject or ndarray
+            Projective object to apply this transformation to. This object
+            may be composite.
+        broadcast : string
+            Broadcasting behavior for applying composite
+            transformation objects. If "elementwise", then the shape
+            of this (composite) transformation object and the shape of
+            the (composite) object to apply transformations to need to
+            be broadcastable. If "pairwise", then apply every element
+            of this (composite) transformation object to every element
+            of the target object (i.e. take an outer product).
 
-        hyp_obj may be either a HyperbolicObject instance or the
-        underlying data of one. In either case, this function returns
-        a HyperbolicObject (of the same subclass as hyp_obj, if
-        applicable).
+        Returns
+        -------
+        ProjectiveObject :
+            Transformed (possibly composite) projective object. The
+            type of this object is the same type as the original
+            (untransformed) object. If the original object was
+            provided as an ndarray, then the returned object has type
+            ProjectiveObject.
 
         """
         new_obj = copy(proj_obj)
@@ -526,42 +703,44 @@ class Transformation(ProjectiveObject):
         return ProjectiveObject(data)
 
     def inv(self):
-        """invert the isometry"""
+        """Get the inverse of this transformation.
+
+        Returns
+        --------
+        ProjectiveTransformation :
+            Inverse of this transformation.
+        """
         return self.__class__(np.linalg.inv(self.matrix))
 
     def __matmul__(self, other):
         return self.apply(other)
 
 class ProjectiveRepresentation(representation.Representation):
-    def __init__(self, generator_names=[], normalization_step=-1):
-        representation.Representation.__init__(self, generator_names,
-                                               normalization_step)
     def __getitem__(self, word):
         matrix = self._word_value(word)
         return Transformation(matrix, column_vectors=True)
 
-    def __setitem__(self, generator, isometry):
-        try:
-            super().__setitem__(generator, isometry.matrix.T)
-            return
-        except AttributeError:
-            super().__setitem__(generator, isometry)
-
-    @classmethod
-    def from_matrix_rep(cls, rep, **kwargs):
-        """Construct a hyperbolic representation from a matrix
-        representation"""
-        hyp_rep = cls(**kwargs)
-        for g, matrix in rep.generators.items():
-            hyp_rep[g] = matrix
-
-        return hyp_rep
+    def __setitem__(self, generator, matrix):
+        transform = Transformation(matrix, column_vectors=True)
+        representation.Representation.__setitem__(self, generator,
+                                                  transform.matrix.T)
 
     def transformations(self, words):
-        """Get an Isometry object holding the matrices which are the images of
-        a sequence of words in the generators.
+        """Get a composite transformation, representing a sequence of words in
+        the generators for this representation.
 
-        """
+        Parameters
+        ----------
+        words : iterable of strings
+            Sequence of words to apply this representation to.
+
+        Returns
+        --------
+        Transformation :
+            Composite transformation object containing one
+            transformation for each word in `words`.
+
+    """
         matrix_array = np.array(
             [representation.Representation.__getitem__(self, word)
              for word in words]
@@ -570,31 +749,24 @@ class ProjectiveRepresentation(representation.Representation):
 
 
 def hyperplane_coordinate_transform(normal):
-    """find an orthogonal matrix taking the the affine chart "x . normal
-    != 0" to the standard affine chart "x_0 != 0
+    """Find an orthogonal matrix taking the affine chart \(\vec{x} \cdot
+       \vec{n} \ne 0\) to the standard affine chart \(x_0 \ne 0\).
+
+    Parameters
+    ----------
+    normal : array
+        The vector \(\vec{n}\), normal to some hyperplane in R^n.
+
+    Returns
+    --------
+    Transformation :
+        Projective transformation (orthogonal in the standard inner
+        product on R^n) taking the desired affine chart to the
+        standard chart with index 0.
 
     """
-
-    return np.linalg.inv(orthogonal_transform(normal)).T
-
-def orthogonal_transform(v1, v2=None):
-    """find an orthogonal matrix taking v1 to v2. If v2 is not specified,
-    take v1 to the first standard basis vector (1, 0, ... 0).
-
-    """
-    if v2 is not None:
-        orth1 = orthogonal_transform(v1)
-        return np.matmul(orth1, np.linalg.inv(orthogonal_transform(v2)))
-    else:
-        Q, R = np.linalg.qr(
-            np.column_stack([v1.reshape((v1.size, 1)),
-                       np.identity(v1.size)])
-        )
-        if R[0,0] == 0:
-            return np.identity(v1.size)
-
-        sign = R[0,0] / np.abs(R[0,0])
-        return np.linalg.inv(Q * sign)
+    mat = utils.find_definite_isometry(normal)
+    return Transformation(mat, column_vectors=True).inv()
 
 def affine_coords(points, chart_index=None, column_vectors=False):
     """Get affine coordinates for an array of points in projective space
@@ -708,6 +880,20 @@ def projective_coords(points, chart_index=0, column_vectors=False):
     return result
 
 def identity(dimension):
+    """Get the identity projective transformation.
+
+    Parameters
+    ----------
+    dimension : int
+        Dimension of the projective space to act on.
+
+    Returns
+    --------
+    Transformation :
+        The identity map on RP^n, where n = `dimension`.
+
+    """
+
     return Transformation(np.identity(dimension + 1))
 
 def affine_linear_map(linear_map, chart_index=0, column_vectors=True):

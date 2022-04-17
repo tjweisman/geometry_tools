@@ -52,7 +52,7 @@ class CoxeterGroup:
 
         """
         num_gens = len(self.generators)
-        rep = Representation(GENERATOR_NAMES[:num_gens])
+        rep = Representation()
 
         for i, gen in enumerate(self.ordered_gens):
             basis_vec = np.zeros(num_gens)
@@ -81,7 +81,7 @@ class CoxeterGroup:
 
     def hyperbolic_rep(self):
         matrix_rep = self.diagonal_rep(order_eigenvalues="signed")
-        return hyperbolic.HyperbolicRepresentation.from_matrix_rep(matrix_rep)
+        return hyperbolic.HyperbolicRepresentation(matrix_rep)
 
 
 class TriangleGroup(CoxeterGroup):

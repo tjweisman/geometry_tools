@@ -289,6 +289,27 @@ def find_isometry(form, partial_map, force_oriented=False):
 
     return iso
 
+def find_definite_isometry(partial_map, force_oriented=False):
+    pmap = np.array(partial_map)
+    if len(pmap.shape) < 2:
+        pmap = pmap.reshape((len(pmap), 1))
+    h, w = pmap.shape[-2:]
+    n = max(h, w)
+    if w > h:
+        mat = np.concatenate([pmap.swapaxes(-1, -2),
+                             np.identity(n)], axis=-1)
+    else:
+        mat = np.concatenate([pmap, np.identity(n)], axis=-1)
+
+    q, r = np.linalg.qr(mat)
+
+    iso = np.sign(r[..., 0,0]) * q
+
+    if force_oriented:
+        iso = make_orientation_preserving(iso)
+
+    return iso
+
 def make_orientation_preserving(matrix):
     """apply a reflection to the last row of matrix to make it orientation
     preserving.
