@@ -11,6 +11,18 @@ def rotation_matrix(angle):
     """Get a 2x2 rotation matrix rotating counterclockwise by the
     specified angle.
 
+    Parameters
+    ----------
+    angle : float
+        angle to rotate by
+
+    Returns
+    --------
+    ndarray :
+        numpy array of shape (2,2) of the form
+        \(\begin{pmatrix}\cos \theta & -\sin \theta\\\sin\theta & \cos \theta
+        \end{pmatrix}\)
+
     """
     return np.array([[np.cos(angle), -1*np.sin(angle)],
                      [np.sin(angle), np.cos(angle)]])

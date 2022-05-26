@@ -1,6 +1,28 @@
-"""Turn objects from the hyperbolic module into matplotlib figures.
+"""This submodule provides an interface between the
+`geometry_tools.projective` and `geometry_tools.hyperbolic` submodules
+and [matplotlib](https://matplotlib.org/).
 
-"""
+The central classes in this module are `ProjectiveDrawing` and
+`HyperbolicDrawing`. To create a matplotlib figure, instantiate one of
+these classes and use the provided methods to add geometric objects to
+the drawing.
+
+```python
+from geometry_tools import hyperbolic, drawtools
+from numpy import pi
+
+hyp_drawing = drawtools.HyperbolicDrawing(model="halfplane")
+triangle = hyperbolic.Polygon.regular_polygon(3, angle=pi / 6)
+
+hyp_drawing.draw_plane()
+hyp_drawing.draw_polygon(triangle, facecolor="lightgreen")
+
+hyp_drawing.show()
+```
+
+![triangle](triangle.png)
+
+    """
 
 import copy
 
@@ -123,6 +145,9 @@ class ProjectiveDrawing:
 
     def precompose_transform(self, transform):
         self.transform = self.transform @ transform
+
+    def show(self):
+        plt.show()
 
 class HyperbolicDrawing(ProjectiveDrawing):
     def __init__(self, figsize=8,
@@ -482,6 +507,3 @@ class HyperbolicDrawing(ProjectiveDrawing):
                 "Drawing boundary arcs in model '{}' is not implemented.".format(
                     self.model)
             )
-
-    def show(self):
-        plt.show()

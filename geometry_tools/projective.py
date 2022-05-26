@@ -26,8 +26,15 @@ class ProjectiveObject:
     object).
 
     The underlying data of a projective object is stored as a numpy
-    ndarray, whose last `unit_ndims` ndims represent the data needed
-    to represent a *single*
+    ndarray. The last `unit_ndims` ndims of this array describe a
+    *single* instance of this type of object.
+
+    For example, a `Polygon` object has `unit_ndims` equal to 2, since
+    a single `Polygon` is represented by an array of shape `(n,d)`,
+    where `n` is the number of vertices and `d` is the dimension of
+    the underlying vector space. So, a `Polygon` object whose
+    underlying array has shape `(5, 6, 4, 3)` represents a 5x6 array
+    of quadrilaterals in RP^2 (i.e. the projectivization of R^3).
 
     """
     def __init__(self, proj_data, aux_data=None, dual_data=None,
@@ -279,6 +286,9 @@ class ProjectiveObject:
                              column_vectors=False)
 
 class Point(ProjectiveObject):
+    """A point (or collection of points) in projective space.
+    """
+
     def __init__(self, point, chart_index=None):
         """Parameters
         ----------
@@ -314,6 +324,12 @@ class Point(ProjectiveObject):
             self.affine_coords(point, chart_index)
 
 class PointPair(Point):
+    """A pair of points (or a composite object consisting of a collection
+    of pairs of points) in projective space.
+
+    This is mostly useful as an interface for subclasses which provide
+    more involved functionality.
+    """
     def __init__(self, endpoint1, endpoint2=None):
         """If `endpoint2` is `None`, interpret `endpoint1` as either an
         `ndarray` of shape (2, ..., n) (where n is the dimension of
@@ -486,21 +502,20 @@ class ConvexPolygon(Polygon):
     """
 
     def __init__(self, vertices, aux_data=None, dual_data=None):
-        """
-        When providing point data for this polygon, non-extreme points
+        r"""When providing point data for this polygon, non-extreme points
         (i.e. points in the interior of the convex hull) are
         discarded. To determine which points lie in the interior of
         the convex hull, the constructor either:
 
-             - uses the provided `dual_data` to determine an affine
-               chart in which the convex polygon lies (this chart is
-               the complement of the hyperplane specified in
-               `dual_data`), or
+        - uses the provided `dual_data` to determine an affine
+          chart in which the convex polygon lies (this chart is
+          the complement of the hyperplane specified in
+          `dual_data`), or
 
-             - interprets the projective coordinates of the provided
-               points as preferred lifts of those points in R^n, and
-               computes an affine chart containing the
-               projectivization of the convex hull of those lifts.
+        - interprets the projective coordinates of the provided points
+          as preferred lifts of those points in \(\mathbb{R}^n\), and
+          computes an affine chart containing the projectivization of
+          the convex hull of those lifts.
 
         Parameters
         ----------
@@ -589,10 +604,11 @@ class ConvexPolygon(Polygon):
             self._convexify()
 
 class Transformation(ProjectiveObject):
+    """A projective transformation (or a composite object consisting of a
+    collection of projective transformations).
+    """
     def __init__(self, proj_data, column_vectors=False):
-        """A projective transformation.
-
-        By default, the underlying data for a projective
+        """By default, the underlying data for a projective
         transformation is a *row matrix* (or an ndarray of row
         matrices), acting on vectors on the *right*.
 
@@ -716,6 +732,10 @@ class Transformation(ProjectiveObject):
         return self.apply(other)
 
 class ProjectiveRepresentation(representation.Representation):
+    """A representation (of a free group) lying in PGL(V). Passing words
+    (in the generators) to this representation yields `Transformation`
+    objects.
+    """
     def __getitem__(self, word):
         matrix = self._word_value(word)
         return Transformation(matrix, column_vectors=True)
@@ -749,8 +769,9 @@ class ProjectiveRepresentation(representation.Representation):
 
 
 def hyperplane_coordinate_transform(normal):
-    """Find an orthogonal matrix taking the affine chart \(\vec{x} \cdot
-       \vec{n} \ne 0\) to the standard affine chart \(x_0 \ne 0\).
+    r"""Find an orthogonal matrix taking the affine chart \(\{\vec{x} :
+       \vec{x} \cdot \vec{n} \ne 0\}\) to the standard affine chart
+       \(\{\vec{x} = (x_0, \ldots, x_n) : x_0 \ne 0\}\).
 
     Parameters
     ----------
@@ -930,7 +951,7 @@ def affine_linear_map(linear_map, chart_index=0, column_vectors=True):
           np.zeros((chart_index, 1)), linear_map[:chart_index, chart_index:]],
          [np.zeros((1, chart_index)), 1., np.zeros((1, w - chart_index))],
          [linear_map[chart_index:, :chart_index],
-          np.zeros((h - index, 1)), linear_map[chart_index:, chart_index:]]])
+          np.zeros((h - chart_index, 1)), linear_map[chart_index:, chart_index:]]])
 
     return Transformation(tf_mat, column_vectors=column_vectors)
 
