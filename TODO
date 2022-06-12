@@ -2,4 +2,4 @@
 - make Coxeter representation code slightly more slick
 - make a way to get fixpoints of isometries
 - port the hyperbolic code to projective code
-- document the fuck out of everything
+- document everything
