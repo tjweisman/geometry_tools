@@ -214,19 +214,19 @@ class Representation:
 
 
     def _automaton_accepted(self, automaton, length,
-                           end_state=None, maxlen=True,
+                           state=None, as_start=True, maxlen=True,
                            precomputed=None, with_words=False):
 
         if precomputed is None:
             precomputed = {}
 
-        if (length, end_state) in precomputed:
-            return precomputed[(length, end_state)]
+        if (length, state) in precomputed:
+            return precomputed[(length, state)]
 
         empty_arr = np.array([]).reshape((0, self.dim, self.dim))
 
         if length == 0:
-            if end_state is None or end_state in automaton.start_vertices:
+            if state is None or as_start or state in automaton.start_vertices:
                 id_array = np.array([np.identity(self.dim)])
                 if with_words:
                     return (id_array, [""])
@@ -236,91 +236,75 @@ class Representation:
                 return (empty_arr, [])
             return empty_arr
 
-        if end_state is not None:
-            prev_states = automaton.in_dict[end_state]
+        if state is None:
+            as_start = True
+            state = automaton.start_vertices[0]
 
-            if len(prev_states) == 0:
-                if with_words:
-                    return (empty_arr, [])
-                return empty_arr
-
-
-            matrix_list = []
-            accepted_words = []
-            for prev_state, labels in prev_states.items():
-                for label in labels:
-                    result = self._automaton_accepted(
-                        automaton, length - 1,
-                        end_state=prev_state,
-                        maxlen=maxlen,
-                        precomputed=precomputed,
-                        with_words=with_words
-                    )
-                    if with_words:
-                        matrices, words = result
-                        words = [word + label for word in words]
-                        accepted_words += words
-                    else:
-                        matrices = result
-
-                    matrices = matrices @ self._word_value(label)
-                    matrix_list.append(matrices)
-
-            accepted_matrices = np.concatenate(matrix_list)
-            if maxlen and length > 1:
-                additional_result = self._automaton_accepted(
-                    automaton, 1,
-                    end_state=end_state,
-                    maxlen=False,
-                    with_words=with_words,
-                    precomputed=precomputed
-                )
-                if with_words:
-                    additional_mats, additional_words = additional_result
-                    accepted_words = additional_words + accepted_words
-                else:
-                    additional_mats = additional_result
-
-                accepted_matrices = np.concatenate(
-                    [additional_mats, accepted_matrices]
-                )
-
-            if with_words:
-                accepted = (accepted_matrices, accepted_words)
-            else:
-                accepted = accepted_matrices
-
-            precomputed[(length, end_state)] = accepted
-            return accepted
-
-        results = [
-            self._automaton_accepted(
-                automaton, length, end_state=vertex,
-                maxlen=maxlen,
-                with_words=with_words)
-            for vertex in automaton.vertices()
-        ]
-
-        if with_words:
-            matrix_list, word_list = zip(*results)
-            accepted_words = list(itertools.chain(*word_list))
+        if as_start:
+            adj_states = automaton.out_dict[state]
         else:
-            matrix_list = results
+            adj_states = automaton.in_dict[state]
+
+        if len(adj_states) == 0 and not as_start:
+            if with_words:
+                return (empty_arr, [])
+            return empty_arr
+
+
+        matrix_list = []
+        accepted_words = []
+        for adj_state, labels in adj_states.items():
+            for label in labels:
+                result = self._automaton_accepted(
+                    automaton, length - 1,
+                    state=adj_state,
+                    as_start=as_start,
+                    maxlen=maxlen,
+                    precomputed=precomputed,
+                    with_words=with_words
+                )
+                if with_words:
+                    matrices, words = result
+                    if as_start:
+                        words = [label + word for word in words]
+                    else:
+                        words = [word + label for word in words]
+                    accepted_words += words
+                else:
+                    matrices = result
+
+                if as_start:
+                    matrices = self._word_value(label) @ matrices
+                else:
+                    matrices = matrices @ self._word_value(label)
+                matrix_list.append(matrices)
 
         accepted_matrices = np.concatenate(matrix_list)
-        if maxlen and length > 0:
-            accepted_matrices = np.concatenate([
-                [np.identity(self.dim)],
-                accepted_matrices
-            ])
+        if maxlen and length > 1:
+            additional_result = self._automaton_accepted(
+                automaton, 1,
+                state=state,
+                as_start=as_start,
+                maxlen=False,
+                with_words=with_words,
+                precomputed=precomputed
+            )
             if with_words:
-                accepted_words = [""] + accepted_words
+                additional_mats, additional_words = additional_result
+                accepted_words = additional_words + accepted_words
+            else:
+                additional_mats = additional_result
+
+            accepted_matrices = np.concatenate(
+                [additional_mats, accepted_matrices]
+            )
 
         if with_words:
             accepted = (accepted_matrices, accepted_words)
         else:
             accepted = accepted_matrices
 
+        precomputed[(length, state)] = accepted
         return accepted
 
     def semi_gens(self):
