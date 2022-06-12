@@ -2,13 +2,12 @@
 this package.
 
 """
-
 import numpy as np
 
 from scipy.optimize import linprog
 
 def rotation_matrix(angle):
-    """Get a 2x2 rotation matrix rotating counterclockwise by the
+    r"""Get a 2x2 rotation matrix rotating counterclockwise by the
     specified angle.
 
     Parameters
@@ -27,29 +26,19 @@ def rotation_matrix(angle):
     return np.array([[np.cos(angle), -1*np.sin(angle)],
                      [np.sin(angle), np.cos(angle)]])
 
-def dimension_to_axis(array, dimension, axis):
-    """Return an array where the given axis has length dimension, if
-    possible.
-    """
-    dim_index = axis
-    if array.shape[axis] != dimension:
-        dim_index = self.shape.index(dimension)
-        return array.swapaxes(axis, dim_index), dim_index
-
-    return array, axis
-
 def permutation_matrix(permutation):
-    """Return an nxn permutation matrix representing the given
-    permutation.
+    """Return a permutation matrix representing the given permutation.
 
-    Parameters:
+    Parameters
     -----------
-    permutation: a sequence of n numbers (indices), specifying a
-    permutation of (1, ... n).
+    permutation: iterable
+        a sequence of n numbers (indices), specifying a permutation of
+        (1, ... n).
 
-    Return:
+    Returns
     ---------
-    numpy array storing an n * n permutation matrix
+    ndarray:
+        square 2-dimensional array, giving a permutation matrix.
 
     """
     n = len(permutation)
@@ -60,8 +49,38 @@ def permutation_matrix(permutation):
     return p_mat
 
 def diagonalize_form(bilinear_form, order_eigenvalues="signed", reverse=False):
-    """Return a matrix conjugating a symmetric real bilinear form to a
+    r"""Return a matrix conjugating a symmetric real bilinear form to a
     diagonal form.
+
+    Parameters
+    ----------
+    bilinear_form: ndarray
+        numpy array of shape (n, n) representing, a symmetric bilinear
+        form in standard coordinates
+    order_eigenvalues: string
+        If "signed" (the default), conjugate to a diagonal bilinear
+        form on R^n, whose eigenvectors are ordered in order of
+        increasing eigenvalue.
+
+        If "minkowski", conjugate to a diagonal bilinear form whose
+        basis vectors are ordered so that lightlike basis vectors come
+        first, followed by spacelike basis vectors, followed by
+        timelike basis vectors. (lightlike vectors pair to a negative
+        value under the form, spacelike vectors pair to a positive
+        value, and timelike vectors pair to zero).
+    reverse : bool
+        if True, reverse the order of the basis vectors for the
+        diagonal bilinear form (from the order specified by
+        `order_eigenvalues`).
+
+    Returns
+    -------
+    ndarray:
+        numpy array of shape (n, n), representing a coordinate change
+        taking the given bilinear form to a diagonal form. If the
+        array returned is \(M\), \(B\) is the matrix given by
+        `bilinear_form`, and \(D\) is a diagonal matrix with the same
+        signature as \(B\), then \(M^TDM = B\).
 
     """
     n, _ = bilinear_form.shape
@@ -103,18 +122,20 @@ def diagonalize_form(bilinear_form, order_eigenvalues="signed", reverse=False):
 def circle_angles(center, coords):
     """Return angles relative to the center of a circle.
 
-    Parameters:
+    Parameters
     -----------
-    center: ndarray of shape (..., 2) representing x,y coordinates the
-    centers of some circles.
+    center: ndarray
+        numpy array with shape `(..., 2)` representing x,y coordinates
+        the centers of some circles.
+    coords: ndarray
+        numpy array with shape `(..., 2)` representing x,y coordinates
+        of some points.
 
-    coords: ndarray of shape (..., 2) representing x,y coordinates of
-    some points.
-
-    Return:
+    Returns
     --------
-    ndarray representing angles (relative to x-axis) of each of the
-    pair of points specified by coords.
+    ndarray:
+        angles (relative to x-axis) of each of the pair of points
+        specified by `coords.`
 
     """
     xs = (coords - np.expand_dims(center, axis=-2))[..., 0]
@@ -123,11 +144,22 @@ def circle_angles(center, coords):
     return np.arctan2(ys, xs)
 
 def apply_bilinear(v1, v2, bilinear_form=None):
-    """apply a bilinar form to a pair of arrays of vectors.
+    """Apply a bilinar form to a pair of arrays of vectors.
 
-    if v1 and v2 are ndarrays of shape (..., n) and (..., n), apply
-    the bilinear form elementwise to them, using standard broadcasting
-    rules.
+    Parameters
+    ----------
+    v1, v2: ndarray
+        ndarrays of shape `(..., n)` giving arrays of vectors.
+    bilinear_form: ndarray
+        ndarray of shape `(n, n)` specifying a matrix representing a
+        symmetric bilinear form to use to pair `v1` and `v2`. If
+        `None`, use the standard (Euclidean) bilinear form on R^n.
+
+    Returns
+    -------
+    ndarray:
+        ndarray representing the result of pairing the vectors in `v1`
+        with `v2`.
 
     """
 
@@ -137,26 +169,53 @@ def apply_bilinear(v1, v2, bilinear_form=None):
     return ((v1 @ bilinear_form) * v2).sum(-1)
 
 def normsq(vectors, bilinear_form=None):
-    """norm of an ndarray of vectors"""
+    """Evaluate the norm squared of an array of vectors, with respect to a bilinear form.
+
+    Shorthand for `apply_bilinear(vectors, vectors, bilinear_form)`.
+    """
     return apply_bilinear(vectors, vectors, bilinear_form)
 
 
 def normalize(vectors, bilinear_form=None):
+    """Normalize an array of vectors, with respect to a bilinear form.
+
+    Parameters
+    ----------
+    vectors: ndarray
+        ndarray of shape `(..., n)`
+    bilinear_form: ndarray or `None`
+        bilinear form to use to evaluate the norms in `vectors`. If
+        `None`, use the standard (Euclidean) bilinear form on R^n.
+
+    Returns
+    -------
+    ndarray:
+        ndarray with the same shape as `vectors`. Each vector in this
+        array has norm either +1 or -1, depending on whether the
+        original vector had positive or negative square-norm (with
+        respect to the given bilinear form).
+
+    """
     norms = normsq(vectors, bilinear_form)
     return vectors / np.sqrt(np.abs(np.expand_dims(norms, axis=-1)))
 
 def short_arc(thetas):
-    """reorder angles so that the counterclockwise arc between them is
+    """Reorder angles so that the counterclockwise arc between them is
     shorter than the clockwise angle.
 
-    Parameters:
+    Parameters
     ------------
-    thetas: ndarray of pairs of angles in the range (-2pi, 2pi)
+    thetas: ndarray
+        numpy array of shape (..., 2), giving ordered pairs of angles
+        in the range (-2pi, 2pi)
 
-    Return:
-    ------------
-    ndarray of pairs of angles. a subset of the pairs in thetas have
-    been swapped.
+    Returns
+    --------
+    ndarray:
+        numpy array with the same shape as `thetas`. The ordered pairs
+        in this array are arranged so that for each pair `(a, b)`, the
+        counterclockwise arc from `a` to `b` is shorter than the
+        counterclockwise arc from `b` to `a`.
 
     """
     shifted_thetas = np.copy(thetas)
@@ -170,16 +229,19 @@ def short_arc(thetas):
     return shifted_thetas
 
 def right_to_left(thetas):
-    """reorder angles so that the counterclockwise arc goes right to left.
+    """Reorder angles so that the counterclockwise arc goes right to left.
 
-    Parameters:
-    -------------
-    thetas: ndarray of pairs of angles.
+    Parameters
+    ------------
+    thetas: ndarray
+        numpy array of shape (..., 2), giving ordered pairs of angles.
 
-    Return:
-    ----------
-    ndarray of pairs of angles. a subset of the pairs have been
-    swapped.
+    Returns
+    --------
+    ndarray:
+        numpy array with the same shape as `thetas`. The ordered pairs
+        in this array are arranged so that for each pair `(a, b)`, the
+        cosine of `b` is at most the cosine of `a`.
 
     """
     flipped_thetas = np.copy(thetas)
@@ -429,3 +491,8 @@ def find_positive_functional(positive_points):
         functionals[ind] = res.x
 
     return normalize(functionals)
+
+def invert_gen(generator):
+    if generator.lower() == generator:
+        return generator.upper()
+    return generator.lower()

@@ -1,7 +1,10 @@
 """Work with group representations into finite-dimensional vector
 spaces, using numerical matrices.
 
-"""
+To make a representation, instantiate the `Representation` class, and
+assign numpy arrays to
+
+    """
 
 import re
 import itertools
@@ -10,6 +13,7 @@ import numpy as np
 from scipy.special import binom
 
 from . import utils
+from .automata import fsa
 
 def semi_gens(generators):
     for gen in generators:
@@ -22,27 +26,18 @@ class RepresentationException(Exception):
 class Representation:
     """Model a representation for a finitely generated group
     representation into GL(n).
-
-    Really this is just a convenient way of mapping words in the
-    generators to matrices - there's no group theory being done here
-    at all.
-
     """
-
-    @staticmethod
-    def invert_gen(generator):
-        if re.match("[a-z]", generator):
-            return generator.upper()
-        else:
-            return generator.lower()
 
     @property
     def dim(self):
         return self._dim
 
-    def elements(self, max_length):
-        for word in self.free_words_less_than(max_length):
-            yield (word, self[word])
+    def freely_reduced_elements(self, length, maxlen=True,
+                                with_words=False):
+        automaton = fsa.free_automaton(list(self.semi_gens()))
+        return self.automaton_accepted(automaton, length,
+                                       maxlen=maxlen,
+                                       with_words=with_words)
 
     def free_words_of_length(self, length):
         if length == 0:
@@ -50,7 +45,7 @@ class Representation:
         else:
             for word in self.free_words_of_length(length - 1):
                 for generator in self.generators:
-                    if len(word) == 0 or generator != self.invert_gen(word[-1]):
+                    if len(word) == 0 or generator != utils.invert_gen(word[-1]):
                         yield word + generator
 
     def free_words_less_than(self, length):
@@ -58,8 +53,118 @@ class Representation:
             for word in self.free_words_of_length(i):
                 yield word
 
+    def automaton_accepted(self, automaton, length,
+                           end_state=None, maxlen=True,
+                           precomputed=None, with_words=False):
+
+        if precomputed is None:
+            precomputed = {}
+
+        if (length, end_state) in precomputed:
+            return precomputed[(length, end_state)]
+
+        empty_arr = np.array([]).reshape((0, self.dim, self.dim))
+
+        if length == 0:
+            if end_state is None or end_state in automaton.start_vertices:
+                id_array = np.array([np.identity(self.dim)])
+                if with_words:
+                    return (id_array, [""])
+                return id_array
+
+            if with_words:
+                return (empty_arr, [])
+            return empty_arr
+
+        if end_state is not None:
+            prev_states = automaton.in_dict[end_state]
+
+            if len(prev_states) == 0:
+                if with_words:
+                    return (empty_arr, [])
+                return empty_arr
+
+
+            matrix_list = []
+            accepted_words = []
+            for prev_state, labels in prev_states.items():
+                for label in labels:
+                    result = self.automaton_accepted(
+                        automaton, length - 1,
+                        end_state=prev_state,
+                        maxlen=maxlen,
+                        precomputed=precomputed,
+                        with_words=with_words
+                    )
+                    if with_words:
+                        matrices, words = result
+                        words = [word + label for word in words]
+                        accepted_words += words
+                    else:
+                        matrices = result
+
+                    matrices = matrices @ self[label]
+                    matrix_list.append(matrices)
+
+            accepted_matrices = np.concatenate(matrix_list)
+            if maxlen and length > 1:
+                additional_result = self.automaton_accepted(
+                    automaton, 1,
+                    end_state=end_state,
+                    maxlen=False,
+                    with_words=with_words,
+                    precomputed=precomputed
+                )
+                if with_words:
+                    additional_mats, additional_words = additional_result
+                    accepted_words = additional_words + accepted_words
+                else:
+                    additional_mats = result
+
+                accepted_matrices = np.concatenate(
+                    [additional_mats, accepted_matrices]
+                )
+
+            if with_words:
+                accepted = (accepted_matrices, accepted_words)
+            else:
+                accepted = accepted_matrices
+
+            precomputed[(length, end_state)] = accepted
+            return accepted
+
+        results = [
+            self.automaton_accepted(
+                automaton, length, end_state=vertex,
+                maxlen=maxlen,
+                with_words=with_words)
+            for vertex in automaton.vertices()
+        ]
+
+        if with_words:
+            matrix_list, word_list = zip(*results)
+            accepted_words = list(itertools.chain(*word_list))
+        else:
+            matrix_list = results
+
+        accepted_matrices = np.concatenate(matrix_list)
+        if maxlen and length > 0:
+            accepted_matrices = np.concatenate([
+                [np.identity(self.dim)],
+                accepted_matrices
+            ])
+            if with_words:
+                accepted_words = [""] + accepted_words
+
+        if with_words:
+            accepted = (accepted_matrices, accepted_words)
+        else:
+            accepted = accepted_matrices
+
+        return accepted
+
     def semi_gens(self):
-        return semi_gens(self.generators.items())
+        return semi_gens(self.generators.keys())
 
     def __init__(self, representation=None,
                  generator_names=None, normalization_step=-1):
@@ -116,7 +221,7 @@ class Representation:
             raise RepresentationException("use matrices of matching dimensions")
 
         self.generators[generator] = matrix
-        self.generators[self.invert_gen(generator)] = np.linalg.inv(matrix)
+        self.generators[utils.invert_gen(generator)] = np.linalg.inv(matrix)
 
     def tensor_product(self, rep):
         if set(rep.generators) != set(self.generators):
@@ -141,7 +246,6 @@ class Representation:
             square_rep[g] = proj * tensor_rep[g] * incl
 
         return square_rep
-
 
 
 def sym_index(i,j, n):
@@ -172,6 +276,40 @@ def symmetric_projection(n):
         proj_matrix[sym_index(u, v, n)][i] = 1
 
     return np.matrix(proj_matrix)
+
+def psl_irrep(A, dim):
+    """the irreducible representation from SL(2) to SL(dim) (via action on
+    homogeneous polynomials)
+
+    """
+
+    a = A[..., 0, 0]
+    b = A[..., 0, 1]
+    c = A[..., 1, 0]
+    d = A[..., 1, 1]
+
+    im = np.zeros(A.shape[:-2] +(dim, dim))
+    n = dim - 1
+    for k in range(dim):
+        for j in range(dim):
+            for i in range(max(0, j - n + k), min(j+1, k+1)):
+                im[..., j,k] += (binom(k,i) * binom(n - k, j - i)
+                          * a**i * c**(k - i) * b**(j - i)
+                          * d**(n - k - j + i))
+    return im
+
+def sl2_to_so21(A):
+    """the isomorphism SL(2,R) to SO(2,1) via the adjoint action, where
+    SO(2,1) preserves the symmetric bilinear form with matrix diag(-1, 1,
+    1)"""
+    killing_conj = np.array([[-0., -1., -0.],
+                             [-1., -0.,  1.],
+                             [-1., -0., -1.]])
+    permutation = permutation_matrix((2,1,0))
+
+    A_3 = psl_irrep(A, 3)
+    return (permutation @ killing_conj @ A_3 @
+            np.linalg.inv(killing_conj) @ permutation)
 
 def o_to_pgl(A, bilinear_form=np.diag((-1, 1, 1))):
     """the isomorphism SO(2,1) --> PSL(2), assuming the matrix A is a 3x3
@@ -210,37 +348,3 @@ def o_to_pgl(A, bilinear_form=np.diag((-1, 1, 1))):
 
     return np.array([[a, b],
                      [c, d]])
-
-def sl2_to_so21(A):
-    """the isomorphism SL(2,R) to SO(2,1) via the adjoint action, where
-    SO(2,1) preserves the symmetric bilinear form with matrix diag(-1, 1,
-    1)"""
-    killing_conj = np.array([[-0., -1., -0.],
-                             [-1., -0.,  1.],
-                             [-1., -0., -1.]])
-    permutation = utils.permutation_matrix((2,1,0))
-
-    A_3 = psl_irrep(A, 3)
-    return (permutation @ killing_conj @ A_3 @
-            np.linalg.inv(killing_conj) @ permutation)
-
-def psl_irrep(A, dim):
-    """the irreducible representation from SL(2) to SL(dim) (via action on
-    homogeneous polynomials)
-
-    """
-
-    a = A[..., 0, 0]
-    b = A[..., 0, 1]
-    c = A[..., 1, 0]
-    d = A[..., 1, 1]
-
-    im = np.zeros(A.shape[:-2] +(dim, dim))
-    n = dim - 1
-    for k in range(dim):
-        for j in range(dim):
-            for i in range(max(0, j - n + k), min(j+1, k+1)):
-                im[..., j,k] += (binom(k,i) * binom(n - k, j - i)
-                          * a**i * c**(k - i) * b**(j - i)
-                          * d**(n - k - j + i))
-    return im

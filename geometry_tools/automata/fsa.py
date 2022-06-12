@@ -49,6 +49,7 @@ import copy
 from collections import deque, defaultdict
 
 from . import kbmag_utils, gap_parse
+from .. import utils
 
 BUILTIN_DIR = "builtin"
 
@@ -539,3 +540,30 @@ def list_builtins():
 
     """
     return pkg_resources.resource_listdir(__name__, BUILTIN_DIR)
+
+def free_automaton(generating_set):
+    """Return an automaton accepting freely reduced words in a set of
+    generators
+
+    Parameters
+    ----------
+    generating_set : iterable of strings
+        Names of the generators for this free group
+
+    Returns
+    --------
+    FSA:
+        Automaton accepting freely reduced words in the generators
+        (and their inverses)
+
+    """
+    generators = list(generating_set) + [
+        utils.invert_gen(g) for g in generating_set
+    ]
+    graph = {
+        g : {h:h for h in generators
+             if utils.invert_gen(h) != g}
+        for g in [''] + generators
+    }
+    fsa = FSA(graph, start_vertices=[''])
+    return fsa
