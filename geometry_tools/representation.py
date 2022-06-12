@@ -1,8 +1,159 @@
 """Work with group representations into finite-dimensional vector
 spaces, using numerical matrices.
 
+
 To make a representation, instantiate the `Representation` class, and
-assign numpy arrays to
+assign numpy arrays to group generators (which are lowercase letters
+a-z). Use square brackets to access the image of a word in the
+generators.
+
+
+```python
+import numpy as np
+import itertools
+import pdb
+from geometry_tools import representation
+from geometry_tools.automata import fsa
+
+rep = representation.Representation()
+rep["a"] = np.array([
+    [3.0, 0.0],
+    [0.0, 1/3.0]
+])
+
+rep["aaa"]
+```
+
+
+
+
+    array([[27.        ,  0.        ],
+           [ 0.        ,  0.03703704]])
+
+
+
+Generator inverses are automatically assigned to capital letters:
+
+
+```python
+rep = representation.Representation()
+rep["a"] = np.array([
+    [3.0, 0.0],
+    [0.0, 1/3.0]
+])
+
+rep["aA"]
+```
+
+
+
+
+    array([[1., 0.],
+           [0., 1.]])
+
+
+
+A common use-case for this class is to get a list of matrices
+representing all elements in the group, up to a bounded word
+length. The fastest way to do this is to use the built-in
+`freely_reduced_elements` method, which returns a numpy array
+containing one matrix for each freely reduced word in the group (up to
+a specified word length).
+
+The array of matrices is *not* typically ordered lexicographically. To
+get a list of words corresponding to the matrices returned, pass the
+`with_words` flag when calling `freely_reduced_elements` (see the
+documentation for that function for details).
+
+
+```python
+rep = representation.Representation()
+rep["a"] = np.array([
+    [3.0, 0.0],
+    [0.0, 1/3.0]
+])
+rep["b"] = np.array([
+    [1.0, -1.0],
+    [1.0, 1.0]
+]) / np.sqrt(2)
+
+
+rep.freely_reduced_elements(6)
+```
+
+
+
+
+    array([[[ 1.00000000e+00,  0.00000000e+00],
+            [ 0.00000000e+00,  1.00000000e+00]],
+
+           [[ 7.07106781e-01,  7.07106781e-01],
+            [-7.07106781e-01,  7.07106781e-01]],
+
+           [[ 2.12132034e+00,  2.12132034e+00],
+            [-2.35702260e-01,  2.35702260e-01]],
+
+           ...,
+
+           [[-2.12132034e+00, -2.12132034e+00],
+            [ 2.35702260e-01, -2.35702260e-01]],
+
+           [[-2.35702260e-01, -2.35702260e-01],
+            [ 2.12132034e+00, -2.12132034e+00]],
+
+           [[-1.07699575e-16, -1.00000000e+00],
+            [ 1.00000000e+00,  7.51818954e-17]]])
+
+
+
+You can speed up this process even more if you have access to a finite
+state automaton which provides a unique word for each element in your
+group.
+
+For instance, to find the image of a ball of radius 10 under the
+canonical representation of a (3,3,4) triangle group, you can use the
+following:
+
+
+```python
+from geometry_tools import coxeter
+from geometry_tools.automata import fsa
+
+# create the representation and load the built-in automaton
+rep = coxeter.TriangleGroup((3,3,4)).canonical_representation()
+automaton = fsa.load_builtin('cox334.wa')
+
+rep.automaton_accepted(automaton, 10)
+```
+
+
+
+
+    array([[[ 1.00000000e+00,  0.00000000e+00,  0.00000000e+00],
+            [ 0.00000000e+00,  1.00000000e+00,  0.00000000e+00],
+            [ 0.00000000e+00,  0.00000000e+00,  1.00000000e+00]],
+
+           [[ 4.44089210e-16, -1.00000000e+00,  2.41421356e+00],
+            [ 1.00000000e+00, -1.00000000e+00,  1.00000000e+00],
+            [ 0.00000000e+00,  0.00000000e+00,  1.00000000e+00]],
+
+           [[-1.00000000e+00,  1.00000000e+00,  1.41421356e+00],
+            [ 0.00000000e+00,  1.00000000e+00,  0.00000000e+00],
+            [ 0.00000000e+00,  0.00000000e+00,  1.00000000e+00]],
+
+           ...,
+
+           [[-2.47279221e+01,  2.57279221e+01,  2.23137085e+01],
+            [-2.91421356e+01,  2.91421356e+01,  2.71421356e+01],
+            [-1.50710678e+01,  1.50710678e+01,  1.40710678e+01]],
+
+           [[-7.24264069e+00,  7.24264069e+00,  6.82842712e+00],
+            [-1.06568542e+01,  1.16568542e+01,  9.24264069e+00],
+            [-5.82842712e+00,  6.82842712e+00,  4.82842712e+00]],
+
+           [[-2.47279221e+01,  2.57279221e+01,  2.23137085e+01],
+            [-1.06568542e+01,  1.16568542e+01,  9.24264069e+00],
+            [-3.05563492e+01,  3.29705627e+01,  2.67279221e+01]]])
 
     """
 
