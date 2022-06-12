@@ -1760,6 +1760,18 @@ class HyperbolicRepresentation(projective.ProjectiveRepresentation):
         """
         return Isometry(self.transformations(words))
 
+    def automaton_accepted(self, automaton, length,
+                           maxlen=True, with_words=False):
+        result = projective.ProjectiveRepresentation.automaton_accepted(
+            self, automaton, length, maxlen=maxlen, with_words=with_words
+        )
+
+        if with_words:
+            transformations, words = result
+            return (Isometry(transformations), words)
+
+        return Isometry(result)
+
 def minkowski(dimension):
     return np.diag(np.concatenate(([-1.0], np.ones(dimension - 1))))
 

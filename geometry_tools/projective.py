@@ -767,6 +767,23 @@ class ProjectiveRepresentation(representation.Representation):
         )
         return Transformation(matrix_array, column_vectors=True)
 
+    def automaton_accepted(self, automaton, length,
+                           maxlen=True, with_words=False):
+        result = self._automaton_accepted(automaton, length,
+                                          maxlen=maxlen,
+                                          with_words=with_words)
+        if with_words:
+            matrix_array, words = result
+        else:
+            matrix_array = result
+
+        transformations = Transformation(matrix_array, column_vectors=True)
+
+        if with_words:
+            return transformations, words
+
+        return transformations
+
 
 def hyperplane_coordinate_transform(normal):
     r"""Find an orthogonal matrix taking the affine chart \(\{\vec{x} :

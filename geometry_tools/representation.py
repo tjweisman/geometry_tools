@@ -56,14 +56,15 @@ rep["aA"]
 A common use-case for this class is to get a list of matrices
 representing all elements in the group, up to a bounded word
 length. The fastest way to do this is to use the built-in
-`freely_reduced_elements` method, which returns a numpy array
-containing one matrix for each freely reduced word in the group (up to
-a specified word length).
+`Representation.freely_reduced_elements` method, which returns a numpy
+array containing one matrix for each freely reduced word in the group
+(up to a specified word length).
 
 The array of matrices is *not* typically ordered lexicographically. To
 get a list of words corresponding to the matrices returned, pass the
-`with_words` flag when calling `freely_reduced_elements` (see the
-documentation for that function for details).
+`with_words` flag when calling
+`Representation.freely_reduced_elements` (see the documentation for
+that function for details).
 
 
 ```python
@@ -110,9 +111,9 @@ You can speed up this process even more if you have access to a finite
 state automaton which provides a unique word for each element in your
 group.
 
-For instance, to find the image of a ball of radius 10 under the
-canonical representation of a (3,3,4) triangle group, you can use the
-following:
+For instance, to find the image of a Cayley ball of radius 10 under
+the canonical representation of a (3,3,4) triangle group, you can use
+the `Representation.automaton_accepted` method as follows:
 
 
 ```python
@@ -205,6 +206,14 @@ class Representation:
                 yield word
 
     def automaton_accepted(self, automaton, length,
+                           maxlen=True, with_words=False):
+
+        return self._automaton_accepted(automaton, length,
+                                        maxlen=maxlen,
+                                        with_words=with_words)
+
+
+    def _automaton_accepted(self, automaton, length,
                            end_state=None, maxlen=True,
                            precomputed=None, with_words=False):
 
@@ -240,7 +249,7 @@ class Representation:
             accepted_words = []
             for prev_state, labels in prev_states.items():
                 for label in labels:
-                    result = self.automaton_accepted(
+                    result = self._automaton_accepted(
                         automaton, length - 1,
                         end_state=prev_state,
                         maxlen=maxlen,
@@ -254,12 +263,12 @@ class Representation:
                     else:
                         matrices = result
 
-                    matrices = matrices @ self[label]
+                    matrices = matrices @ self._word_value(label)
                     matrix_list.append(matrices)
 
             accepted_matrices = np.concatenate(matrix_list)
             if maxlen and length > 1:
-                additional_result = self.automaton_accepted(
+                additional_result = self._automaton_accepted(
                     automaton, 1,
                     end_state=end_state,
                     maxlen=False,
@@ -270,7 +279,7 @@ class Representation:
                     additional_mats, additional_words = additional_result
                     accepted_words = additional_words + accepted_words
                 else:
-                    additional_mats = result
+                    additional_mats = additional_result
 
                 accepted_matrices = np.concatenate(
                     [additional_mats, accepted_matrices]
@@ -285,7 +294,7 @@ class Representation:
             return accepted
 
         results = [
-            self.automaton_accepted(
+            self._automaton_accepted(
                 automaton, length, end_state=vertex,
                 maxlen=maxlen,
                 with_words=with_words)
@@ -456,7 +465,7 @@ def sl2_to_so21(A):
     killing_conj = np.array([[-0., -1., -0.],
                              [-1., -0.,  1.],
                              [-1., -0., -1.]])
-    permutation = permutation_matrix((2,1,0))
+    permutation = utils.permutation_matrix((2,1,0))
 
     A_3 = psl_irrep(A, 3)
     return (permutation @ killing_conj @ A_3 @
