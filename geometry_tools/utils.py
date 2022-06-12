@@ -77,10 +77,10 @@ def diagonalize_form(bilinear_form, order_eigenvalues="signed", reverse=False):
     -------
     ndarray:
         numpy array of shape (n, n), representing a coordinate change
-        taking the given bilinear form to a diagonal form. If the
-        array returned is \(M\), \(B\) is the matrix given by
-        `bilinear_form`, and \(D\) is a diagonal matrix with the same
-        signature as \(B\), then \(M^TDM = B\).
+        taking the given bilinear form to a diagonal form. If \(B\) is
+        the matrix given by `bilinear_form`, and \(D\) is a diagonal
+        matrix with the same signature as \(B\), then this function
+        returns a matrix \(M\) such that \(M^TDM = B\).
 
     """
     n, _ = bilinear_form.shape

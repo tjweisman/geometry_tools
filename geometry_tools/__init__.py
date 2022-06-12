@@ -11,7 +11,10 @@ The package is mostly built on top of [numpy](https://numpy.org/) and [matplotli
 
 - draw nice pictures in the hyperbolic plane
 
-None of the functionality of this package is (mathematically) very deep. Mostly, the package just wraps more sophisticated tools in a way intended to make it easy to quickly draw good pictures in \(\mathbb{H}^2\) and \(\mathbb{H}^3\). Eventually I hope to extend some of the picture-drawing functionality to real projective space, but we're not there yet.
+None of the functionality of this package is (mathematically) very deep.
+Mostly, the package just wraps more sophisticated tools in a way intended to
+make it easy to quickly draw good pictures in \(\mathbb{H}^2\), \(\mathbb
+{H}^3\), and \(\mathbb{R}P^2\).
 
 ## A quick example
 
