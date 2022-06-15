@@ -1761,9 +1761,13 @@ class HyperbolicRepresentation(projective.ProjectiveRepresentation):
         return Isometry(self.transformations(words))
 
     def automaton_accepted(self, automaton, length,
-                           maxlen=True, with_words=False):
+                           maxlen=True, with_words=False,
+                           start_state=None, end_state=None,
+                           precomputed=None):
         result = projective.ProjectiveRepresentation.automaton_accepted(
-            self, automaton, length, maxlen=maxlen, with_words=with_words
+            self, automaton, length, maxlen=maxlen, with_words=with_words,
+            start_state=start_state, end_state=end_state,
+            precomputed=precomputed
         )
 
         if with_words:

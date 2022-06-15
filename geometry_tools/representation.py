@@ -10,8 +10,7 @@ generators.
 
 ```python
 import numpy as np
-import itertools
-import pdb
+
 from geometry_tools import representation
 from geometry_tools.automata import fsa
 
@@ -168,6 +167,22 @@ from . import utils
 from .automata import fsa
 
 def semi_gens(generators):
+    """Get an iterable of semigroup generators from an iterable of group generators.
+
+    Given a sequence of lowercase/uppercase letters, return only the
+    lowercase ones.
+
+    Parameters
+    ----------
+    generators : iterable of strings
+        Sequence of semigroup generators
+
+    Yields
+    --------
+    gen : string
+        the lowercase characters in `generators`
+
+    """
     for gen in generators:
         if re.match("[a-z]", gen):
             yield gen
@@ -186,12 +201,54 @@ class Representation:
 
     def freely_reduced_elements(self, length, maxlen=True,
                                 with_words=False):
+        """Return group elements, one for each freely reduced word
+           in the generators.
+
+        Parameters
+        ----------
+        length : int
+            maximum length of a word to find a representation of
+        maxlen : bool
+            If `True` (the default), the returned array has one
+            element for each word up to length `length`
+            (inclusive). If `False`, only compute the image of words
+            of length exactly equal to `length`.
+        with_words : bool
+            If `True`, also return the list of words corresponding to
+            the computed matrices.
+
+        Returns
+        --------
+        result : ndarray or tuple
+            If `with_words` is `True`, `result` is a tuple `(elements, words)`,
+            where `elements` is an ndarray of shape `(k, n, n)`,
+            containing one matrix for each of the `k` freely reduced
+            words in the generators, and `words` is a python list of
+            strings, containing those words. If `with_words` is
+            `False`, just return `elements`.
+
+        """
         automaton = fsa.free_automaton(list(self.semi_gens()))
         return self.automaton_accepted(automaton, length,
                                        maxlen=maxlen,
                                        with_words=with_words)
 
     def free_words_of_length(self, length):
+        """Yield freely reduced words in the generators, of a specified length.
+
+        Parameters
+        ----------
+        length : int
+            the length of words to return
+
+        Yields
+        --------
+        word : string
+            All freely reduced words in the generators of length
+            `length`.
+
+        """
+
         if length == 0:
             yield ""
         else:
@@ -201,16 +258,95 @@ class Representation:
                         yield word + generator
 
     def free_words_less_than(self, length):
+        """Yield freely reduced words in the generators, up to a specified
+        length.
+
+        Parameters
+        ----------
+        length : int
+            the maximum length of words to return
+
+        Yields
+        --------
+        word : string
+            All freely reduced words in the generators, up to length
+            `length` (inclusive)
+
+        """
         for i in range(length):
             for word in self.free_words_of_length(i):
                 yield word
 
     def automaton_accepted(self, automaton, length,
-                           maxlen=True, with_words=False):
+                           maxlen=True, with_words=False,
+                           start_state=None, end_state=None,
+                           precomputed=None):
+        """Return group elements representing words accepted by a
+           finite-state automaton.
+
+        Parameters
+        ----------
+        automaton : automata.fsa.FSA
+            Finite-state automaton which determines the accepted words
+        length : int
+            Maximum length of a word to compute
+        maxlen : bool
+            if `True` (the default), compute representations of all
+            accepted words of length up to `length`. If `False`, only
+            compute representations of words whose length is exactly
+            `length`.
+        with_words : bool
+            Whether to return a list of accepted words along with the
+            computed array of images.
+        start_state: object
+            vertex of the automaton to use as the starting state for
+            all accepted words. If `None`, then the default start
+            vertex of the automaton is used. *Note*: at most one of
+            `start_state` and `end_state` can be specified.
+        end_state: object
+            vertex of the automaton where all accepted paths must
+            end. If `None`, then any ending state is allowed. *Note*:
+            at most one of `start_state` and `end_state` can be
+            specified.
+        precomputed: dict
+            dictionary giving precomputed values of this
+            function. Keys are tuples of then form `(length, state)`,
+            where `length` is an integer and `state` is a vertex of
+            the automaton. If `None`, use an empty dictionary. In
+            either case, the dictionary will be populated when the
+            function is called.
+
+        Returns
+        --------
+        result : ndarray or tuple
+            If `with_words` is `True`, `result` is a tuple `(elements, words)`,
+            where `elements` is an ndarray containing one
+            matrix for each accepted word, and `words` is a list of
+            strings containing the corresponding words. If
+            `with_words` is `False`, just return `elements`.
+
+        """
+
+        if start_state is not None and end_state is not None:
+            raise ValueError("At most one of start_state and end_state "
+                             "can be specified")
+
+        as_start = True
+
+        if start_state is not None:
+            state = start_state
+            as_start = True
+
+        if end_state is not None:
+            state = end_state
+            as_start = False
 
         return self._automaton_accepted(automaton, length,
                                         maxlen=maxlen,
-                                        with_words=with_words)
+                                        with_words=with_words,
+                                        state=state,
+                                        as_start=True,
+                                        precomputed=precomputed)
 
 
     def _automaton_accepted(self, automaton, length,
@@ -308,10 +444,31 @@ class Representation:
         return accepted
 
     def semi_gens(self):
+        """Iterate over group generator names for this representation.
+
+        Only iterate over group generators (lowercase letters), not
+        semigroup generators (upper and lowercase letters).
+
+        Yields
+        --------
+        gen : string
+            group generator names
+
+        """
         return semi_gens(self.generators.keys())
 
     def __init__(self, representation=None,
-                 generator_names=None, normalization_step=-1):
+                 generator_names=None):
+        """
+        Parameters
+        ----------
+        representation : Representation
+            Representation to copy elements from
+        generator_names : iterable of strings
+            Names to use for the generators. These must be initialized
+            as arrays later to use the representation properly.
+
+        """
 
         self._dim = None
 
@@ -335,20 +492,10 @@ class Representation:
             for gen in list(self.generators):
                 self.generators[gen.upper()] = None
 
-        self.normalization_step = normalization_step
-
-    def normalize(self, matrix):
-        """function to force a matrices into a subgroup of GL(d,R)
-        """
-        return matrix
-
     def _word_value(self, word):
         matrix = np.identity(self._dim)
         for i, letter in enumerate(word):
             matrix = matrix @ self.generators[letter]
-            if (self.normalization_step > 0 and
-                (i % self.normalization_step) == 0):
-                matrix = self.normalize(matrix)
         return matrix
 
     def __getitem__(self, word):
@@ -368,6 +515,24 @@ class Representation:
         self.generators[utils.invert_gen(generator)] = np.linalg.inv(matrix)
 
     def tensor_product(self, rep):
+        """Return a tensor product of this representation with `rep`.
+
+        Parameters
+        ----------
+        rep : Representation
+            Representation to tensor with.
+
+        Raises
+        ------
+        RepresentationException
+            Raised if `self` and `rep` have differing generating sets.
+
+        Returns
+        --------
+        tensor: Representation
+            Representation giving the tensor product of self with `rep`.
+
+        """
         if set(rep.generators) != set(self.generators):
             raise RepresentationException(
                 "Cannot take a tensor product of a representation of groups with "
@@ -382,6 +547,15 @@ class Representation:
             return product_rep
 
     def symmetric_square(self):
+        """Return the symmetric square of this representation.
+
+        Returns
+        --------
+        square : Representation
+            Symmetric square of `self`.
+
+        """
+
         tensor_rep = self.tensor_product(self)
         incl = symmetric_inclusion(self._dim)
         proj = symmetric_projection(self._dim)
@@ -392,9 +566,9 @@ class Representation:
         return square_rep
 
 
-def sym_index(i,j, n):
+def sym_index(i, j, n):
     if i > j:
-        i,j = j,i
+        i, j = j, i
     return int((n - i) * (n - i  - 1) / 2 + (j - i))
 
 def tensor_pos(i, n):
@@ -404,6 +578,57 @@ def tensor_index(i,j,n):
     return i * n + j
 
 def symmetric_inclusion(n):
+    r"""Return a matrix representing the linear inclusion
+    \(\mathrm{Sym}^2(\mathbb{R}^n) \to \mathbb{R}^n \otimes
+    \mathbb{R}^n\).
+
+    If \(\mathbb{R}^n\) is given the standard basis \(\{e_1, \ldots,
+    e_n\}\), then \(\mathrm{Sym^2}(\mathbb{R}^n)\) has the ordered
+    basis \[\{e_ne_n, e_{n-1}e_{n-1}, e_{n-1}e_n, e_{n-1}e_{n-1},
+    e_{n-1}e_{n-2}, e_{n-1}e_{n-3}, \ldots \}.\] This is represented
+    schematically by the symmetric matrix:
+
+    \[\begin{pmatrix}
+    \ddots \\
+    & 3 & 4 & 5\\
+    & & 1 & 2\\
+    & & & 0
+    \end{pmatrix},
+    \]
+    where the (i,j) entry of the matrix gives the index of basis
+    element \(e_ie_j\).
+
+    The tensor product \(\mathbb{R}^n \otimes \mathbb{R}^n\) has the
+    ordered basis
+    \[
+        \{e_1 \otimes e_1, e_1 \otimes e_2, \ldots, e_1 \otimes e_n, e_2 \otimes e_1, \ldots, \}
+    \]
+    represented schematically by the matrix
+    \[
+        \begin{pmatrix}
+            0 & 1 & \ldots \\
+            n & n + 1 & \ldots\\
+            \vdots
+        \end{pmatrix}.
+    \]
+    Here the (i, j) entry of the matrix gives the index of the basis
+    element \(e_i \otimes e_j\).
+
+    The returned matrix gives the linear map taking \(e_ie_j\) to
+    \(\frac{1}{2}(e_i \otimes e_j + e_j \otimes e_i)\), with respect
+    to the bases specified above.
+
+    Parameters
+    ----------
+    n : int
+        Dimension of the underlying vector space \(\mathbb{R}^n\).
+
+    Returns
+    --------
+    matrix : ndarray
+        \(n^2 \times \binom{n}{2}\) array defining this linear map.
+
+    """
     incl_matrix = np.zeros((n * n, int(n * (n + 1) / 2)))
     for i in range(n):
         for j in range(n):
@@ -417,13 +642,34 @@ def symmetric_projection(n):
     proj_matrix = np.zeros((int(n * (n + 1) / 2), n * n))
     for i in range(n * n):
         u, v = tensor_pos(i,n)
-        proj_matrix[sym_index(u, v, n)][i] = 1
+        proj_matrix[_sym_index(u, v, n)][i] = 1
 
     return np.matrix(proj_matrix)
 
-def psl_irrep(A, dim):
-    """the irreducible representation from SL(2) to SL(dim) (via action on
-    homogeneous polynomials)
+def sl2_irrep(A, n):
+    r"""The irreducible representation \(\mathrm{SL}(2) \to
+    \mathrm{SL}(n)\), via the action on homogeneous polynomials.
+
+    Given an element of \(\mathrm{SL}(2)\) as a 2x2 array, compute a
+    matrix giving the action of this matrix on symmetric polynomials
+    in elements of the standard basis \(\{e_1, e_2\}\). The (ordered)
+    basis for the new matrix is given by the degree-(n-1) monomials
+    \(\{e_1^{0} e_2^{n-1}, e_1^{1} e_2^{n-2}, \ldots, e_1^{n-1}e_2^{0}\}\).
+
+    Parameters
+    ----------
+    A : ndarray
+        Array of shape `(..., 2, 2)`, giving a matrix (or array of
+        matrices) to represent.
+    n : int
+        Dimension of the irreducible representation.
+
+    Returns
+    ---------
+    result : ndarray
+        Array of shape `(..., n, n)` giving the representation of
+        `A` under the `dim`-dimensional irreducible representation of
+        \(\mathrm{SL}(2)\).
 
     """
 
@@ -432,33 +678,72 @@ def psl_irrep(A, dim):
     c = A[..., 1, 0]
     d = A[..., 1, 1]
 
-    im = np.zeros(A.shape[:-2] +(dim, dim))
-    n = dim - 1
-    for k in range(dim):
-        for j in range(dim):
-            for i in range(max(0, j - n + k), min(j+1, k+1)):
-                im[..., j,k] += (binom(k,i) * binom(n - k, j - i)
+    im = np.zeros(A.shape[:-2] +(n, n))
+    r = dim - 1
+    for k in range(n):
+        for j in range(n):
+            for i in range(max(0, j - r + k), min(j+1, k+1)):
+                im[..., j,k] += (binom(k,i) * binom(r - k, j - i)
                           * a**i * c**(k - i) * b**(j - i)
-                          * d**(n - k - j + i))
+                          * d**(r - k - j + i))
     return im
 
 def sl2_to_so21(A):
-    """the isomorphism SL(2,R) to SO(2,1) via the adjoint action, where
-    SO(2,1) preserves the symmetric bilinear form with matrix diag(-1, 1,
-    1)"""
+    r"""Return the image of an element of \(\mathrm{SL}(2, \mathbb{R})\)
+    under the isomorphism \(\mathrm{SL}(2, \mathbb{R}) \to
+    \mathrm{SO}(2,1)\).
+
+    Here \(\mathrm{SO}(2,1)\) preserves the symmetric bilinear form
+    determined by the matrix `diag(-1, 1, 1)` (in the standard basis on
+    \(\mathbb{R}^3\)).
+
+    An inverse for this representation is given by the function
+    `o_to_pgl`.
+
+    Parameters
+    ------------
+    A : ndarray
+        Array of shape `(..., 2, 2)` giving a matrix (or array of
+        matrices) in \(\mathrm{SL}(2, \mathbb{R})\).
+
+    Returns
+    --------
+    result : ndarray
+        Array of shape `(..., 3, 3)` giving the image of `A` under the
+        representation.
+
+    """
     killing_conj = np.array([[-0., -1., -0.],
                              [-1., -0.,  1.],
                              [-1., -0., -1.]])
     permutation = utils.permutation_matrix((2,1,0))
 
-    A_3 = psl_irrep(A, 3)
+    A_3 = sl2_irrep(A, 3)
     return (permutation @ killing_conj @ A_3 @
             np.linalg.inv(killing_conj) @ permutation)
 
-def o_to_pgl(A, bilinear_form=np.diag((-1, 1, 1))):
-    """the isomorphism SO(2,1) --> PSL(2), assuming the matrix A is a 3x3
-    matrix determining a linear map in a basis where the symmetric
-    bilinear form has matrix diag(-1, 1, 1).
+def o_to_pgl(A, bilinear_form=np.diag((-1., 1., 1.))):
+    r"""Return the image of an element of \(\mathrm{O}(2, 1)\) under the
+    representation \(\mathrm{O}(2,1) \to \mathrm{GL}(2)\).
+
+    On \(\mathrm{SO}(2, 1)\), this restricts to an inverse of the
+    isomorphism \(\mathrm{SL}(2, \mathbb{R}) \to \mathrm{SO}(2, 1)\)
+    given by the function `sl2_to_so21`.
+
+    Parameters
+    -----------
+    A : ndarray
+        Array of shape `(..., 3, 3)` giving a matrix (or array of
+        matrices) preserving a bilinear form of signature (2, 1).
+    bilinear_form : ndarray
+        3x3 matrix giving the bilinear form preserved by `A`. By
+        default, the diagonal form `diag(-1, 1, 1)`.
+
+    Returns
+    --------
+    result : ndarray
+        Array of shape `(..., 2, 2)` giving the image of `A` under
+        this representation.
 
     """
     conj = np.eye(3)

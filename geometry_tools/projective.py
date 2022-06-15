@@ -768,10 +768,17 @@ class ProjectiveRepresentation(representation.Representation):
         return Transformation(matrix_array, column_vectors=True)
 
     def automaton_accepted(self, automaton, length,
-                           maxlen=True, with_words=False):
-        result = self._automaton_accepted(automaton, length,
-                                          maxlen=maxlen,
-                                          with_words=with_words)
+                           maxlen=True, with_words=False,
+                           start_state=None, end_state=None,
+                           precomputed=None):
+        result = representation.Representation.automaton_accepted(
+            self, automaton, length,
+            with_words=with_words,
+            start_state=start_state,
+            end_state=end_state,
+            precomputed=precomputed
+        )
+
         if with_words:
             matrix_array, words = result
         else:

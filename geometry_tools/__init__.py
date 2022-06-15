@@ -24,7 +24,7 @@ To draw a picture of a right-angled pentagon in the hyperbolic plane:
 from geometry_tools import hyperbolic, drawtools
 from numpy import pi
 
-# make a right-pentagon
+# make a right-angled pentagon
 pentagon = hyperbolic.regular_polygon(5, angle=pi/2)
 
 # draw the pentagon
