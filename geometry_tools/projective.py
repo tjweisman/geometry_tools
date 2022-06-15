@@ -274,7 +274,7 @@ class ProjectiveObject:
 
         Returns
         -------
-        ndarray :
+        ndarray
             affine coordinates of this Point, in the specified
             standard affine chart.
 
@@ -396,7 +396,7 @@ class PointPair(Point):
 
         Returns
         --------
-        Point :
+        Point
             A composite Point object representing the endpoints of
             this (possibly composite) PointPair
 
@@ -408,7 +408,7 @@ class PointPair(Point):
 
         Returns
         -----------
-        tuple :
+        tuple
             Tuple of the form `(endpoint1, endpoint2)`, where
             `endpoint1` and `endpoint2` are (possibly composite)
             `Point` objects representing the endpoints of this pair
@@ -427,7 +427,7 @@ class PointPair(Point):
 
         Returns
         --------
-        ndarray:
+        ndarray
             Affine coordinates of the endpoints of this pair of
             points.
 
@@ -439,7 +439,7 @@ class PointPair(Point):
 
         Returns
         --------
-        ndarray:
+        ndarray
             Projective coordinates of the endpoints of this pair of
             points.
 
@@ -480,7 +480,7 @@ class Polygon(Point):
 
         Returns
         --------
-        PointPair :
+        PointPair
             Edges of this polygon, as a composite PointPair object.
 
         """
@@ -491,7 +491,7 @@ class Polygon(Point):
 
         Returns
         --------
-        Point :
+        Point
             Vertices of this polygon, as a composite Point object.
 
         """
@@ -555,7 +555,7 @@ class ConvexPolygon(Polygon):
 
         Returns
         --------
-        ConvexPolygon :
+        ConvexPolygon
             if `in_place` is `False`, return a modified ConvexPolygon
             object with the new points added.
 
@@ -675,7 +675,7 @@ class Transformation(ProjectiveObject):
 
         Returns
         -------
-        ProjectiveObject :
+        ProjectiveObject
             Transformed (possibly composite) projective object. The
             type of this object is the same type as the original
             (untransformed) object. If the original object was
@@ -723,7 +723,7 @@ class Transformation(ProjectiveObject):
 
         Returns
         --------
-        ProjectiveTransformation :
+        ProjectiveTransformation
             Inverse of this transformation.
         """
         return self.__class__(np.linalg.inv(self.matrix))
@@ -756,7 +756,7 @@ class ProjectiveRepresentation(representation.Representation):
 
         Returns
         --------
-        Transformation :
+        Transformation
             Composite transformation object containing one
             transformation for each word in `words`.
 
@@ -804,7 +804,7 @@ def hyperplane_coordinate_transform(normal):
 
     Returns
     --------
-    Transformation :
+    Transformation
         Projective transformation (orthogonal in the standard inner
         product on R^n) taking the desired affine chart to the
         standard chart with index 0.
@@ -834,7 +834,7 @@ def affine_coords(points, chart_index=None, column_vectors=False):
 
     Returns
     --------
-    ndarray:
+    ndarray
         If chart_index is specified, return an array of points in
         affine coordinates in that chart. Otherwise, return a tuple
         `(affine, chart_index)`, where `chart_index` is the affine
@@ -900,7 +900,7 @@ def projective_coords(points, chart_index=0, column_vectors=False):
 
     Returns
     --------
-    ndarray:
+    ndarray
         Projective coordinates of the given points. The last dimension
         of the array is the dimension of the underlying vector space
         (or the second-to-last dimension, if `column_vectors` is
@@ -934,7 +934,7 @@ def identity(dimension):
 
     Returns
     --------
-    Transformation :
+    Transformation
         The identity map on RP^n, where n = `dimension`.
 
     """
@@ -962,7 +962,7 @@ def affine_linear_map(linear_map, chart_index=0, column_vectors=True):
 
     Returns
     --------
-    Transformation :
+    Transformation
         Projective transformation preserving a standard affine chart
         and acting by a linear map on that affine space (i.e. fixing a
         point in that affine space).
@@ -991,7 +991,7 @@ def affine_translation(translation, chart_index=0):
 
     Returns
     --------
-    Transformation :
+    Transformation
         Projective transformation preserving a standard affine chart
         and acting by an affine translation in that affine space.
 

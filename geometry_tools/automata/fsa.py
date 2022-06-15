@@ -271,6 +271,7 @@ class FSA:
 
         Yields
         --------
+        tuple
             An ordered pair of the form `(tail, head)` for each edge
             in the automaton
 
@@ -378,7 +379,7 @@ class FSA:
 
         Returns
         -------
-        object :
+        object
             The state of the automaton when it accepts `word`
 
         """
@@ -552,7 +553,7 @@ def free_automaton(generating_set):
 
     Returns
     --------
-    FSA:
+    FSA
         Automaton accepting freely reduced words in the generators
         (and their inverses)
 

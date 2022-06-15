@@ -277,7 +277,7 @@ class Point(HyperbolicObject, projective.Point):
 
         Returns
         --------
-        ndarray :
+        ndarray
             Hyperboloid coordinates for this point (or array of
             points).
 
@@ -300,7 +300,7 @@ class Point(HyperbolicObject, projective.Point):
 
         Returns
         --------
-        ndarray :
+        ndarray
             Projective coordinates for this point (or array of
             points).
 
@@ -323,7 +323,7 @@ class Point(HyperbolicObject, projective.Point):
 
         Returns
         --------
-        ndarray :
+        ndarray
             Half-space coordinates for this point (or array of
             points).
 
@@ -380,7 +380,7 @@ class Point(HyperbolicObject, projective.Point):
 
         Returns
         --------
-        ndarray(float) :
+        ndarray
             distances in hyperbolic space between self and other
 
         """
@@ -415,7 +415,7 @@ class Point(HyperbolicObject, projective.Point):
 
         Returns
         --------
-        TangentVector:
+        TangentVector
             A tangent vector with this point at its base and pointing
             towards `other`.
 
@@ -436,7 +436,7 @@ class Point(HyperbolicObject, projective.Point):
 
         Returns
         --------
-        Point :
+        Point
             Point object with Kleinian/Poincare coords (0, 0, ...)
         """
 
@@ -511,7 +511,7 @@ class Subspace(IdealPoint):
 
         Returns
         --------
-        ndarray :
+        ndarray
             Coordinates for k vectors in the ideal boundary of
             hyperbolic space, giving a basis for this subspace.
 
@@ -526,7 +526,7 @@ class Subspace(IdealPoint):
 
         Returns
         --------
-        DualPoint :
+        DualPoint
             A spacelike (i.e. Minkowski-positive) point which is
             Minkowski-orthogonal to this subspace. This is not
             uniquely determined (as a point in projective space)
@@ -668,7 +668,7 @@ class PointPair(Point, projective.PointPair):
 
         Returns
         --------
-        ndarray :
+        ndarray
             Coordinates for the endpoints of this PointPair, as an
             ndarray with shape `(2, ... n)` (where `n` is the
             dimension of the hyperbolic space).
@@ -681,7 +681,7 @@ class PointPair(Point, projective.PointPair):
 
         Returns
         --------
-        Point:
+        Point
             Composite `Point` object with the same underlying data as
             this point pair.
 
@@ -700,7 +700,7 @@ class PointPair(Point, projective.PointPair):
 
         Returns
         --------
-        tuple :
+        tuple
             A tuple `(p1, p2)`, where `p1` and `p2` are either both
             `Point`s or both `ndarrays`, representing the endpoints of
             this pair.
@@ -776,7 +776,7 @@ class Geodesic(PointPair, Subspace):
 
         Returns
         --------
-        Geodesic:
+        Geodesic
             A `Geodesic` fixed by the given isometry.
 
     """
@@ -880,7 +880,7 @@ class Segment(Geodesic):
 
         Returns
         --------
-        Geodesic :
+        Geodesic
             Geodesic in hyperbolic space spanned by this segment.
         """
         return Geodesic(self.ideal_basis)
@@ -1020,7 +1020,7 @@ class Hyperplane(Subspace):
 
         Returns
         --------
-        Hyperplane:
+        Hyperplane
             A `Hyperplane` fixed by the given isometry.
         """
         try:
@@ -1136,7 +1136,7 @@ class TangentVector(HyperbolicObject):
 
         Returns
         -------
-        TangentVector :
+        TangentVector
             Normalized version of this tangent vector (with respect to
             the standard Minkowski inner product)
 
@@ -1160,7 +1160,7 @@ class TangentVector(HyperbolicObject):
 
         Returns
         -------
-        Isometry :
+        Isometry
             Isometry taking the "origin" to this tangent vector.
 
     """
@@ -1184,7 +1184,7 @@ class TangentVector(HyperbolicObject):
 
         Returns
         -------
-        Isometry :
+        Isometry
             Isometry this tangent vector to `other`.
 
         """
@@ -1199,7 +1199,7 @@ class TangentVector(HyperbolicObject):
 
         Returns
         -------
-        float or ndarray :
+        float or ndarray
             The angle between `self` and `other`.
 
         """
@@ -1219,7 +1219,7 @@ class TangentVector(HyperbolicObject):
 
         Returns
         -------
-        Point :
+        Point
             Point in hyperbolic space along the geodesic ray defined
             by this tangent vector
 
@@ -1251,7 +1251,7 @@ class TangentVector(HyperbolicObject):
 
         Returns
         -------
-        TangentVector :
+        TangentVector
             An "origin" tangent vector.
 
         """
@@ -1819,7 +1819,7 @@ def spacelike(vectors):
 
     Returns
     --------
-    ndarray :
+    ndarray(bool)
         `True` for vectors which have Minkowski norm above a fixed
         error threshold.
 
@@ -1838,7 +1838,7 @@ def timelike(self, vectors):
 
     Returns
     --------
-    ndarray :
+    ndarray(bool)
         `True` for vectors which have Minkowski norm below a fixed
         error threshold.
 
@@ -1857,7 +1857,7 @@ def lightlike(self, vectors):
 
     Returns
     --------
-    ndarray :
+    ndarray(bool)
         `True` for vectors where the absolute value of the Minkowski
         norm is below a fixed error threshold.
 
