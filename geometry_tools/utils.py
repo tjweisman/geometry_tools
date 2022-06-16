@@ -17,7 +17,7 @@ def rotation_matrix(angle):
 
     Returns
     --------
-    ndarray :
+    ndarray
         numpy array of shape (2,2) of the form
         \(\begin{pmatrix}\cos \theta & -\sin \theta\\\sin\theta & \cos \theta
         \end{pmatrix}\)
@@ -37,7 +37,7 @@ def permutation_matrix(permutation):
 
     Returns
     ---------
-    ndarray:
+    ndarray
         square 2-dimensional array, giving a permutation matrix.
 
     """
@@ -75,7 +75,7 @@ def diagonalize_form(bilinear_form, order_eigenvalues="signed", reverse=False):
 
     Returns
     -------
-    ndarray:
+    ndarray
         numpy array of shape (n, n), representing a coordinate change
         taking the given bilinear form to a diagonal form. If \(B\) is
         the matrix given by `bilinear_form`, and \(D\) is a diagonal
@@ -133,7 +133,7 @@ def circle_angles(center, coords):
 
     Returns
     --------
-    ndarray:
+    ndarray
         angles (relative to x-axis) of each of the pair of points
         specified by `coords.`
 
@@ -157,7 +157,7 @@ def apply_bilinear(v1, v2, bilinear_form=None):
 
     Returns
     -------
-    ndarray:
+    ndarray
         ndarray representing the result of pairing the vectors in `v1`
         with `v2`.
 
@@ -189,7 +189,7 @@ def normalize(vectors, bilinear_form=None):
 
     Returns
     -------
-    ndarray:
+    ndarray
         ndarray with the same shape as `vectors`. Each vector in this
         array has norm either +1 or -1, depending on whether the
         original vector had positive or negative square-norm (with
@@ -211,7 +211,7 @@ def short_arc(thetas):
 
     Returns
     --------
-    ndarray:
+    ndarray
         numpy array with the same shape as `thetas`. The ordered pairs
         in this array are arranged so that for each pair `(a, b)`, the
         counterclockwise arc from `a` to `b` is shorter than the
@@ -238,7 +238,7 @@ def right_to_left(thetas):
 
     Returns
     --------
-    ndarray:
+    ndarray
         numpy array with the same shape as `thetas`. The ordered pairs
         in this array are arranged so that for each pair `(a, b)`, the
         cosine of `b` is at most the cosine of `a`.
@@ -256,16 +256,19 @@ def arc_include(thetas, reference_theta):
     """Reorder angles so that the counterclockwise arc between them always
     includes some reference point on the circle.
 
-    Parameters:
-    --------------
-    thetas: ndarray of pairs of angles in the range (-2pi, 2pi)
+    Parameters
+    ----------
+    thetas : ndarray(float)
+        pairs of angles in the range (-2pi, 2pi).
+    reference_theta: ndarray(float)
+         angles in the range (-2pi, 2pi)
 
-    reference_theta: ndarray of angles in the range (-2pi, 2pi)
-
-    Return:
-    -------------
-    ndarray theta_p of pairs of angles, so that reference_theta lies
-    in the counterclockwise angle between theta_p[0] and theta_p[1].
+    Returns
+    --------
+    theta_p : ndarray(float)
+        pairs of angles of the same shape as `thetas`, so that
+        `reference_theta` lies in the counterclockwise angle between
+        `theta_p[..., 0]` and `theta_p[..., 1]`.
 
     """
 
@@ -283,18 +286,74 @@ def arc_include(thetas, reference_theta):
     return s_thetas
 
 def sphere_inversion(points):
+    r"""Apply unit sphere inversion to points in R^n.
+
+    This realizes the map \(v \mapsto v / ||v||^2\).
+
+    Parameters
+    ----------
+    points : ndarray
+        Array of shape `(..., n)` giving a set of points in R^n
+
+    Returns
+    --------
+    ndarray
+        The image of the `points` array under sphere inversion.
+
+    """
     with np.errstate(divide="ignore", invalid="ignore"):
         return (points.T / (normsq(points)).T).T
 
 def swap_matrix(i, j, n):
+    """Return a permutation matrix representing a single transposition.
+
+    Parameters
+    ----------
+    i, j : int
+        Indices swapped by a transposition.
+    n : int
+        dimension of the permutation matrix.
+
+    Returns
+    --------
+    ndarray
+        Array of shape `(n, n)` giving a transposition matrix.
+
+    """
     permutation = list(range(n))
     permutation[i] = j
     permutation[j] = i
     return permutation_matrix(permutation)
 
 def projection(v1, v2, bilinear_form):
-    """project v1 onto v2, with respect to a (hopefully nondegenerate)
-    bilinear form"""
+    r"""Return the projection of `v1` onto `v2` with respect to some
+    bilinear form.
+
+    The returned vector `w` is parallel to `v2`, and `v1 - w` is
+    orthogonal to `v2` with respect to the given bilinear form.
+    `w` is determined by the formula
+    \[
+    v_2 \cdot \langle v_1, v_2 \rangle / \langle v_2, v_2 \rangle,
+    \]
+    where \(\langle \cdot, \cdot \rangle\) is the pairing determined by
+    `bilinear_form`.
+
+    Parameters
+    ----------
+    v1 : ndarray
+        vector in R^n to project
+    v2 : ndarray
+        vector in R^n to project onto
+    bilinear_form : ndarray
+        array of shape `(n, n)` giving a bilinear form to use for the
+        projection.
+
+    Returns
+    --------
+    w : ndarray
+        vector in R^n giving the projection of `v1` onto `v2`.
+
+    """
 
     return (v2.T *
             apply_bilinear(v1, v2, bilinear_form).T /
