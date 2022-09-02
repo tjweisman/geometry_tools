@@ -329,6 +329,7 @@ class Representation:
                              "can be specified")
 
         as_start = True
+        state = None
 
         if start_state is not None:
             state = start_state
@@ -342,7 +343,7 @@ class Representation:
                                         maxlen=maxlen,
                                         with_words=with_words,
                                         state=state,
-                                        as_start=True,
+                                        as_start=as_start,
                                         precomputed=precomputed)
 
 
@@ -567,10 +568,10 @@ class Representation:
 
 def sym_index(i, j, n):
     r"""Return coordinate indices for an isomorphism
-    \(\mathrm{Sym}^2(\mathbb{R}^n) \to \mathbb{R}^{\binom{n}{2}}\).
+    \(\mathrm{Sym}^2(\mathbb{R}^n) \to \mathbb{R}^{\binom{n}{2} + n}\).
 
     If \(\{e_1, \ldots, e_n\}\) is the standard basis for \(\mathbb{R}^n\),
-    the isomorphism is realized by giving \(\mathrm{Sym}^2(\mathbb{R}^n)
+    the isomorphism is realized by giving \(\mathrm{Sym}^2(\mathbb{R}^n)\)
     the ordered basis
     \[
         \{e_ne_n, e_{n-1}e_{n-1}, e_{n-1}e_n,
@@ -602,7 +603,7 @@ def sym_index(i, j, n):
     --------
     int
         index of the corresponding basis vector in
-        \(\mathbb{R}^{\binom{n}{2}}\).
+        \(\mathbb{R}^{\binom{n}{2} + n}\).
 
     """
     if i > j:
@@ -696,7 +697,7 @@ def symmetric_inclusion(n):
     \(\mathrm{Sym}^2(\mathbb{R}^n)\) and
     \(\mathbb{R}^n \otimes \mathbb{R}^n\)
     are respectively identified with
-    \(\mathbb{R}^{\binom{n}{2}}\) and \(\mathbb{R}^{n^2}\) via the
+    \(\mathbb{R}^{\binom{n}{2} + n}\) and \(\mathbb{R}^{n^2}\) via the
     isomorphisms described in `sym_index`, `tensor_index`, and
     `tensor_pos`.
 
@@ -713,7 +714,7 @@ def symmetric_inclusion(n):
     Returns
     --------
     matrix : ndarray
-        \(n^2 \times \binom{n}{2}\) array defining this linear map.
+        \(n^2 \times \binom{n}{2} + n\) array defining this linear map.
 
     """
     incl_matrix = np.zeros((n * n, int(n * (n + 1) / 2)))
@@ -744,7 +745,7 @@ def symmetric_projection(n):
     Returns
     --------
     ndarray
-        \(\binom{n}{2} \times n\) matrix representing the linear map
+        \(\binom{n}{2} + n \times n\) matrix representing the linear map
         in the given bases.
 
     """
@@ -788,7 +789,7 @@ def sl2_irrep(A, n):
     d = A[..., 1, 1]
 
     im = np.zeros(A.shape[:-2] +(n, n))
-    r = dim - 1
+    r = n - 1
     for k in range(n):
         for j in range(n):
             for i in range(max(0, j - r + k), min(j+1, k+1)):

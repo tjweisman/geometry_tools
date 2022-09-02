@@ -540,15 +540,17 @@ class Subspace(IdealPoint):
     def _data_with_dual(self):
         midpoints = np.sum(self.ideal_basis, axis=-2) / self.ideal_basis.shape[-2]
 
-        spacelike_guess = np.ones(
-            self.ideal_basis.shape[:-2] + (1, self.ideal_basis.shape[-1])
+        poincare_ctr, poincare_rad = self.sphere_parameters(model=Model.POINCARE)
+        spacelike_guess = Point(poincare_ctr, model=Model.KLEIN).coords(
+            model=Model.PROJECTIVE
         )
-        spacelike_guess[..., 0] = 0.
 
-        to_orthogonalize = np.concatenate([
-            np.expand_dims(midpoints, axis=-2),
+
+        to_orthogonalize = np.concatenate(
+            [np.expand_dims(midpoints, axis=-2),
             self.ideal_basis[..., 1:, :],
-            spacelike_guess], axis=-2)
+            np.expand_dims(spacelike_guess, axis=-2)],
+            axis=-2)
 
         orthed = utils.indefinite_orthogonalize(self.minkowski,
                                                 to_orthogonalize)
@@ -606,8 +608,6 @@ class Subspace(IdealPoint):
             )
 
         return center, radius
-
-
 
     def reflection_across(self):
         """Get a hyperbolic isometry reflecting across this hyperplane.
