@@ -58,6 +58,8 @@ The `geometry_tools` package is handy for drawing pictures of tilings in \(\math
 
 You can also [download this example as a Jupyter notebook](triangular_tiling.ipynb) or a [python file](triangular_tiling.py).
 
+To get started, first instantiate the `coxeter.TriangleGroup` class to get a (2,3,7) triangle group, and compute its geometric representation into the isometries of the hyperbolic plane:
+
 
 ```python
 # get a representation for a triangle group.
@@ -67,8 +69,7 @@ from geometry_tools import hyperbolic, coxeter, drawtools
 triangle_rep = coxeter.TriangleGroup((2,3,7)).hyperbolic_rep()
 ```
 
-We can draw the reflection walls for the group:
-
+We can draw the reflection walls for the group using the `drawtools` subpackage:
 
 ```python
 # find the fixed points at infinity for the generating reflections

@@ -70,8 +70,8 @@ class FSA:
     }
     ```
 
-    That is, vertex1 is connected to neighbor_a by an edge with label
-    label_a, etc.
+    That is, `vertex1` is connected to `neighbor_a` by an edge with
+    label `label_a`, etc.
 
     The automaton can be constructed by passing it a dictionary of
     this form, or by adding vertices/edges individually through the
@@ -90,7 +90,7 @@ class FSA:
 
         start_vertices : list
             list of vertices which are valid start states
-            for this automaton. Currently, the FSA class will not
+            for this automaton. Currently, the `FSA` class will not
             correctly handle lists of length > 1.
 
         graph_dict : bool
@@ -189,8 +189,8 @@ class FSA:
         if len(self._out_dict[tail][head]) == 1:
             return self._out_dict[tail][head][0]
         else:
-            raise FSAException("ambiguous: there is not exactly"
-                            " one edge between these vertices!" )
+            raise ValueError("ambiguous edge removal: there is not exactly"
+                            f" one edge between {tail} and {head}" )
 
     def edge_labels(self, tail, head):
         """Get the list of labels associated to all the edges between `tail`
@@ -318,11 +318,11 @@ class FSA:
                           return_distances=False):
         """Find a version of the automaton which does not backtrack.
 
-        This function is the opposite of make_recurrent: it finds a
+        This function is the opposite of `make_recurrent`: it finds a
         subgraph of the automaton which is the union of
         shortest-length paths from the root vertex to each node. This
         will be a directed acyclic graph (in fact, a tree if
-        edge_ties is false).
+        `edge_ties` is false).
 
         It is mostly useful for visualizing the structure of the
         automaton.
@@ -332,7 +332,8 @@ class FSA:
         edge_ties : bool
             if `True`, if two edges give rise to paths of the
             same length, include both of them in the new graph.
-        """
+
+    """
         H = FSA({})
         H.add_vertices(self.vertices())
 
