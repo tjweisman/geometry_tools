@@ -29,7 +29,7 @@ import copy
 import numpy as np
 
 import matplotlib.pyplot as plt
-from matplotlib.patches import Circle, Arc, PathPatch, Rectangle
+from matplotlib.patches import Circle, Arc, PathPatch, Rectangle, Polygon
 from matplotlib.collections import LineCollection, PolyCollection, EllipseCollection
 
 from matplotlib.transforms import Affine2D
@@ -125,7 +125,88 @@ class ProjectiveDrawing:
                                **default_kwargs)
         self.ax.add_collection(lines)
 
-    def draw_polygon(self, polygon, **kwargs):
+    def view_diam(self):
+        return np.sqrt(self.width * self.width + self.height * self.height)
+
+    def view_ctr(self):
+        return np.array([(self.xlim[0] + self.xlim[1])/2,
+                         (self.ylim[0] + self.ylim[1])/2])
+
+    def nonaff_poly_path(self, polygon):
+        pass
+
+    def draw_nonaff_polygon(self, polygon, **kwargs):
+        if len(polygon.proj_data) == 0:
+            return
+
+         # first, find the first index where we switch signs
+        sign_switch = utils.first_sign_switch(polygon.projective_coords()[..., 0])
+
+        # roll the coordinates by the signs
+        coord_mat = polygon.projective_coords()
+
+        rows, cols = np.ogrid[:coord_mat.shape[0], :coord_mat.shape[1]]
+        cols = (cols + sign_switch[:, np.newaxis]) % coord_mat.shape[-2]
+        rolled_coords = coord_mat[rows, cols]
+
+        # find the index where signs switch back
+        second_switch = utils.first_sign_switch(rolled_coords[..., 0])
+
+        # re-index polygon affine coordinates by first sign switch
+        rolled_polys = projective.Polygon(rolled_coords)
+        poly_affine = rolled_polys.affine_coords()
+
+        # find affine coordinates of sign-switch points
+        s1_v1 = poly_affine[..., -1, :]
+        s1_v2 = poly_affine[..., 0, :]
+
+        s2_v1 = np.take_along_axis(poly_affine, second_switch[:, np.newaxis, np.newaxis] - 1, axis=1
+                                  ).squeeze(axis=1)
+        s2_v2 = np.take_along_axis(poly_affine, second_switch[:, np.newaxis, np.newaxis], axis=1
+                                  ).squeeze(axis=1)
+
+        # compute normalized (affine) displacement vectors between
+        # endpoints of segments which cross infinity
+        disp_1 = s1_v2 - s1_v1
+        disp_2 = s2_v2 - s2_v1
+
+        n_disp_1 = utils.normalize(disp_1)
+        n_disp_2 = utils.normalize(disp_2)
+
+        # compute dummy vertex coordinates for segments which cross infinity.
+        # this could be DRYer.
+        dummy_p1v1 = s1_v2 + (
+            n_disp_1 * (self.view_diam() + np.linalg.norm(s1_v2, axis=-1))[:, np.newaxis]
+        )
+        dummy_p2v1 = s1_v1 - (
+            n_disp_1 * (self.view_diam() + np.linalg.norm(s1_v1, axis=-1))[:, np.newaxis]
+        )
+
+        dummy_p1v2 = s2_v1 - (
+            n_disp_2 * (self.view_diam() + np.linalg.norm(s2_v1, axis=-1))[:, np.newaxis]
+        )
+        dummy_p2v2 = s2_v2 + (
+            n_disp_2 * (self.view_diam() + np.linalg.norm(s2_v2, axis=-1))[:, np.newaxis]
+        )
+
+        dummy_coords_1 = np.stack([dummy_p1v2, dummy_p1v1], axis=-2)
+        dummy_coords_2 = np.stack([dummy_p2v1, dummy_p2v2], axis=-2)
+
+
+        # draw a pair of polygons for each non-affine polygon
+        for poly_coords, s_index, dc_1, dc_2 in zip(
+            poly_affine, second_switch, dummy_coords_1, dummy_coords_2):
+
+            p1 = Polygon(np.concatenate([poly_coords[:s_index], dc_1]),
+                        **kwargs)
+            p2 = Polygon(np.concatenate([poly_coords[s_index:], dc_2]),
+                        **kwargs)
+            self.ax.add_patch(p1)
+            self.ax.add_patch(p2)
+
+
+
+    def draw_polygon(self, polygon, assume_affine=True, **kwargs):
         default_kwargs = {
             "facecolor": "none",
             "edgecolor": "black"
@@ -134,8 +215,18 @@ class ProjectiveDrawing:
             default_kwargs[key] = value
 
         polylist = self.transform @ polygon.flatten_to_unit()
-        polys = PolyCollection(polylist.affine_coords(), **default_kwargs)
-        self.ax.add_collection(polys)
+
+        if assume_affine:
+            polys = PolyCollection(polylist.affine_coords(), **default_kwargs)
+            self.ax.add_collection(polys)
+            return
+
+        in_chart = polylist.in_standard_chart()
+        affine_polys = PolyCollection(polylist[in_chart].affine_coords(),
+                                      **default_kwargs)
+        self.ax.add_collection(affine_polys)
+
+        self.draw_nonaff_polygon(polylist[~in_chart], **default_kwargs)
 
     def set_transform(self, transform):
         self.transform = transform

@@ -555,3 +555,9 @@ def invert_gen(generator):
     if generator.lower() == generator:
         return generator.upper()
     return generator.lower()
+
+def first_sign_switch(array):
+    signs = np.sign(array)
+    row_i, col_i = np.nonzero(signs != np.expand_dims(signs[..., 0], axis=-1))
+    _, init_inds = np.unique(row_i, return_index=True)
+    return col_i[init_inds]

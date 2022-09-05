@@ -466,6 +466,10 @@ class Polygon(Point):
         ProjectiveObject.__init__(self, vertices, aux_data,
                                   unit_ndims=2, aux_ndims=3)
 
+    def in_standard_chart(self):
+        coord_signs = np.sign(self.projective_coords()[..., 0])
+        return np.all(coord_signs == 1, axis=-1) | np.all(coord_signs == -1, axis=-1)
+
     def set(self, proj_data, aux_data=None, dual_data=None):
         ProjectiveObject.set(self, proj_data, aux_data)
         self.vertices = self.proj_data
@@ -576,6 +580,9 @@ class ConvexPolygon(Polygon):
 
         new_poly = ConvexPolygon(new_data)
         return new_poly
+
+    def in_standard_chart(self):
+        pass
 
     def _convexify(self):
         if len(self.proj_data.shape) > 2:
