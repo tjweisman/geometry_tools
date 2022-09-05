@@ -9,15 +9,15 @@ with open(path.join(setup_dir, 'README.md'),
 
 setup(
     name="geometry_tools",
-    version="0.3",
+    version="0.4",
     packages=find_packages(),
-
     include_package_data=True,
 
     install_requires=[
         "numpy",
         "matplotlib",
-        "scipy"
+        "scipy",
+        "setuptools-git"
     ],
 
     author="Teddy Weisman",
