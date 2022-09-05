@@ -214,7 +214,7 @@ class ProjectiveDrawing:
         for key, value in kwargs.items():
             default_kwargs[key] = value
 
-        polylist = self.transform @ polygon.flatten_to_unit()
+        polylist = projective.Polygon(self.transform @ polygon.flatten_to_unit())
 
         if assume_affine:
             polys = PolyCollection(polylist.affine_coords(), **default_kwargs)

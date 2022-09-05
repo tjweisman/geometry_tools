@@ -865,12 +865,13 @@ class Segment(Geodesic):
         mu1 = (-b + np.sqrt(b * b - 4 * a * c)) / (2*a)
         mu2 = (-b - np.sqrt(b * b - 4 * a * c)) / (2*a)
 
-        null1 = ((mu1.T * end_data[..., 0, :].T).T +
-                 ((1 - mu1).T * end_data[..., 1, :].T).T)
-        null2 = ((mu2.T * end_data[..., 0, :].T).T +
-                 ((1 - mu2).T * end_data[..., 1, :].T).T)
+        null1 = (mu1[..., np.newaxis] * end_data[..., 0, :] +
+                 (1 - mu1)[..., np.newaxis] * end_data[..., 1, :])
 
-        ideal_basis = np.array([null1, null2]).swapaxes(0, -2)
+        null2 = (mu2[..., np.newaxis] * end_data[..., 0, :] +
+                 (1 - mu2)[..., np.newaxis] * end_data[..., 1, :])
+
+        ideal_basis = np.stack([null1, null2], axis=-2)
         proj_data = np.concatenate([end_data, ideal_basis], axis=-2)
 
         self.set(proj_data)

@@ -499,7 +499,7 @@ class Polygon(Point):
             Vertices of this polygon, as a composite Point object.
 
         """
-        return (self.proj_data)
+        return Point(self.proj_data)
 
 class ConvexPolygon(Polygon):
     """A finite-sided convex polygon in projective space.
