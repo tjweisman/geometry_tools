@@ -132,9 +132,6 @@ class ProjectiveDrawing:
         return np.array([(self.xlim[0] + self.xlim[1])/2,
                          (self.ylim[0] + self.ylim[1])/2])
 
-    def nonaff_poly_path(self, polygon):
-        pass
-
     def draw_nonaff_polygon(self, polygon, **kwargs):
         if len(polygon.proj_data) == 0:
             return

@@ -581,9 +581,6 @@ class ConvexPolygon(Polygon):
         new_poly = ConvexPolygon(new_data)
         return new_poly
 
-    def in_standard_chart(self):
-        pass
-
     def _convexify(self):
         if len(self.proj_data.shape) > 2:
             raise GeometryError(
