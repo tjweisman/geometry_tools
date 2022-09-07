@@ -441,6 +441,25 @@ class Representation:
         precomputed[(length, state)] = accepted
         return accepted
 
+    def elements(self, words):
+        """Get images of an iterable of words.
+
+        Parameters
+        -----------
+        words : iterable of strings
+            words to find the image of under the representation
+
+        Returns
+        ----------
+        ndarray
+            numpy array of shape `(l, n, n)`, where `l` is the length
+            of `words` and `n` is the dimension of the representation.
+
+        """
+        return np.array(
+            [self._word_value(word) for word in words]
+        )
+
     def semi_gens(self):
         """Iterate over group generator names for this representation.
 

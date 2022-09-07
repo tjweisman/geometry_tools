@@ -764,12 +764,8 @@ class ProjectiveRepresentation(representation.Representation):
             Composite transformation object containing one
             transformation for each word in `words`.
 
-    """
-        matrix_array = np.array(
-            [representation.Representation.__getitem__(self, word)
-             for word in words]
-        )
-        return Transformation(matrix_array, column_vectors=True)
+        """
+        return Transformation(self.elements(words), column_vectors=True)
 
     def automaton_accepted(self, automaton, length,
                            maxlen=True, with_words=False,
