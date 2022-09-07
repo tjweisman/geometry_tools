@@ -173,17 +173,21 @@ class ProjectiveDrawing:
         # compute dummy vertex coordinates for segments which cross infinity.
         # this could be DRYer.
         dummy_p1v1 = s1_v2 + (
-            n_disp_1 * (self.view_diam() + np.linalg.norm(s1_v2, axis=-1))[:, np.newaxis]
+            n_disp_1 * (self.view_diam() +
+                        np.linalg.norm(s1_v2 - self.view_ctr(), axis=-1))[:, np.newaxis]
         )
         dummy_p2v1 = s1_v1 - (
-            n_disp_1 * (self.view_diam() + np.linalg.norm(s1_v1, axis=-1))[:, np.newaxis]
+            n_disp_1 * (self.view_diam() +
+                        np.linalg.norm(s1_v1 - self.view_ctr(), axis=-1))[:, np.newaxis]
         )
 
         dummy_p1v2 = s2_v1 - (
-            n_disp_2 * (self.view_diam() + np.linalg.norm(s2_v1, axis=-1))[:, np.newaxis]
+            n_disp_2 * (self.view_diam() +
+                        np.linalg.norm(s2_v1 - self.view_ctr(), axis=-1))[:, np.newaxis]
         )
         dummy_p2v2 = s2_v2 + (
-            n_disp_2 * (self.view_diam() + np.linalg.norm(s2_v2, axis=-1))[:, np.newaxis]
+            n_disp_2 * (self.view_diam() +
+                        np.linalg.norm(s2_v2 - self.view_ctr(), axis=-1))[:, np.newaxis]
         )
 
         dummy_coords_1 = np.stack([dummy_p1v2, dummy_p1v1], axis=-2)
