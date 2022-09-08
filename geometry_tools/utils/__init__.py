@@ -384,25 +384,30 @@ def find_isometry(form, partial_map, force_oriented=False):
     """find a form-preserving matrix agreeing with a specified map on
     the flag defined by the standard basis.
 
-    Parameters:
+    Parameters
     -----------------
-    form: the bilinear map to preserve
+    form : ndarray of shape `(n, n)`
+        the bilinear map to preserve
 
-    partial_map: array of shape (..., k , n), representing the images
-    of the first k standard basis vectors (row vectors)
+    partial_map : ndarray of shape `(..., k, n)`
+        array representing the images of the first k standard basis
+        vectors (row vectors)
 
-    force_oriented: whether we should apply a reflection to force the
-    resulting map to be orientation-preserving.
+    force_oriented : boolean
+        whether we should apply a reflection to force the resulting
+        map to be orientation-preserving.
 
-    Return:
+    Returns
     -------------
-    ndarray of shape (..., n, n) representing an array of matrices
-    whose rows and columns are "orthonormal" with respect to the
-    bilinear form (may have norm -1).
+    ndarray
+        array of shape `(..., n, n)` representing an array of matrices
+        whose rows and columns are "orthonormal" with respect to the
+        bilinear form (since the form may be indefinite, "normal"
+        vectors may have norm -1).
 
-    For all j < k, the subspace spanned by the first j standard basis
-    vectors is sent to the subspace spanned by the first j rows of the
-    result.
+        For all `j <= k`, the subspace spanned by the first `j`
+        standard basis vectors is sent to the subspace spanned by the
+        first `j` rows of the result.
 
     """
 
@@ -561,3 +566,51 @@ def first_sign_switch(array):
     row_i, col_i = np.nonzero(signs != np.expand_dims(signs[..., 0], axis=-1))
     _, init_inds = np.unique(row_i, return_index=True)
     return col_i[init_inds]
+
+def circle_through(p1, p2, p3):
+    """Get the unique circle passing through three points in the plane.
+
+    This does NOT check for colinearity and will just return nans in
+    that case.
+
+    Parameters
+    ------------
+    p1, p2, p3 : ndarray of shape `(..., 2)`
+        Euclidean coordinates of three points in the plane (or three
+        arrays of points)
+
+    Returns
+    --------
+    tuple
+        tuple of the form `(center, radius)`, where `center` is an
+        ndarray containing Euclidean coordinates of the center of the
+        determined circle, and `radius` is either a float or an
+        ndarray containing the radius of the determined circle.
+
+    """
+    t_p1 = p1 - p3
+    t_p2 = p2 - p3
+
+    x1 = t_p1[..., 0]
+    y1 = t_p1[..., 1]
+
+    x2 = t_p2[..., 0]
+    y2 = t_p2[..., 1]
+
+    r_sq = np.stack([x1**2 + y1**2, x2**2 + y2**2], axis=-1)
+    r_sq = np.expand_dims(r_sq, axis=-2)
+
+    mats = np.stack([t_p1, t_p2], axis=-1)
+
+    # we'll act on the right
+    t_ctrs = np.squeeze(r_sq @ np.linalg.inv(mats), axis=-2)/2.
+
+    radii = np.linalg.norm(t_ctrs, axis=-1)
+
+    return (t_ctrs + p3, radii)
+
+def r_to_c(real_coords):
+    return real_coords[..., 0] + real_coords[..., 1]*1.0j
+
+def c_to_r(cx_array):
+    return cx_array.view('(2,)float')

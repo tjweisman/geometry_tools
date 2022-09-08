@@ -29,13 +29,13 @@ import copy
 import numpy as np
 
 import matplotlib.pyplot as plt
-from matplotlib.patches import Circle, Arc, PathPatch, Rectangle, Polygon
+from matplotlib.patches import Circle, Arc, PathPatch, Rectangle, Polygon, Annulus
 from matplotlib.collections import LineCollection, PolyCollection, EllipseCollection
 
 from matplotlib.transforms import Affine2D
 from matplotlib.path import Path
 
-from geometry_tools import hyperbolic, utils, projective
+from geometry_tools import hyperbolic, utils, projective, complex_projective
 from geometry_tools.hyperbolic import Model
 
 #I played around with this a bit, but it's an eyeball test
@@ -71,13 +71,13 @@ class DrawingError(Exception):
     """
     pass
 
-class ProjectiveDrawing:
+class Drawing:
     def __init__(self, figsize=8,
                  ax=None,
                  fig=None,
                  xlim=(-5., 5.),
                  ylim=(-5., 5.),
-                 transform=None):
+                 axis="off"):
 
         if ax is None or fig is None:
             fig, ax = plt.subplots(figsize=(figsize, figsize))
@@ -90,10 +90,34 @@ class ProjectiveDrawing:
         self.ax, self.fig = ax, fig
 
         plt.tight_layout()
-        self.ax.axis("off")
+        self.ax.axis(axis)
         self.ax.set_aspect("equal")
         self.ax.set_xlim(self.xlim)
         self.ax.set_ylim(self.ylim)
+
+    def view_diam(self):
+        return np.sqrt(self.width * self.width + self.height * self.height)
+
+    def view_ctr(self):
+        return np.array([(self.xlim[0] + self.xlim[1])/2,
+                         (self.ylim[0] + self.ylim[1])/2])
+
+    def set_transform(self, transform):
+        self.transform = transform
+
+    def add_transform(self, transform):
+        self.transform = transform @ self.transform
+
+    def precompose_transform(self, transform):
+        self.transform = self.transform @ transform
+
+    def show(self):
+        plt.show()
+
+
+class ProjectiveDrawing(Drawing):
+    def __init__(self, transform=None, **kwargs):
+        Drawing.__init__(self, **kwargs)
 
         self.transform = projective.identity(2)
         if transform is not None:
@@ -125,12 +149,7 @@ class ProjectiveDrawing:
                                **default_kwargs)
         self.ax.add_collection(lines)
 
-    def view_diam(self):
-        return np.sqrt(self.width * self.width + self.height * self.height)
 
-    def view_ctr(self):
-        return np.array([(self.xlim[0] + self.xlim[1])/2,
-                         (self.ylim[0] + self.ylim[1])/2])
 
     def draw_nonaff_polygon(self, polygon, **kwargs):
         if len(polygon.proj_data) == 0:
@@ -229,19 +248,9 @@ class ProjectiveDrawing:
 
         self.draw_nonaff_polygon(polylist[~in_chart], **default_kwargs)
 
-    def set_transform(self, transform):
-        self.transform = transform
 
-    def add_transform(self, transform):
-        self.transform = transform @ self.transform
 
-    def precompose_transform(self, transform):
-        self.transform = self.transform @ transform
-
-    def show(self):
-        plt.show()
-
-class HyperbolicDrawing(ProjectiveDrawing):
+class HyperbolicDrawing(Drawing):
     def __init__(self, figsize=8,
                  ax=None,
                  fig=None,
@@ -251,7 +260,8 @@ class HyperbolicDrawing(ProjectiveDrawing):
                  model=Model.POINCARE,
                  xlim=None,
                  ylim=None,
-                 transform=None):
+                 transform=None,
+                 axis="off"):
 
         if ax is None or fig is None:
             fig, ax = plt.subplots(figsize=(figsize, figsize))
@@ -277,7 +287,7 @@ class HyperbolicDrawing(ProjectiveDrawing):
         self.ax, self.fig = ax, fig
 
         plt.tight_layout()
-        self.ax.axis("off")
+        self.ax.axis(axis)
         self.ax.set_aspect("equal")
         self.ax.set_xlim(self.xlim)
         self.ax.set_ylim(self.ylim)
@@ -292,8 +302,6 @@ class HyperbolicDrawing(ProjectiveDrawing):
 
         if transform is not None:
             self.transform = transform
-
-
 
     def draw_plane(self, **kwargs):
         default_kwargs = {
@@ -599,3 +607,50 @@ class HyperbolicDrawing(ProjectiveDrawing):
                 "Drawing boundary arcs in model '{}' is not implemented.".format(
                     self.model)
             )
+
+class CP1Drawing(Drawing):
+    def __init__(self, transform=None, **kwargs):
+        Drawing.__init__(self, **kwargs)
+
+        self.transform = projective.identity(1)
+        if transform is not None:
+            self.transform = transform
+
+
+    def draw_disk(self, disks, draw_nonaffine=True,
+                  **kwargs):
+        default_kwargs = {
+            "facecolor": "none",
+            "edgecolor": "black"
+        }
+        for key, value in kwargs.items():
+            default_kwargs[key] = value
+
+        disklist = self.transform @ disks.flatten_to_unit()
+
+        nonaff_in_collection = (draw_nonaffine and
+                                default_kwargs["facecolor"].lower() == "none")
+
+        if nonaff_in_collection:
+            collection_disks = disklist
+        else:
+            aff_disks = disklist.center_inside()
+            collection_disks = disklist[aff_disks]
+            extra_disks = disklist[~aff_disks]
+
+        center, radius = collection_disks.circle_parameters()
+        circles = EllipseCollection(radius * 2, radius * 2,
+                                    0, units="xy", offsets=center,
+                                    transOffset=self.ax.transData,
+                                    **default_kwargs)
+
+        self.ax.add_collection(circles)
+
+        if draw_nonaffine and not nonaff_in_collection:
+            ext_center, ext_radius = extra_disks.circle_parameters()
+            ann_outer_rad = np.linalg.norm(ext_center - self.view_ctr(),
+                                           axis=-1) + self.view_diam()
+
+            for center, inrad, outrad in zip(ext_center, ext_radius, ann_outer_rad):
+                annulus = Annulus(center, outrad, outrad - inrad, **default_kwargs)
+                self.ax.add_patch(annulus)
