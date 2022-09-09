@@ -20,7 +20,5 @@ that's probably all they're good for).
 
 ## Documentation
 
-You can find some documentation up at the [project site]
-(http://www-personal.umich.edu/~tjwei/geometry_tools). If you have questions
-or have found bugs, email me at[tjweisman@gmail.com]
-(mailto:tjweisman@gmail.com).
+You can find some documentation up at the [project site](http://www-personal.umich.edu/~tjwei/geometry_tools).
+If you have questions or have found bugs, email me at [tjweisman@gmail.com](mailto:tjweisman@gmail.com).
