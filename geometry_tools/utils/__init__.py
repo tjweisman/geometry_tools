@@ -613,4 +613,34 @@ def r_to_c(real_coords):
     return real_coords[..., 0] + real_coords[..., 1]*1.0j
 
 def c_to_r(cx_array):
-    return cx_array.view('(2,)float')
+    return cx_array.astype('complex').view('(2,)float')
+
+def order_eigs(eigenvalues, eigenvectors):
+    """Sort eigenvalue/eigenvector tuples by increasing modulus.
+
+    This function accepts the eigenvalue/eigenvector data returned by
+    the `np.linalg.eig` function.
+
+    Parameters
+    ----------
+    eigenvalues : ndarray
+        Array of shape (..., n) representing eigenvalues of some
+        matrices
+    eigenvectors : ndarray
+        Array of shape (..., n, n) representing eigenvectors of some
+        matrices (as column vectors).
+
+    Returns
+    ---------
+    tuple
+        Tuple of the form `(eigvals, eigvecs)`, where both eigvals and
+        eigvecs have the same data as the input arrays, but arranged
+        so that eigenvalues and eigenvectors are in increasing order
+        of modulus.
+
+    """
+    eigorder = np.argsort(np.abs(eigenvalues), axis=-1)
+    eigvecs = np.take_along_axis(eigenvectors, np.expand_dims(eigorder, axis=-2), axis=-1)
+    eigvals = np.take_along_axis(eigenvalues, eigorder, axis=-1)
+
+    return eigvals, eigvecs
