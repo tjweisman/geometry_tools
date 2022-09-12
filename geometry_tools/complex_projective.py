@@ -77,11 +77,19 @@ class CP1Disk(CP1Object):
             q, r = np.linalg.qr(np.expand_dims(center_coords, axis=-1),
                                 mode='complete')
 
-            p1_t = np.stack([np.cos(2 * rad), np.sin(2 * rad), 0], axis=-1)
-            p2_t = np.stack([np.cos(2 * rad), -np.sin(2 * rad), 0], axis=-1)
-            p3_t = np.stack([np.cos(2 * rad), 0, np.sin(2 * rad)], axis=-1)
+            p1_t = np.stack([np.cos(2 * rad),
+                             np.sin(2 * rad),
+                             np.zeros_like(rad)], axis=-1)
+            p2_t = np.stack([np.cos(2 * rad),
+                             -np.sin(2 * rad),
+                             np.zeros_like(rad)], axis=-1)
+            p3_t = np.stack([np.cos(2 * rad),
+                             np.zeros_like(rad),
+                             np.sin(2 * rad)], axis=-1)
+
             t_pts = np.stack([p1_t, p2_t, p3_t], axis=-1)
-            sph_pts = np.linalg.inv(q) * r[..., 0, 0] @ t_pts
+            sph_pts = (np.expand_dims(r[..., 0, 0], axis=(-1, -2)) *
+                       q @ t_pts)
 
             proj_pts = spherical_to_projective(
                 sph_pts.swapaxes(-1, -2)
@@ -135,7 +143,7 @@ def projective_to_spherical(points, column_vectors=False):
     z0 = ppoints[..., 0]
     z1 = ppoints[..., 1]
     normsq = np.abs(z0 * np.conjugate(z0) + z1 * np.conjugate(z1))
-    horizontal = utils.c_to_r(2 * z0 * np.conjugate(z1) / normsq)
+    horizontal = utils.c_to_r(2 * np.conjugate(z0) * z1 / normsq)
     vertical = (np.abs(z1 * np.conjugate(z1)) -
                 np.abs(z0 * np.conjugate(z0))) / normsq
 
@@ -160,9 +168,10 @@ def spherical_to_projective(points, column_vectors=False):
                    axis=-1)
 
     # need to do this in two charts
-    res[chart2] = np.stack([utils.r_to_c(spoints[chart2, :-1]),
-                           1 + spoints[chart2, -1]],
-                           axis=-1)
+    res[chart2] = np.stack(
+        [np.conjugate(utils.r_to_c(spoints[chart2, :-1])),
+         1 + spoints[chart2, -1]],
+        axis=-1)
 
     if column_vectors:
         res = res.swapaxes(-1, -2)

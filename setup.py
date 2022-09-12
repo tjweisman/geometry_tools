@@ -14,7 +14,7 @@ setup(
     include_package_data=True,
 
     install_requires=[
-        "numpy",
+        "numpy>=1.22",
         "matplotlib",
         "scipy"
     ],

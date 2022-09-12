@@ -654,3 +654,16 @@ class CP1Drawing(Drawing):
             for center, inrad, outrad in zip(ext_center, ext_radius, ann_outer_rad):
                 annulus = Annulus(center, outrad, outrad - inrad, **default_kwargs)
                 self.ax.add_patch(annulus)
+
+    def draw_point(self, point, **kwargs):
+        pointlist = self.transform @ point.flatten_to_unit()
+        default_kwargs = {
+            "color" : "black",
+            "marker": "o",
+            "linestyle":"none"
+        }
+        for key, value in kwargs.items():
+            default_kwargs[key] = value
+
+        x, y = pointlist.real_affine_coords().T
+        plt.plot(x, y, **default_kwargs)
