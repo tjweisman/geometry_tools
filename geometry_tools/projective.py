@@ -249,6 +249,9 @@ class ProjectiveObject:
     def __getitem__(self, item):
         return self.__class__(self.proj_data[item])
 
+    def __setitem__(self, key, value):
+        self.proj_data[key] = self.__class__(value).proj_data
+
     def projective_coords(self, proj_data=None):
         """Wrapper for ProjectiveObject.set, since underlying coordinates are
         projective."""
@@ -281,6 +284,90 @@ class ProjectiveObject:
 
         return affine_coords(self.proj_data, chart_index=chart_index,
                              column_vectors=False)
+
+    @staticmethod
+    def _assert_prop_equal(objects, propname):
+
+        if len(objects) == 0:
+            return
+
+        properties = np.array([obj.__dict__[propname]
+                               for obj in objects])
+
+        if (properties[0] != properties).any():
+            raise GeometryError(
+                f"{propname} does not match for objects."
+            )
+
+
+    @classmethod
+    def combine(cls, to_combine):
+        """Construct a new ProjectiveObject of the same type combining the
+        data of `self` and `other`.
+
+        Both `self` and `other` will be flattened to unit dimensions
+        before combining. If dimensions of the underlying data do not
+        match, this will raise an error.
+
+        Parameters
+        ----------
+        other : ProjectiveObject of the same type as `self`.
+            ProjectiveObject to combine with
+
+        Returns
+        -------
+        ProjectiveObject
+            Object of the same type as `self` containing (flattened)
+            combined data.
+
+        """
+        if len(to_combine) == 0:
+            return
+
+        cls._assert_prop_equal(to_combine, "unit_ndims")
+        cls._assert_prop_equal(to_combine, "aux_ndims")
+        cls._assert_prop_equal(to_combine, "dual_ndims")
+
+        unit_ndims = to_combine[0].unit_ndims
+        aux_ndims = to_combine[0].aux_ndims
+        dual_ndims = to_combine[0].dual_ndims
+
+        flattened_objs = [
+            obj.flatten_to_unit()
+            for obj in to_combine
+        ]
+
+        # first make a generic ProjectiveObject
+        new_data = np.concatenate(
+            [obj.proj_data for obj in flattened_objs],
+            axis=-(unit_ndims+1)
+        )
+        new_aux = None
+        new_dual = None
+
+        if aux_ndims > 0:
+            new_data = np.concatenate(
+                [obj.aux_data for obj in flattened_objs],
+                axis=-(aux_ndims+1)
+            )
+            new_aux = np.concatenate([flat_self.aux_data, flat_other.aux_data],
+                                     axis=-(self.aux_ndims+1))
+        if dual_ndims > 0:
+            new_data = np.concatenate(
+                [obj.dual_data for obj in flattened_objs],
+                axis=-(dual_ndims+1)
+            )
+
+        newObj = ProjectiveObject(new_data, new_aux, new_dual,
+                                  unit_ndims=unit_ndims,
+                                  aux_ndims=aux_ndims,
+                                  dual_ndims=dual_ndims)
+
+        # construct an object with the correct type from this underlying data
+        return cls(newObj)
+
+
+
 
 class Point(ProjectiveObject):
     """A point (or collection of points) in projective space.
@@ -319,6 +406,9 @@ class Point(ProjectiveObject):
             self.projective_coords(point)
         else:
             self.affine_coords(point, chart_index)
+
+    def in_affine_chart(self, index):
+        return self.proj_data[..., index] != 0
 
 class PointPair(Point):
     """A pair of points (or a composite object consisting of a collection
@@ -909,7 +999,9 @@ def projective_coords(points, chart_index=0, column_vectors=False):
     if column_vectors:
         coords = coords.swapaxes(-1, -2)
 
-    result = np.zeros(coords.shape[:-1] + (coords.shape[-1] + 1,))
+    result = np.zeros(coords.shape[:-1] + (coords.shape[-1] + 1,),
+                      dtype=coords.dtype)
+
     indices = np.arange(coords.shape[-1])
     indices[chart_index:] += 1
 

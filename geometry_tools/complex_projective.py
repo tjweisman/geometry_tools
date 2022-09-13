@@ -29,7 +29,7 @@ class CP1Point(projective.Point, CP1Object):
         if coords == "cx_affine":
             projective.Point.__init__(self, point, chart_index=0)
         elif coords == "real_affine":
-            cx_aff_data = utils.r_to_c(point)
+            cx_aff_data = np.expand_dims(utils.r_to_c(point), axis=-1)
             projective.Point.__init__(self, cx_aff_data, chart_index=0)
         elif coords == "spherical":
             proj_data = spherical_to_projective(point)
@@ -38,11 +38,11 @@ class CP1Point(projective.Point, CP1Object):
             projective.Point.__init__(self, point)
 
     def spherical_coords(self, spherical_data=None):
-
         if spherical_data is not None:
             self.set(spherical_to_projective(spherical_data))
 
-        return projective_to_spherical(self.proj_data, column_vectors=False)
+        return projective_to_spherical(self.proj_data,
+                                       column_vectors=False)
 
 class CP1Disk(CP1Object):
     def _compute_proj_data(self, center, rad, radius_metric="affine"):
@@ -113,10 +113,10 @@ class CP1Disk(CP1Object):
         CP1Object.__init__(self, proj_data, unit_ndims=2)
 
     def boundary_points(self):
-        return CP1Object(self.proj_data[..., :3, :])
+        return CP1Point(self.proj_data[..., :3, :])
 
     def interior_point(self):
-        return CP1Object(self.proj_data[..., -1, :])
+        return CP1Point(self.proj_data[..., -1, :])
 
     def circle_parameters(self):
         bdry_pts = self.boundary_points()
@@ -130,10 +130,61 @@ class CP1Disk(CP1Object):
 
     def center_inside(self):
         circ_ctr, circ_rad = self.circle_parameters()
-        int_pt_coords = self.interior_point().real_affine_coords()
+        ipts = self.interior_point()
 
-        dist_sq = utils.normsq(circ_ctr - int_pt_coords)
-        return dist_sq < circ_rad * circ_rad
+        center_affine = ipts.in_affine_chart(0)
+        int_pt_coords = ipts[center_affine].real_affine_coords()
+        dist_sq = utils.normsq(circ_ctr[center_affine] - int_pt_coords)
+
+        res = np.full(self.obj_shape(), False)
+
+        res[center_affine] = dist_sq < circ_rad[center_affine]**2
+
+        return res
+
+    def fs_diameter(self):
+        center, radius = self.circle_parameters()
+        center_norm = np.linalg.norm(center, axis=-1)
+
+        res = np.arctan(center_norm + radius) - np.arctan(center_norm - radius)
+        inverted = ~self.center_inside()
+        res[inverted] = np.pi - res[inverted]
+
+        return res
+
+    def fs_center(self):
+        center, radius = self.circle_parameters()
+        center_norm = np.linalg.norm(center, axis=-1)
+
+        fs_ctr_dist = np.tan(
+            (np.arctan(center_norm + radius) +
+             np.arctan(center_norm - radius)) / 2
+        )
+
+        scale_factor = np.ones_like(center_norm)
+        nonzero_scale = np.abs(fs_ctr_dist) > 0
+        scale_factor[nonzero_scale] = (fs_ctr_dist[nonzero_scale] /
+                                       center_norm[nonzero_scale])
+
+        fs_center = CP1Point(np.expand_dims(scale_factor, axis=-1) * center,
+                             coords="real_affine")
+
+        # apply a sphere inversion for disks containing infinity
+        inverted = ~self.center_inside()
+        inverted_pts = projective.Transformation(np.array([
+            [0., -1.],
+            [1., 0.]])
+        ) @ fs_center[inverted]
+        fs_center[inverted] = inverted_pts
+
+        fs_center.proj_data[inverted] = np.conjugate(
+            fs_center.proj_data[inverted]
+        )
+
+        return fs_center
+
+    def fs_parameters(self):
+        pass
 
 def projective_to_spherical(points, column_vectors=False):
     ppoints = np.array(points)
@@ -156,7 +207,6 @@ def projective_to_spherical(points, column_vectors=False):
     return spherical
 
 def spherical_to_projective(points, column_vectors=False):
-
     spoints = np.array(points)
     if column_vectors:
         spoints = spoints.swapaxes(-1, -2)
