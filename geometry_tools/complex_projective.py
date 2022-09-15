@@ -3,6 +3,8 @@ numerical coordinates.
 
 """
 
+from copy import copy
+
 import numpy as np
 
 from geometry_tools import utils
@@ -24,18 +26,20 @@ class CP1Point(projective.Point, CP1Object):
         except TypeError:
             pass
 
+        pdata = np.array(point)
         # this might end up being rewritten to work the same way that
         # hyperbolic models do.
         if coords == "cx_affine":
-            projective.Point.__init__(self, point, chart_index=0)
+            cx_aff_data = np.expand_dims(pdata, axis=-1)
+            projective.Point.__init__(self, cx_aff_data, chart_index=0)
         elif coords == "real_affine":
-            cx_aff_data = np.expand_dims(utils.r_to_c(point), axis=-1)
+            cx_aff_data = np.expand_dims(utils.r_to_c(pdata), axis=-1)
             projective.Point.__init__(self, cx_aff_data, chart_index=0)
         elif coords == "spherical":
-            proj_data = spherical_to_projective(point)
+            proj_data = spherical_to_projective(pdata)
             projective.Point.__init__(self, proj_data)
         else:
-            projective.Point.__init__(self, point)
+            projective.Point.__init__(self, pdata)
 
     def spherical_coords(self, spherical_data=None):
         if spherical_data is not None:
@@ -43,6 +47,9 @@ class CP1Point(projective.Point, CP1Object):
 
         return projective_to_spherical(self.proj_data,
                                        column_vectors=False)
+    def to_standard_triple(self):
+
+        return to_standard_triple(self)
 
 class CP1Disk(CP1Object):
     def _compute_proj_data(self, center, rad, radius_metric="affine"):
@@ -171,10 +178,7 @@ class CP1Disk(CP1Object):
 
         # apply a sphere inversion for disks containing infinity
         inverted = ~self.center_inside()
-        inverted_pts = projective.Transformation(np.array([
-            [0., -1.],
-            [1., 0.]])
-        ) @ fs_center[inverted]
+        inverted_pts = inversion() @ fs_center[inverted]
         fs_center[inverted] = inverted_pts
 
         fs_center.proj_data[inverted] = np.conjugate(
@@ -183,8 +187,63 @@ class CP1Disk(CP1Object):
 
         return fs_center
 
-    def fs_parameters(self):
-        pass
+    def inversion(self):
+        basechange = self.boundary_points().to_standard_triple()
+        std_inversion = projective.Transformation(
+            np.array([[1.0, 0.], [0., -1.]])
+        )
+        return basechange.inv() @ std_inversion @ basechange
+
+    def complement(self):
+        new_int = self.inversion() @ self.interior_point()
+
+        complement = CP1Disk(copy(self.proj_data))
+        complement.proj_data[..., -1, :] = new_int.proj_data
+        return complement
+
+    def contains(self, other, broadcast="elementwise"):
+        if broadcast == "pairwise":
+            s_to_use = self.flatten_to_unit()
+            o_to_use = other.flatten_to_unit()
+        else:
+            s_to_use = self
+            o_to_use = other
+
+        s_aff = s_to_use.center_inside()
+        o_aff = o_to_use.center_inside()
+
+        sctr, srad = s_to_use.circle_parameters()
+        octr, orad = o_to_use.circle_parameters()
+
+        contain, contained, intersect = utils.disk_interactions(
+            sctr, srad, octr, orad, broadcast=broadcast
+        )
+
+        res = np.full(contain.shape, False)
+
+        if broadcast == "elementwise":
+            res[s_aff & o_aff] = contain[s_aff & o_aff]
+            res[~s_aff & o_aff] = ~intersect[~s_aff & o_aff]
+            res[~s_aff & ~o_aff] = contained[~s_aff & ~o_aff]
+            return res
+
+        affaffmask = np.logical_and(
+            np.expand_dims(s_aff, axis=1),
+            np.expand_dims(o_aff, axis=0)
+        )
+        naffaffmask = np.logical_and(
+            np.expand_dims(~s_aff, axis=1),
+            np.expand_dims(o_aff, axis=0)
+        )
+        naffnaffmask = np.logical_and(
+            np.expand_dims(~s_aff, axis=1),
+            np.expand_dims(~o_aff, axis=0)
+        )
+        np.putmask(res, affaffmask, contain)
+        np.putmask(res, naffaffmask, ~intersect)
+        np.putmask(res, naffnaffmask, contained)
+        return res
+
 
 def projective_to_spherical(points, column_vectors=False):
     ppoints = np.array(points)
@@ -227,3 +286,29 @@ def spherical_to_projective(points, column_vectors=False):
         res = res.swapaxes(-1, -2)
 
     return res
+
+def to_standard_triple(triple):
+    tpoint = CP1Point(triple)
+    if tpoint.proj_data.shape[-2] != 3:
+        raise GeometryError(
+            f"Cannot take an array of {self.proj_data.shape[-2]}-tuples"
+            " to an array of triples."
+        )
+
+    tdata = tpoint.projective_coords()
+
+    res = np.linalg.inv(tdata[..., :2, :])
+    p3_t = np.expand_dims(tdata[..., 2, :],
+                          axis=-2) @ res
+
+    eigenvalue = np.emath.sqrt(p3_t[..., 1] / p3_t[..., 0])
+
+    res[..., 0] *= eigenvalue
+    res[..., 1] /= eigenvalue
+
+    return projective.Transformation(res)
+
+def inversion():
+    return projective.Transformation(
+        np.array([[0, -1],[1,0]])
+    )

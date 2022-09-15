@@ -176,6 +176,8 @@ class ProjectiveObject:
         # don't bother because the only dual geometry we're using is
         # technically also auxilliary...
 
+        proj_data = np.array(proj_data)
+
         self._assert_geometry_valid(proj_data)
         if aux_data is None:
             aux_data = self._compute_aux_data(proj_data)

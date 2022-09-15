@@ -644,3 +644,51 @@ def order_eigs(eigenvalues, eigenvectors):
     eigvals = np.take_along_axis(eigenvalues, eigorder, axis=-1)
 
     return eigvals, eigvecs
+
+def affine_disks_contain(cout, rout, cin, rin,
+                         broadcast="elementwise"):
+    if broadcast == "pairwise":
+        pairwise_dists = np.linalg.norm(
+            np.expand_dims(cout, 0) - np.expand_dims(cin, 1),
+            axis=-1
+        )
+        radial_diffs = np.expand_dims(rout, 0) - np.expand_dims(rin, 1)
+        return pairwise_dists < radial_diffs
+
+    return np.linalg.norm(cout - cin, axis=-1) < (rout - rin)
+
+
+def disk_containments(c1, r1, c2, r2,
+                      broadcast="elementwise"):
+    if broadcast == "pairwise":
+        pairwise_dists = np.linalg.norm(
+            np.expand_dims(cout, 0) - np.expand_dims(cin, 1),
+            axis=-1
+        )
+        radial_diff1 = np.expand_dims(rout, 0) - np.expand_dims(rin, 1)
+        return (pairwise_dists < radial_diffs,
+                pairwise_dists < -radial_diffs)
+
+    dists = np.linalg.norm(cout - cin, axis=-1)
+    return (dists < (rout - rin),
+            dists < (rin - rout))
+
+def disk_interactions(c1, r1, c2, r2,
+                      broadcast="elementwise"):
+    # WARNING: this will only work for Nx2 arrays
+    if broadcast == "pairwise":
+        pairwise_dists = np.linalg.norm(
+            np.expand_dims(c1, 1) - np.expand_dims(c2, 0),
+            axis=-1
+        )
+        radial_diff = np.expand_dims(r1, 1) - np.expand_dims(r2, 0)
+        radial_sum = np.expand_dims(r1, 1) + np.expand_dims(r2, 0)
+        return (pairwise_dists < radial_diff,
+                pairwise_dists < -radial_diff,
+                pairwise_dists < radial_sum)
+
+    dists = np.linalg.norm(c1 - c2, axis=-1)
+
+    return (dists < (r1 - r2),
+            dists < (r2 - r1),
+            dists < (r2 + r1))
