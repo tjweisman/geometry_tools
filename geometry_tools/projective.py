@@ -141,7 +141,8 @@ class ProjectiveObject:
 
         raise TypeError
 
-    def obj_shape(self):
+    @property
+    def shape(self):
         """Get the shape of the ndarray of "unit objects" this
         ProjectiveObject represents.
 
@@ -253,6 +254,12 @@ class ProjectiveObject:
 
     def __setitem__(self, key, value):
         self.proj_data[key] = self.__class__(value).proj_data
+
+    def __len__(self):
+        if len(self.proj_data.shape) == self.unit_ndims:
+            raise TypeError("len() of unsized object")
+
+        return len(self.proj_data)
 
     def projective_coords(self, proj_data=None):
         """Wrapper for ProjectiveObject.set, since underlying coordinates are

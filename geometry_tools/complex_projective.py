@@ -143,7 +143,7 @@ class CP1Disk(CP1Object):
         int_pt_coords = ipts[center_affine].real_affine_coords()
         dist_sq = utils.normsq(circ_ctr[center_affine] - int_pt_coords)
 
-        res = np.full(self.obj_shape(), False)
+        res = np.full(self.shape, False)
 
         res[center_affine] = dist_sq < circ_rad[center_affine]**2
 
@@ -244,6 +244,48 @@ class CP1Disk(CP1Object):
         np.putmask(res, naffnaffmask, contained)
         return res
 
+    def intersects(self, other, broadcast="elementwise"):
+        if broadcast == "pairwise":
+            s_to_use = self.flatten_to_unit()
+            o_to_use = other.flatten_to_unit()
+        else:
+            s_to_use = self
+            o_to_use = other
+
+        s_aff = s_to_use.center_inside()
+        o_aff = o_to_use.center_inside()
+
+        sctr, srad = s_to_use.circle_parameters()
+        octr, orad = o_to_use.circle_parameters()
+
+        contain, contained, intersect = utils.disk_interactions(
+            sctr, srad, octr, orad, broadcast=broadcast
+        )
+
+        res = np.full(contain.shape, True)
+
+        if broadcast == "elementwise":
+            res[s_aff & o_aff] = intersect[s_aff & o_aff]
+            res[~s_aff & o_aff] = ~contain[~s_aff & o_aff]
+            res[s_aff & ~o_aff] = ~contained[~s_aff & ~o_aff]
+            return res
+
+        affaffmask = np.logical_and(
+            np.expand_dims(s_aff, axis=1),
+            np.expand_dims(o_aff, axis=0)
+        )
+        naffaffmask = np.logical_and(
+            np.expand_dims(~s_aff, axis=1),
+            np.expand_dims(o_aff, axis=0)
+        )
+        affnaffmask = np.logical_and(
+            np.expand_dims(s_aff, axis=1),
+            np.expand_dims(~o_aff, axis=0)
+        )
+        np.putmask(res, affaffmask, intersect)
+        np.putmask(res, naffaffmask, ~contain)
+        np.putmask(res, affnaffmask, ~contained)
+        return res
 
 def projective_to_spherical(points, column_vectors=False):
     ppoints = np.array(points)
