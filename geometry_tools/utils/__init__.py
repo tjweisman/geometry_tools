@@ -360,8 +360,29 @@ def projection(v1, v2, bilinear_form):
             normsq(v2, bilinear_form).T).T
 
 def indefinite_orthogonalize(form, matrices):
-    """apply the Gram-Schmidt algorithm, but for a possibly indefinite
-    bilinear form."""
+    """Apply the Gram-Schmidt algorithm, but for a possibly indefinite
+    bilinear form.
+
+    Parameters
+    -----------
+    form : ndarray of shape `(n,n)`
+        bilinear form to orthogonalize with respect to
+
+    matrices : ndarray of shape `(..., k, n)`
+        array of k row vectors to orthogonalize.
+
+    Returns
+    --------
+    result : ndarray
+        array with the same shape as `matrices`. The last two
+        dimensions of this array give matrices with mutually
+        orthogonal rows, with respect to the given bilinear form.
+
+        For all `j <= k`, the subspace spanned by the first `j` rows
+        of `result` is the same as the subspace spanned by the first
+        `j` rows of `matrices`.
+
+    """
     if len(matrices.shape) < 2:
         return normalize(matrices, form)
 
@@ -428,6 +449,30 @@ def find_isometry(form, partial_map, force_oriented=False):
     return iso
 
 def find_definite_isometry(partial_map, force_oriented=False):
+    """find an orthogonal matrix agreeing with a specified map on
+    the flag defined by the standard basis.
+
+    Parameters
+    -----------------
+    partial_map : ndarray of shape `(..., k, n)`
+        array representing the images of the first k standard basis
+        vectors (row vectors)
+
+    force_oriented : boolean
+        whether we should apply a reflection to force the resulting
+        map to be orientation-preserving.
+
+    Returns
+    -------------
+    ndarray
+        array of shape `(..., n, n)` representing an array of matrices
+        with orthonormal rows and columns.
+
+        For all `j <= k`, the subspace spanned by the first `j`
+        standard basis vectors is sent to the subspace spanned by the
+        first `j` rows of the result.
+
+    """
     pmap = np.array(partial_map)
     if len(pmap.shape) < 2:
         pmap = pmap.reshape((len(pmap), 1))
@@ -454,6 +499,18 @@ def make_orientation_preserving(matrix):
 
     if matrix is already orientation preserving, do nothing.
 
+    Parameters
+    -----------
+    matrix : ndarray of shape `(..., n, n)`
+        ndarray of linear maps
+
+    Returns
+    ---------
+    result : ndarray
+        array with the same shape as `matrices`, representating an
+        ndarray of linear maps. If `A` is an orientation-reversing
+        matrix in `matrices`, then the corresponding matrix in
+        `result` has its last row negated.
     """
     preserved = matrix.copy()
     preserved[np.linalg.det(preserved) < 0, -1, :] *= -1
@@ -461,16 +518,28 @@ def make_orientation_preserving(matrix):
 
 def expand_unit_axes(array, unit_axes, new_axes):
     """expand the last axes of an array to make it suitable for ndarray
-    elementwise multiplication.
+    pairwise multiplication.
 
-    array is an ndarray whose last unit_axes axes are a "unit"
-    (treated as a single unit for elementwise multiplication). Its
-    shape is ([object axes], [unit axes]), where [object axes] and
-    [unit axes] are tuples.
+    `array` is an ndarray, viewed as an array of arrays, each of which
+    has `unit_axes` axes. That is, its shape decomposes into a pair of
+    tuples `([axes 1], [axes 2])`, where `[axes 2]` is a tuple of
+    length `unit_axes`.
 
-    This function returns an array of shape
-    ([object axes], 1, ..., 1, [unit axes]),
-    where the number of 1's is either (new_axes - unit_axes) or 0.
+    Parameters
+    -----------
+    array : ndarray
+        ndarray to expand
+    unit_axes : int
+        number of axes of `array` to treat as a "unit"
+    new_axes : int
+        number of axes to add to the array
+
+    Returns
+    ---------
+    ndarray
+        ndarray of shape `([object axes], 1, ..., 1, [unit axes])`,
+        where the number of 1's is either `new_axes - unit_axes`, or 0
+        if this is negative.
 
     """
     if new_axes <= unit_axes:
@@ -479,15 +548,29 @@ def expand_unit_axes(array, unit_axes, new_axes):
     return np.expand_dims(array.T, axis=tuple(range(unit_axes, new_axes))).T
 
 def squeeze_excess(array, unit_axes, other_unit_axes):
-    """squeeze excess axes from an ndarray of arrays with unit_axes axes.
+    """Squeeze all excess axes from an ndarray of arrays with unit_axes axes.
 
-    This undoes expand_unit_axes. If array is an ndarray of shape
+    This undoes expand_unit_axes().
 
-    `([object axes], [excess axes], [unit axes])`,
+    Parameters
+    -----------
+    array : ndarray
+        ndarray of shape `([object axes], [excess axes], [unit
+        axes])`, where `[unit axes]` is a tuple of length `unit_axes`,
+        and `[excess axes]` is a tuple of length `other_unit_axes -
+        unit_axes`.
+    unit_axes : int
+        number of axes to view as "units" in `array`. That is, `array`
+        is viewed as an ndarray of arrays each with `unit_axes` axes.
+    other_unit_axes : int
+        axes to avoid squeezing when we reshape the array.
 
-    where [unit axes] has length unit_axes, and [excess axes] has
-    length other_unit_axes - unit_axes, this function reshapes the
-    array by squeezing out all the 1's in [excess axes].
+    Returns
+    --------
+    ndarray
+        Reshaped array with certain length-1 axes removed. If the
+        input array has shape `([object axes], [excess axes], [unit
+        axes])`, squeeze out all the ones in `[excess axes]`.
 
     """
     squeezable = np.array(array.T.shape[unit_axes:other_unit_axes])
