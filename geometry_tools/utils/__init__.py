@@ -57,7 +57,7 @@ def diagonalize_form(bilinear_form, order_eigenvalues="signed", reverse=False):
     bilinear_form: ndarray
         numpy array of shape (n, n) representing, a symmetric bilinear
         form in standard coordinates
-    order_eigenvalues: string
+    order_eigenvalues: {'signed', 'minkowski'}
         If "signed" (the default), conjugate to a diagonal bilinear
         form on R^n, whose eigenvectors are ordered in order of
         increasing eigenvalue.
@@ -78,7 +78,7 @@ def diagonalize_form(bilinear_form, order_eigenvalues="signed", reverse=False):
     ndarray
         numpy array of shape (n, n), representing a coordinate change
         taking the given bilinear form to a diagonal form. If \(B\) is
-        the matrix given by `bilinear_form`, and \(D\) is a diagonal
+        the matrix given by bilinear_form, and \(D\) is a diagonal
         matrix with the same signature as \(B\), then this function
         returns a matrix \(M\) such that \(M^TDM = B\).
 
@@ -125,17 +125,17 @@ def circle_angles(center, coords):
     Parameters
     -----------
     center: ndarray
-        numpy array with shape `(..., 2)` representing x,y coordinates
+        numpy array with shape (..., 2) representing x,y coordinates
         the centers of some circles.
     coords: ndarray
-        numpy array with shape `(..., 2)` representing x,y coordinates
+        numpy array with shape (..., 2) representing x,y coordinates
         of some points.
 
     Returns
     --------
     ndarray
         angles (relative to x-axis) of each of the pair of points
-        specified by `coords.`
+        specified by coords.
 
     """
     xs = (coords - np.expand_dims(center, axis=-2))[..., 0]
@@ -149,17 +149,17 @@ def apply_bilinear(v1, v2, bilinear_form=None):
     Parameters
     ----------
     v1, v2: ndarray
-        ndarrays of shape `(..., n)` giving arrays of vectors.
+        ndarrays of shape (..., n) giving arrays of vectors.
     bilinear_form: ndarray
-        ndarray of shape `(n, n)` specifying a matrix representing a
-        symmetric bilinear form to use to pair `v1` and `v2`. If
+        ndarray of shape (n, n) specifying a matrix representing a
+        symmetric bilinear form to use to pair v1 and v2. If
         `None`, use the standard (Euclidean) bilinear form on R^n.
 
     Returns
     -------
     ndarray
-        ndarray representing the result of pairing the vectors in `v1`
-        with `v2`.
+        ndarray representing the result of pairing the vectors in v1
+        with v2.
 
     """
 
@@ -169,9 +169,11 @@ def apply_bilinear(v1, v2, bilinear_form=None):
     return ((v1 @ bilinear_form) * v2).sum(-1)
 
 def normsq(vectors, bilinear_form=None):
-    """Evaluate the norm squared of an array of vectors, with respect to a bilinear form.
+    """Evaluate the norm squared of an array of vectors, with respect to a
+       bilinear form.
 
-    Shorthand for `apply_bilinear(vectors, vectors, bilinear_form)`.
+    Equivalent to a call of apply_bilinear(vectors, vectors, bilinear_form).
+
     """
     return apply_bilinear(vectors, vectors, bilinear_form)
 
@@ -182,15 +184,15 @@ def normalize(vectors, bilinear_form=None):
     Parameters
     ----------
     vectors: ndarray
-        ndarray of shape `(..., n)`
-    bilinear_form: ndarray or `None`
-        bilinear form to use to evaluate the norms in `vectors`. If
-        `None`, use the standard (Euclidean) bilinear form on R^n.
+        ndarray of shape (..., n)
+    bilinear_form: ndarray or None
+        bilinear form to use to evaluate the norms in vectors. If
+        None, use the standard (Euclidean) bilinear form on R^n.
 
     Returns
     -------
     ndarray
-        ndarray with the same shape as `vectors`. Each vector in this
+        ndarray with the same shape as vectors. Each vector in this
         array has norm either +1 or -1, depending on whether the
         original vector had positive or negative square-norm (with
         respect to the given bilinear form).
@@ -212,7 +214,7 @@ def short_arc(thetas):
     Returns
     --------
     ndarray
-        numpy array with the same shape as `thetas`. The ordered pairs
+        numpy array with the same shape as thetas. The ordered pairs
         in this array are arranged so that for each pair `(a, b)`, the
         counterclockwise arc from `a` to `b` is shorter than the
         counterclockwise arc from `b` to `a`.
@@ -550,15 +552,15 @@ def expand_unit_axes(array, unit_axes, new_axes):
 def squeeze_excess(array, unit_axes, other_unit_axes):
     """Squeeze all excess axes from an ndarray of arrays with unit_axes axes.
 
-    This undoes expand_unit_axes().
+    This undoes expand_unit_axes.
 
     Parameters
     -----------
     array : ndarray
-        ndarray of shape `([object axes], [excess axes], [unit
-        axes])`, where `[unit axes]` is a tuple of length `unit_axes`,
-        and `[excess axes]` is a tuple of length `other_unit_axes -
-        unit_axes`.
+        ndarray of shape
+        `([object axes], [excess axes], [unit axes])`, where `[unit axes]`
+        is a tuple of length `unit_axes`, and `[excess axes]` is a
+        tuple of length `other_unit_axes - unit_axes`.
     unit_axes : int
         number of axes to view as "units" in `array`. That is, `array`
         is viewed as an ndarray of arrays each with `unit_axes` axes.
@@ -569,8 +571,9 @@ def squeeze_excess(array, unit_axes, other_unit_axes):
     --------
     ndarray
         Reshaped array with certain length-1 axes removed. If the
-        input array has shape `([object axes], [excess axes], [unit
-        axes])`, squeeze out all the ones in `[excess axes]`.
+        input array has shape
+        `([object axes], [excess axes], [unit axes])`,
+        squeeze out all the ones in `[excess axes]`.
 
     """
     squeezable = np.array(array.T.shape[unit_axes:other_unit_axes])
@@ -581,10 +584,64 @@ def squeeze_excess(array, unit_axes, other_unit_axes):
 
 def matrix_product(array1, array2, unit_axis_1=2, unit_axis_2=2,
                    broadcast="elementwise"):
-    """do ndarray multiplication, where we treat array1 and array2 as
-    ndarrays of ndarrays with ndim unit_axis1 and unit_axis2.
+    """Multiply two ndarrays of ndarrays together.
 
-    broadcasting is either elementwise or pairwise.
+    Each array in the input is viewed as an ndarray of smaller
+    ndarrays with a specified number of axes. The shapes of these
+    smaller arrays must broadcast against each other (i.e. be
+    compatible with the numpy `@` operator).
+
+    For the dimensions of the outer ndarray, the behavior of this
+    function depends on the broadcast rule provided by the `broadcast`
+    keyword.
+
+    Parameters
+    -----------
+    array1, array2 : ndarray
+        ndarrays of ndarrays to multiply together
+    unit_axis_1, unit_axis_2 : int
+        Each of `array1` and `array2` is viewed as an array with
+        `unit_axis_1` and `unit_axis_2` ndims, respectively. By
+        default both are set to 2, meaning this function multiplies a
+        pair of ndarrays of matrices (2-dim arrays).
+    broadcast : {'elementwise', 'pairwise', 'pairwise_reversed'}
+        broadcast rule to use when multiplying arrays.
+
+        If the broadcast rule is 'elementwise' (the default), assume that
+        the shape of one outer array broadcasts against the shape of
+        the other outer array, and multiply with the same rules as the
+        numpy `@` operator.
+
+        If 'pairwise', multiply every element in the first outer array
+        by every element in the second outer array, and return a new
+        array of arrays with expanded axes. If 'pairwise_reversed', do
+        the same thing, but use the axes of the second array first in
+        the result.
+
+    Returns
+    --------
+    result : ndarray
+
+        result of matrix multiplication.
+
+        If `array1` and `array2` have shapes
+        `([outer ndims 1], [inner ndims 1])` and
+        `([outer ndims 2], [inner ndims 2])` (where
+        `[inner ndims]` are tuples with length `unit_axis_1` and
+        `unit_axis_2`, respectively) then:
+
+        - if `broadcast` is 'elementwise', `result` has shape
+          `([result ndims], [product ndims])`, where `[result ndims]`
+          is the result of broadcasting the outer ndims against each
+          other, and `[product ndims]` is the result of broadcasting
+          the inner ndims against each other.
+
+        - if `broadcast` is 'pairwise', result has shape `([outer
+          ndims 1], [outer ndims 2], [product ndims])`.
+
+        - if `broadcast` is 'pairwise_reversed', result has shape
+          `([outer ndims 2], [outer ndims 1], [product ndims])`
+
     """
 
     reshape1 = expand_unit_axes(array1, unit_axis_1, unit_axis_2)
@@ -619,6 +676,27 @@ def matrix_product(array1, array2, unit_axis_1=2, unit_axis_2=2,
     return product
 
 def find_positive_functional(positive_points):
+    """Find a dual vector which evaluates to a positive real on a given
+       array of vectors, using scipy's linear programming routines.
+
+    Parameters
+    ----------
+    positive_points : ndarray
+        array of vectors to find a dual vector for. If this is a
+        2-dimensional array, then find a single dual vector which is
+        positive when paired with every row of the array.
+
+        If the array has shape (..., k, n), then find an array of dual
+        vectors such that the vectors in the array pair positively
+        with the corresponding k vectors in positive_points.
+
+    Returns
+    --------
+    duals : ndarray
+        array of dual vectors. If positive_points has shape (d1, ...,
+        dj, k, n), then `duals` has shape (d1, ..., dj, n).
+
+    """
     dim = positive_points.shape[-1]
     codim = positive_points.shape[-2]
 
