@@ -212,7 +212,7 @@ class FSA:
         """Add edges to the FSA.
 
         Parameters
-        -------------
+        ----------
         edges : list
             a list of tuples of the form `(tail, head, label)`,
             specifying an edge to add.
@@ -270,7 +270,7 @@ class FSA:
         """Get all of the edges of this FSA
 
         Yields
-        --------
+        ------
         tuple
             An ordered pair of the form `(tail, head)` for each edge
             in the automaton
@@ -285,7 +285,7 @@ class FSA:
         no dead ends.
 
         Parameters
-        -----------
+        ----------
         inplace : bool
             if `True`, modify the automaton in-place. Otherwise,
             return a recurrent copy.
@@ -328,7 +328,7 @@ class FSA:
         automaton.
 
         Parameters
-        --------------
+        ----------
         edge_ties : bool
             if `True`, if two edges give rise to paths of the
             same length, include both of them in the new graph.
@@ -400,7 +400,7 @@ class FSA:
         starting at a given state.
 
         Parameters
-        -----------
+        ----------
         length : int
             the length of the words we want to enumerate
 
@@ -413,7 +413,7 @@ class FSA:
             automaton at each accepted word.
 
         Yields
-        -------
+        ------
         string or (string, object)
             If `with_states` is false, yield the sequence of words
             accepted (in some arbitrary order). Otherwise, yield pairs
@@ -453,7 +453,7 @@ class FSA:
             accepted word
 
         Yields
-        -------
+        ------
         string or (string, object)
             If `with_states` is false, yield the sequence of words
             accepted (in some arbitrary order). Otherwise, yield pairs
@@ -472,12 +472,12 @@ def load_kbmag_file(filename) -> FSA:
     the kbmag program.
 
     Parameters
-    -----------
+    ----------
     filename : string
         the GAP record file containing automaton data.
 
     Returns
-    --------
+    -------
     FSA
         The automaton described by the
         file.
@@ -553,7 +553,7 @@ def free_automaton(generating_set):
         Names of the generators for this free group
 
     Returns
-    --------
+    -------
     FSA
         Automaton accepting freely reduced words in the generators
         (and their inverses)

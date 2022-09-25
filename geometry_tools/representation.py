@@ -178,7 +178,7 @@ def semi_gens(generators):
         Sequence of semigroup generators
 
     Yields
-    --------
+    ------
     gen : string
         the lowercase characters in `generators`
 
@@ -215,7 +215,7 @@ class Representation:
             the computed matrices.
 
         Returns
-        --------
+        -------
         result : ndarray or tuple
             If `with_words` is `True`, `result` is a tuple `(elements, words)`,
             where `elements` is an ndarray of shape `(k, n, n)`,
@@ -239,7 +239,7 @@ class Representation:
             the length of words to return
 
         Yields
-        --------
+        ------
         word : string
             All freely reduced words in the generators of length
             `length`.
@@ -264,7 +264,7 @@ class Representation:
             the maximum length of words to return
 
         Yields
-        --------
+        ------
         word : string
             All freely reduced words in the generators, up to length
             `length` (inclusive)
@@ -314,7 +314,7 @@ class Representation:
             function is called.
 
         Returns
-        --------
+        -------
         result : ndarray or tuple
             If `with_words` is `True`, `result` is a tuple `(elements, words)`,
             where `elements` is an ndarray containing one
@@ -445,12 +445,12 @@ class Representation:
         """Get images of an iterable of words.
 
         Parameters
-        -----------
+        ----------
         words : iterable of strings
             words to find the image of under the representation
 
         Returns
-        ----------
+        -------
         ndarray
             numpy array of shape `(l, n, n)`, where `l` is the length
             of `words` and `n` is the dimension of the representation.
@@ -467,7 +467,7 @@ class Representation:
         semigroup generators (upper and lowercase letters).
 
         Yields
-        --------
+        ------
         gen : string
             group generator names
 
@@ -547,7 +547,7 @@ class Representation:
             Raised if `self` and `rep` have differing generating sets.
 
         Returns
-        --------
+        -------
         tensor: Representation
             Representation giving the tensor product of self with `rep`.
 
@@ -569,7 +569,7 @@ class Representation:
         """Return the symmetric square of this representation.
 
         Returns
-        --------
+        -------
         square : Representation
             Symmetric square of `self`.
 
@@ -619,7 +619,7 @@ def sym_index(i, j, n):
         dimension of the underlying vector space \(\mathbb{R}^n\).
 
     Returns
-    --------
+    -------
     int
         index of the corresponding basis vector in
         \(\mathbb{R}^{\binom{n}{2} + n}\).
@@ -660,7 +660,7 @@ def tensor_pos(i, n):
         dimension of the underlying vector space \(\mathbb{R}^n\)
 
     Returns
-    --------
+    -------
     tuple
         tuple `(j, k)` determining the monomial \(e_j \otimes e_k\)
         mapped to by given the basis vector in \(\mathbb{R}^{n^2}\).
@@ -701,7 +701,7 @@ def tensor_index(i,j,n):
         dimension of the underlying vector space \(\mathbb{R}^n\)
 
     Returns
-    --------
+    -------
     int
         index of a basis vector in \(\mathbb{R}^{n^2}\) mapped to by
         \(e_i \otimes e_j\).
@@ -731,7 +731,7 @@ def symmetric_inclusion(n):
         Dimension of the underlying vector space \(\mathbb{R}^n\).
 
     Returns
-    --------
+    -------
     matrix : ndarray
         \(n^2 \times \binom{n}{2} + n\) array defining this linear map.
 
@@ -762,7 +762,7 @@ def symmetric_projection(n):
         Dimension of the underlying vector space \(\mathbb{R}^n\)
 
     Returns
-    --------
+    -------
     ndarray
         \(\binom{n}{2} + n \times n\) matrix representing the linear map
         in the given bases.
@@ -794,7 +794,7 @@ def sl2_irrep(A, n):
         Dimension of the irreducible representation.
 
     Returns
-    ---------
+    -------
     result : ndarray
         Array of shape `(..., n, n)` giving the representation of
         `A` under the `dim`-dimensional irreducible representation of
@@ -830,13 +830,13 @@ def sl2_to_so21(A):
     `o_to_pgl`.
 
     Parameters
-    ------------
+    ----------
     A : ndarray
         Array of shape `(..., 2, 2)` giving a matrix (or array of
         matrices) in \(\mathrm{SL}(2, \mathbb{R})\).
 
     Returns
-    --------
+    -------
     result : ndarray
         Array of shape `(..., 3, 3)` giving the image of `A` under the
         representation.
@@ -860,7 +860,7 @@ def o_to_pgl(A, bilinear_form=np.diag((-1., 1., 1.))):
     given by the function `sl2_to_so21`.
 
     Parameters
-    -----------
+    ----------
     A : ndarray
         Array of shape `(..., 3, 3)` giving a matrix (or array of
         matrices) preserving a bilinear form of signature (2, 1).
@@ -869,7 +869,7 @@ def o_to_pgl(A, bilinear_form=np.diag((-1., 1., 1.))):
         default, the diagonal form `diag(-1, 1, 1)`.
 
     Returns
-    --------
+    -------
     result : ndarray
         Array of shape `(..., 2, 2)` giving the image of `A` under
         this representation.

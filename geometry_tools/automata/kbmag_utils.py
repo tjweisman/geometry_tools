@@ -16,7 +16,7 @@ def build_dict(transitions, labels, to_filter=[]):
     by kbmag to describe a finite-state automaton.
 
     Parameters
-    -----------
+    ----------
 
     transitions : list
         list of tuples of length `n`, where `n` is the number of
@@ -32,7 +32,7 @@ def build_dict(transitions, labels, to_filter=[]):
         (i.e. the "failure states" of the automaton).
 
     Returns
-    ------
+    -------
     dict
         Dictionary describing the finite-state automaton, in the format
         expected by the `geometry_tools.automata.fsa.FSA` class.

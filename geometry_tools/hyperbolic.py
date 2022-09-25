@@ -276,7 +276,7 @@ class Point(HyperbolicObject, projective.Point):
             update coordinates.
 
         Returns
-        --------
+        -------
         ndarray
             Hyperboloid coordinates for this point (or array of
             points).
@@ -299,7 +299,7 @@ class Point(HyperbolicObject, projective.Point):
             coordinates.
 
         Returns
-        --------
+        -------
         ndarray
             Projective coordinates for this point (or array of
             points).
@@ -322,7 +322,7 @@ class Point(HyperbolicObject, projective.Point):
             space H^n. If `None`, do not update coordinates.
 
         Returns
-        --------
+        -------
         ndarray
             Half-space coordinates for this point (or array of
             points).
@@ -379,7 +379,7 @@ class Point(HyperbolicObject, projective.Point):
             The point to compute distances to
 
         Returns
-        --------
+        -------
         ndarray
             distances in hyperbolic space between self and other
 
@@ -394,7 +394,7 @@ class Point(HyperbolicObject, projective.Point):
         """Get an isometry taking an "origin" point to this point
 
         Returns
-        --------
+        -------
         Isometry :
             Some isometry taking the point with Kleinian/Poincare
             coordinates (0, 0, ...) to this point. This isometry is
@@ -414,7 +414,7 @@ class Point(HyperbolicObject, projective.Point):
             vector points
 
         Returns
-        --------
+        -------
         TangentVector
             A tangent vector with this point at its base and pointing
             towards `other`.
@@ -435,7 +435,7 @@ class Point(HyperbolicObject, projective.Point):
             Shape of array of origin points to get
 
         Returns
-        --------
+        -------
         Point
             Point object with Kleinian/Poincare coords (0, 0, ...)
         """
@@ -510,7 +510,7 @@ class Subspace(IdealPoint):
             Model of hyperbolic space in which to compute coordinates
 
         Returns
-        --------
+        -------
         ndarray
             Coordinates for k vectors in the ideal boundary of
             hyperbolic space, giving a basis for this subspace.
@@ -525,7 +525,7 @@ class Subspace(IdealPoint):
         """Get a spacelike point in the orthogonal complement to this subspace
 
         Returns
-        --------
+        -------
         DualPoint
             A spacelike (i.e. Minkowski-positive) point which is
             Minkowski-orthogonal to this subspace. This is not
@@ -569,7 +569,7 @@ class Subspace(IdealPoint):
             `Model.POINCARE` and `Model.HALFSPACE`
 
         Returns
-        ---------
+        -------
         tuple
             Tuple of the form `(centers, radii)`, where `centers` and
             `radii` are `ndarray`s respectively holding the centers
@@ -613,7 +613,7 @@ class Subspace(IdealPoint):
         """Get a hyperbolic isometry reflecting across this hyperplane.
 
         Returns
-        --------
+        -------
         Isometry
             Isometry reflecting across this hyperplane.
 
@@ -667,7 +667,7 @@ class PointPair(Point, projective.PointPair):
             model to compute coordinates in
 
         Returns
-        --------
+        -------
         ndarray
             Coordinates for the endpoints of this PointPair, as an
             ndarray with shape `(2, ... n)` (where `n` is the
@@ -680,7 +680,7 @@ class PointPair(Point, projective.PointPair):
         """Convert this pair of points to a composite `Point` object
 
         Returns
-        --------
+        -------
         Point
             Composite `Point` object with the same underlying data as
             this point pair.
@@ -699,7 +699,7 @@ class PointPair(Point, projective.PointPair):
             for these points.
 
         Returns
-        --------
+        -------
         tuple
             A tuple `(p1, p2)`, where `p1` and `p2` are either both
             `Point`s or both `ndarrays`, representing the endpoints of
@@ -734,7 +734,7 @@ class Geodesic(PointPair, Subspace):
             hyperbolic model to use for the computation
 
         Returns
-        --------
+        -------
         tuple
             tuple `(centers, radii, thetas)`, where `centers`,
             `radii`, and `thetas` are `ndarray`s representing the
@@ -775,7 +775,7 @@ class Geodesic(PointPair, Subspace):
             dimension of the underlying hyperbolic space is not 2.
 
         Returns
-        --------
+        -------
         Geodesic
             A `Geodesic` fixed by the given isometry.
 
@@ -880,7 +880,7 @@ class Segment(Geodesic):
         """Get the bi-infinite geodesic spanned by this segment
 
         Returns
-        --------
+        -------
         Geodesic
             Geodesic in hyperbolic space spanned by this segment.
         """
@@ -905,7 +905,7 @@ class Segment(Geodesic):
             hyperbolic model to use for the computation
 
         Returns
-        --------
+        -------
         tuple
             tuple `(centers, radii, thetas)`, where `centers`,
             `radii`, and `thetas` are `ndarray`s representing the
@@ -1020,7 +1020,7 @@ class Hyperplane(Subspace):
             If the given isometry is not a reflection.
 
         Returns
-        --------
+        -------
         Hyperplane
             A `Hyperplane` fixed by the given isometry.
         """
@@ -1244,7 +1244,7 @@ class TangentVector(HyperbolicObject):
         to the second standard basis vector in R^(n,1).
 
         Parameters
-        -----------
+        ----------
         dimension : int
             Dimension of the hyperbolic space where this tangent vector lives
         shape : tuple
@@ -1669,7 +1669,7 @@ class Isometry(projective.Transformation, HyperbolicObject):
             order of descending eigenvalue moduli
 
         Returns
-        --------
+        -------
         Point
             Points fixed by this isometry object.
 
@@ -1688,7 +1688,7 @@ class Isometry(projective.Transformation, HyperbolicObject):
             point has maximum modulus
 
         Returns
-        --------
+        -------
         Point
             A point (possibly ideal) fixed by this isometry object.
 
@@ -1819,7 +1819,7 @@ def spacelike(vectors):
         array is the dimension of the vector space.
 
     Returns
-    --------
+    -------
     ndarray(bool)
         `True` for vectors which have Minkowski norm above a fixed
         error threshold.
@@ -1838,7 +1838,7 @@ def timelike(self, vectors):
         array is the dimension of the vector space.
 
     Returns
-    --------
+    -------
     ndarray(bool)
         `True` for vectors which have Minkowski norm below a fixed
         error threshold.
@@ -1857,7 +1857,7 @@ def lightlike(self, vectors):
         array is the dimension of the vector space.
 
     Returns
-    --------
+    -------
     ndarray(bool)
         `True` for vectors where the absolute value of the Minkowski
         norm is below a fixed error threshold.

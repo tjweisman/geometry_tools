@@ -147,7 +147,7 @@ class ProjectiveObject:
         ProjectiveObject represents.
 
         Returns
-        --------
+        -------
         tuple
 
 
@@ -161,7 +161,7 @@ class ProjectiveObject:
         portions of the underlying data.
 
         Parameters
-        -------------
+        ----------
         proj_data : ndarray
             underyling data representing this projective object.
 
@@ -491,7 +491,7 @@ class PointPair(Point):
         """Get a Point representing the endpoints of this pair
 
         Returns
-        --------
+        -------
         Point
             A composite Point object representing the endpoints of
             this (possibly composite) PointPair
@@ -503,7 +503,7 @@ class PointPair(Point):
         """Return a pair of point objects, one for each endpoint
 
         Returns
-        -----------
+        -------
         tuple
             Tuple of the form `(endpoint1, endpoint2)`, where
             `endpoint1` and `endpoint2` are (possibly composite)
@@ -522,7 +522,7 @@ class PointPair(Point):
             Index of the standard affine chart to take coordinates in
 
         Returns
-        --------
+        -------
         ndarray
             Affine coordinates of the endpoints of this pair of
             points.
@@ -534,7 +534,7 @@ class PointPair(Point):
         """Get endpoints of this segment in projective coordinates.
 
         Returns
-        --------
+        -------
         ndarray
             Projective coordinates of the endpoints of this pair of
             points.
@@ -579,7 +579,7 @@ class Polygon(Point):
         """Get the edges of this polygon
 
         Returns
-        --------
+        -------
         PointPair
             Edges of this polygon, as a composite PointPair object.
 
@@ -590,7 +590,7 @@ class Polygon(Point):
         """Get the vertices of the polygon.
 
         Returns
-        --------
+        -------
         Point
             Vertices of this polygon, as a composite Point object.
 
@@ -654,7 +654,7 @@ class ConvexPolygon(Polygon):
             (currently unsupported)
 
         Returns
-        --------
+        -------
         ConvexPolygon
             if `in_place` is `False`, return a modified ConvexPolygon
             object with the new points added.
@@ -822,7 +822,7 @@ class Transformation(ProjectiveObject):
         """Get the inverse of this transformation.
 
         Returns
-        --------
+        -------
         ProjectiveTransformation
             Inverse of this transformation.
         """
@@ -855,7 +855,7 @@ class ProjectiveRepresentation(representation.Representation):
             Sequence of words to apply this representation to.
 
         Returns
-        --------
+        -------
         Transformation
             Composite transformation object containing one
             transformation for each word in `words`.
@@ -899,7 +899,7 @@ def hyperplane_coordinate_transform(normal):
         The vector \(\vec{n}\), normal to some hyperplane in R^n.
 
     Returns
-    --------
+    -------
     Transformation
         Projective transformation (orthogonal in the standard inner
         product on R^n) taking the desired affine chart to the
@@ -914,7 +914,7 @@ def affine_coords(points, chart_index=None, column_vectors=False):
     in one of the standard affine charts.
 
     Parameters
-    -----------
+    ----------
     points: ndarray
         `ndarray` of points in projective space. the last dimension is
         assumed to be the same as the dimension of the underlying
@@ -929,7 +929,7 @@ def affine_coords(points, chart_index=None, column_vectors=False):
         of the underlying vector space.
 
     Returns
-    --------
+    -------
     ndarray
         If chart_index is specified, return an array of points in
         affine coordinates in that chart. Otherwise, return a tuple
@@ -995,7 +995,7 @@ def projective_coords(points, chart_index=0, column_vectors=False):
         of affine space.
 
     Returns
-    --------
+    -------
     ndarray
         Projective coordinates of the given points. The last dimension
         of the array is the dimension of the underlying vector space
@@ -1031,7 +1031,7 @@ def identity(dimension):
         Dimension of the projective space to act on.
 
     Returns
-    --------
+    -------
     Transformation
         The identity map on RP^n, where n = `dimension`.
 
@@ -1059,7 +1059,7 @@ def affine_linear_map(linear_map, chart_index=0, column_vectors=True):
         vectors (on the right).
 
     Returns
-    --------
+    -------
     Transformation
         Projective transformation preserving a standard affine chart
         and acting by a linear map on that affine space (i.e. fixing a
@@ -1088,7 +1088,7 @@ def affine_translation(translation, chart_index=0):
         index of the standard affine chart this translation acts on
 
     Returns
-    --------
+    -------
     Transformation
         Projective transformation preserving a standard affine chart
         and acting by an affine translation in that affine space.

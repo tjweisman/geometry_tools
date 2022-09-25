@@ -16,7 +16,7 @@ def rotation_matrix(angle):
         angle to rotate by
 
     Returns
-    --------
+    -------
     ndarray
         numpy array of shape (2,2) of the form
         \(\begin{pmatrix}\cos \theta & -\sin \theta\\\sin\theta & \cos \theta
@@ -30,13 +30,13 @@ def permutation_matrix(permutation):
     """Return a permutation matrix representing the given permutation.
 
     Parameters
-    -----------
+    ----------
     permutation: iterable
         a sequence of n numbers (indices), specifying a permutation of
         (1, ... n).
 
     Returns
-    ---------
+    -------
     ndarray
         square 2-dimensional array, giving a permutation matrix.
 
@@ -123,7 +123,7 @@ def circle_angles(center, coords):
     """Return angles relative to the center of a circle.
 
     Parameters
-    -----------
+    ----------
     center: ndarray
         numpy array with shape (..., 2) representing x,y coordinates
         the centers of some circles.
@@ -132,7 +132,7 @@ def circle_angles(center, coords):
         of some points.
 
     Returns
-    --------
+    -------
     ndarray
         angles (relative to x-axis) of each of the pair of points
         specified by coords.
@@ -206,13 +206,13 @@ def short_arc(thetas):
     shorter than the clockwise angle.
 
     Parameters
-    ------------
+    ----------
     thetas: ndarray
         numpy array of shape (..., 2), giving ordered pairs of angles
         in the range (-2pi, 2pi)
 
     Returns
-    --------
+    -------
     ndarray
         numpy array with the same shape as thetas. The ordered pairs
         in this array are arranged so that for each pair `(a, b)`, the
@@ -234,12 +234,12 @@ def right_to_left(thetas):
     """Reorder angles so that the counterclockwise arc goes right to left.
 
     Parameters
-    ------------
+    ----------
     thetas: ndarray
         numpy array of shape (..., 2), giving ordered pairs of angles.
 
     Returns
-    --------
+    -------
     ndarray
         numpy array with the same shape as `thetas`. The ordered pairs
         in this array are arranged so that for each pair `(a, b)`, the
@@ -266,7 +266,7 @@ def arc_include(thetas, reference_theta):
          angles in the range (-2pi, 2pi)
 
     Returns
-    --------
+    -------
     theta_p : ndarray(float)
         pairs of angles of the same shape as `thetas`, so that
         `reference_theta` lies in the counterclockwise angle between
@@ -298,7 +298,7 @@ def sphere_inversion(points):
         Array of shape `(..., n)` giving a set of points in R^n
 
     Returns
-    --------
+    -------
     ndarray
         The image of the `points` array under sphere inversion.
 
@@ -317,7 +317,7 @@ def swap_matrix(i, j, n):
         dimension of the permutation matrix.
 
     Returns
-    --------
+    -------
     ndarray
         Array of shape `(n, n)` giving a transposition matrix.
 
@@ -351,7 +351,7 @@ def projection(v1, v2, bilinear_form):
         projection.
 
     Returns
-    --------
+    -------
     w : ndarray
         vector in R^n giving the projection of `v1` onto `v2`.
 
@@ -366,7 +366,7 @@ def indefinite_orthogonalize(form, matrices):
     bilinear form.
 
     Parameters
-    -----------
+    ----------
     form : ndarray of shape `(n,n)`
         bilinear form to orthogonalize with respect to
 
@@ -374,7 +374,7 @@ def indefinite_orthogonalize(form, matrices):
         array of k row vectors to orthogonalize.
 
     Returns
-    --------
+    -------
     result : ndarray
         array with the same shape as `matrices`. The last two
         dimensions of this array give matrices with mutually
@@ -408,7 +408,7 @@ def find_isometry(form, partial_map, force_oriented=False):
     the flag defined by the standard basis.
 
     Parameters
-    -----------------
+    ----------
     form : ndarray of shape `(n, n)`
         the bilinear map to preserve
 
@@ -421,7 +421,7 @@ def find_isometry(form, partial_map, force_oriented=False):
         map to be orientation-preserving.
 
     Returns
-    -------------
+    -------
     ndarray
         array of shape `(..., n, n)` representing an array of matrices
         whose rows and columns are "orthonormal" with respect to the
@@ -455,7 +455,7 @@ def find_definite_isometry(partial_map, force_oriented=False):
     the flag defined by the standard basis.
 
     Parameters
-    -----------------
+    ----------
     partial_map : ndarray of shape `(..., k, n)`
         array representing the images of the first k standard basis
         vectors (row vectors)
@@ -465,7 +465,7 @@ def find_definite_isometry(partial_map, force_oriented=False):
         map to be orientation-preserving.
 
     Returns
-    -------------
+    -------
     ndarray
         array of shape `(..., n, n)` representing an array of matrices
         with orthonormal rows and columns.
@@ -502,12 +502,12 @@ def make_orientation_preserving(matrix):
     if matrix is already orientation preserving, do nothing.
 
     Parameters
-    -----------
+    ----------
     matrix : ndarray of shape `(..., n, n)`
         ndarray of linear maps
 
     Returns
-    ---------
+    -------
     result : ndarray
         array with the same shape as `matrices`, representating an
         ndarray of linear maps. If `A` is an orientation-reversing
@@ -528,7 +528,7 @@ def expand_unit_axes(array, unit_axes, new_axes):
     length `unit_axes`.
 
     Parameters
-    -----------
+    ----------
     array : ndarray
         ndarray to expand
     unit_axes : int
@@ -537,7 +537,7 @@ def expand_unit_axes(array, unit_axes, new_axes):
         number of axes to add to the array
 
     Returns
-    ---------
+    -------
     ndarray
         ndarray of shape `([object axes], 1, ..., 1, [unit axes])`,
         where the number of 1's is either `new_axes - unit_axes`, or 0
@@ -555,7 +555,7 @@ def squeeze_excess(array, unit_axes, other_unit_axes):
     This undoes expand_unit_axes.
 
     Parameters
-    -----------
+    ----------
     array : ndarray
         ndarray of shape
         `([object axes], [excess axes], [unit axes])`, where `[unit axes]`
@@ -568,7 +568,7 @@ def squeeze_excess(array, unit_axes, other_unit_axes):
         axes to avoid squeezing when we reshape the array.
 
     Returns
-    --------
+    -------
     ndarray
         Reshaped array with certain length-1 axes removed. If the
         input array has shape
@@ -596,7 +596,7 @@ def matrix_product(array1, array2, unit_axis_1=2, unit_axis_2=2,
     keyword.
 
     Parameters
-    -----------
+    ----------
     array1, array2 : ndarray
         ndarrays of ndarrays to multiply together
     unit_axis_1, unit_axis_2 : int
@@ -619,7 +619,7 @@ def matrix_product(array1, array2, unit_axis_1=2, unit_axis_2=2,
         the result.
 
     Returns
-    --------
+    -------
     result : ndarray
 
         result of matrix multiplication.
@@ -691,7 +691,7 @@ def find_positive_functional(positive_points):
         with the corresponding k vectors in positive_points.
 
     Returns
-    --------
+    -------
     duals : ndarray
         array of dual vectors. If positive_points has shape (d1, ...,
         dj, k, n), then `duals` has shape (d1, ..., dj, n).
@@ -735,13 +735,13 @@ def circle_through(p1, p2, p3):
     that case.
 
     Parameters
-    ------------
+    ----------
     p1, p2, p3 : ndarray of shape `(..., 2)`
         Euclidean coordinates of three points in the plane (or three
         arrays of points)
 
     Returns
-    --------
+    -------
     tuple
         tuple of the form `(center, radius)`, where `center` is an
         ndarray containing Euclidean coordinates of the center of the
@@ -792,7 +792,7 @@ def order_eigs(eigenvalues, eigenvectors):
         matrices (as column vectors).
 
     Returns
-    ---------
+    -------
     tuple
         Tuple of the form `(eigvals, eigvecs)`, where both eigvals and
         eigvecs have the same data as the input arrays, but arranged
