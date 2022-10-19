@@ -13,8 +13,7 @@ that's probably all they're good for).
 
 1. Download the package as a .zip file and extract it (or clone the repository)
 
-2. From the directory where you extracted the package, run:
-` python setup.py install `
+2. If you have [pip](https://pip.pypa.io/en/stable/) installed, run `pip install .` from the directory where you downloaded the repository. If you don't have pip installed, you should install pip. Or, try running `python setup.py install` from the repository directory.
 
 3. To check that it worked, run `import geometry_tools` from a python prompt.
 
