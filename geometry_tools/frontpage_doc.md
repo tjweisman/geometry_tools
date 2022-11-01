@@ -73,7 +73,7 @@ We can draw the reflection walls for the group using the `drawtools` subpackage:
 # find the fixed points at infinity for the generating reflections
 
 reflections = triangle_rep.isometries(["a", "b", "c"])
-walls = hyperbolic.Hyperplane.from_reflection(reflections)
+walls = hyperbolic.Geodesic.from_reflection(reflections)
 
 wall_a, wall_b, wall_c = walls
 
@@ -136,7 +136,7 @@ The `geometry_tools.automata` subpackage provides a handful of tools for working
 Thanks to code provided by [Florian Stecker](https://florianstecker.de/), the `geometry_tools` package can also generate automata for any Coxeter group. So we can get an automaton for the (2,3,7) triangle group like so:
 
 ```python
-# load the built-in (2,3,7) automaton
+# construct the (2,3,7) automaton
 triangle_fsa = coxeter.TriangleGroup((2,3,7)).automaton()
 
 # get a unique word for each group element of length < 25.
