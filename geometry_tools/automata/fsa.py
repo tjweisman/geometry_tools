@@ -466,6 +466,18 @@ class FSA:
                     i, start_vertex=start_vertex, with_states=with_states):
                 yield word
 
+    def rename_generators(self, rename_map, inplace=True):
+        new_dict = {
+            vertex: {
+                rename_map[label]: neighbor
+                for label, neighbor in neighbors.items()
+            }
+            for vertex, neighbors in self._graph_dict.items()
+        }
+        if inplace:
+            self._from_graph_dict(new_dict)
+        else:
+            return FSA(new_dict, self.start_vertices)
 
 def load_kbmag_file(filename) -> FSA:
     """Build a finite-state automaton from a GAP record file produced by
