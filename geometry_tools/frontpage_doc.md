@@ -54,7 +54,7 @@ The `geometry_tools` package is handy for drawing pictures of tilings in \(\math
 
 ![png](output_15_0.png)
 
-You can also [download this example as a Jupyter notebook](triangular_tiling.ipynb) or a [python file](triangular_tiling.py).
+You can also [download this example as a Jupyter notebook](examples/triangular_tiling.ipynb) or a [python file](examples/triangular_tiling.py).
 
 To get started, first instantiate the `coxeter.TriangleGroup` class to get a (2,3,7) triangle group, and compute its geometric representation into the isometries of the hyperbolic plane:
 
