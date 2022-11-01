@@ -189,16 +189,16 @@ class CoxeterGroup:
         matrix_rep = self.diagonal_rep(order_eigenvalues="signed")
         return hyperbolic.HyperbolicRepresentation(matrix_rep)
 
-    def automaton(self, shortlex=False):
+    def automaton(self, shortlex=True):
         """Get a finite-state automaton accepting geodesic words in the
         Coxeter group.
 
         Parameters
         ----------
         shortlex : bool
-            If True, return an automaton which only accepts shortlex
-            geodesic representatives of elements in the group. If
-            False (the default), return an automaton which only
+            If True (the default), return an automaton which only
+            accepts shortlex geodesic representatives of elements in
+            the group. If False, return an automaton which only
             accepts geodesic words, and accepts at least one geodesic
             word per element.
 
@@ -207,7 +207,7 @@ class CoxeterGroup:
         fsa.FSA
             finite-state automaton accepting geodesic words.
 
-        """
+    """
         aut = coxeter_automaton.generate_automaton_coxeter_matrix(
             self.coxeter_matrix,
             shortlex

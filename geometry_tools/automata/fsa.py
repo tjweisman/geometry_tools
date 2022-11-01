@@ -110,13 +110,18 @@ class FSA:
         else:
             self._out_dict = copy.deepcopy(vert_dict)
             self._build_in_dict()
-            self._build_graph_dict
+            self._build_graph_dict()
 
         self.start_vertices = start_vertices
 
     def _from_graph_dict(self, graph_dict):
         self._graph_dict = copy.deepcopy(graph_dict)
+        hidden = _hidden_vertices(graph_dict)
+        for v in hidden:
+            self._graph_dict[v] = {}
+
         out_dict = {v : {} for v in self._graph_dict}
+
         for v, neighbors in self._graph_dict.items():
             out_dict[v] = defaultdict(list)
             for label, neighbor in neighbors.items():
@@ -134,7 +139,7 @@ class FSA:
         self._graph_dict = label_dict
 
     def _build_in_dict(self):
-        in_dict = {v:{} for v in self._out_dict}
+        in_dict = defaultdict(dict)
         for v, neighbors_out in self._out_dict.items():
             for w, labels in neighbors_out.items():
                 in_dict[w][v] = labels
@@ -581,3 +586,14 @@ def free_automaton(generating_set):
     }
     fsa = FSA(graph, start_vertices=[''])
     return fsa
+
+def _hidden_vertices(graph_dict):
+    vertices = list(graph_dict)
+    hidden = []
+    for v, neighbors in graph_dict.items():
+        for _, neighbor in neighbors.items():
+            if (neighbor not in vertices and
+                neighbor not in hidden):
+                hidden.append(neighbor)
+
+    return hidden
