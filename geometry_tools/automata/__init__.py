@@ -17,7 +17,7 @@ z2_z3_aut = fsa.FSA({
 }, start_vertices=[0])
 
 
-# list accepted words 
+# list accepted words
 list(z2_z3_aut.enumerate_fixed_length_paths(3))
 ```
 	['bab', 'baB', 'Bab', 'BaB', 'aba', 'aBa']
@@ -32,10 +32,11 @@ from geometry_tools.automata import fsa
 fsa.list_builtins()
 ```
 
-The package does *not* provide any tools to produce finite-state automata from
-a group presentation. You can, however, produce automata in this way by
-running the [kbmag](https://gap-packages.github.io/kbmag/) program (which is
-not included with `geometry_tools`). `kbmag` will produce automata files
+The package does *not* provide any tools to produce finite-state
+automata from an arbitrary group presentation. You can, however,
+produce automata for word-hyperbolic groups in this way by running the
+[kbmag](https://gap-packages.github.io/kbmag/) program (which is not
+included with `geometry_tools`). `kbmag` will produce automata files
 which you can load and manipulate using `geometry_tools.automata`:
 
 ```python
@@ -48,4 +49,9 @@ my_fsa = fsa.load_kbmag_file("automaton_file.wa")
 my_fsa.graph_dict
 ```
 
-"""
+Thanks to code provided by Florian Stecker, it is also possible to
+construct an automaton recognizing geodesic (and shortlex-geodesic)
+words in an arbitrary Coxeter group. See the documentation for
+coxeter.CoxeterGroup.automaton().
+
+    """
