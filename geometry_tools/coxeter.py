@@ -54,7 +54,7 @@ class CoxeterGroup:
         self._compute_bilinear_form()
 
     def _compute_bilinear_form(self):
-        adjusted_cox_matrix = np.array(self.coxeter_matrix)
+        adjusted_cox_matrix = np.array(self.coxeter_matrix, dtype=float)
         adjusted_cox_matrix[adjusted_cox_matrix <= 0] = 0.5
 
         self.bilinear_form = -1 * np.cos(np.pi / adjusted_cox_matrix)
@@ -134,10 +134,10 @@ class CoxeterGroup:
 
         return rep
 
-    def tits_vinberg_rep(self, parameters):
+    #def tits_vinberg_rep(self, parameters):
         #TODO: actually compute a Tits-Vinberg representation based on
         #some parameters
-        return self.canonical_representation()
+    #    return self.canonical_representation()
 
 
     def diagonal_rep(self, order_eigenvalues="signed"):
