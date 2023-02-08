@@ -254,9 +254,6 @@ class HyperbolicDrawing(Drawing):
     def __init__(self, figsize=8,
                  ax=None,
                  fig=None,
-                 facecolor="aliceblue",
-                 edgecolor="lightgray",
-                 linewidth=1,
                  model=Model.POINCARE,
                  xlim=None,
                  ylim=None,
@@ -292,10 +289,6 @@ class HyperbolicDrawing(Drawing):
         self.ax.set_xlim(self.xlim)
         self.ax.set_ylim(self.ylim)
 
-        self.facecolor = facecolor
-        self.edgecolor = edgecolor
-        self.linewidth = linewidth
-
         self.model = model
 
         self.transform = hyperbolic.identity(2)
@@ -305,9 +298,9 @@ class HyperbolicDrawing(Drawing):
 
     def draw_plane(self, **kwargs):
         default_kwargs = {
-            "facecolor": self.facecolor,
-            "edgecolor": self.edgecolor,
-            "linewidth": self.linewidth,
+            "facecolor": "aliceblue",
+            "edgecolor": "lightgray",
+            "linewidth": 1,
             "zorder": 0
         }
         for key, value in kwargs.items():
@@ -322,10 +315,7 @@ class HyperbolicDrawing(Drawing):
             ymin, ymax = self.ylim
             plane = Rectangle((self.left_infinity, 0.),
                               self.h_infinity, self.up_infinity,
-                              facecolor=self.facecolor,
-                              edgecolor=self.edgecolor,
-                              zorder=0,
-                              **kwargs)
+                              **default_kwargs)
             self.ax.add_patch(plane)
 
         else:

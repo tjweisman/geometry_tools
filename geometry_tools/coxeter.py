@@ -85,25 +85,26 @@ class CoxeterGroup:
 
 
     def from_coxeter_matrix(self, matrix):
-        if (matrix.T - matrix != 0).any():
+        _matrix = np.array(matrix)
+        if (_matrix.T - _matrix != 0).any():
             raise GeometryError("Coxeter matrix must be symmetric")
 
-        if (matrix.astype(int) != matrix).any():
+        if (_matrix.astype(int) != _matrix).any():
             raise GeometryError("Coxeter matrix must have integer entries")
 
-        if (np.diag(matrix) != 1).any():
+        if (np.diag(_matrix) != 1).any():
             warnings.warn("Coxeter matrix should have 1's on the diagonal")
 
-        self.coxeter_matrix = matrix
+        self.coxeter_matrix = _matrix
         self.generators = defaultdict(dict)
 
-        n = len(matrix)
+        n = len(_matrix)
         self.generator_index = {
             GENERATOR_NAMES[i]:i for i in range(n)
         }
         self.ordered_gens = GENERATOR_NAMES[:n]
 
-        for i, row in enumerate(matrix):
+        for i, row in enumerate(_matrix):
             for j, order in enumerate(row):
                 self.generators[GENERATOR_NAMES[i]][GENERATOR_NAMES[j]] = order
 
