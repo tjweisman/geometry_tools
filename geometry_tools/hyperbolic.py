@@ -39,11 +39,12 @@ point = hyperbolic.get_point([0., 0.])
     array([-0.  ,  0.25])
 
 
-Most of the power of the `geometry_tools.hyperbolic` module comes from the
-fact that you can easily and efficiently build *composite* hyperbolic objects
-out of arrays of subobjects, and then translate the entire composite object
-at once. For instance, we can build an array of points, and translate all of
-those points by an isometry:
+This module is built on top of the `geometry_tools.projective`
+submodule, which means that it is possible to easily and efficiently
+build *composite* hyperbolic objects out of arrays of subobjects, and
+then translate the entire composite object at once. For instance, we
+can build an array of points, and translate all of those points by an
+isometry:
 
 ```python
 from geometry_tools import hyperbolic
@@ -116,7 +117,7 @@ isometries being applied to 2 points, each of which has 2 coordinates. To
 flatten the output to a 10x2 array (representing an array of 10 points), we
 could use `HyperbolicObject.flatten_to_unit()`.
 
-"""
+    """
 
 
 from copy import copy
