@@ -919,6 +919,44 @@ class Transformation(ProjectiveObject):
         product = self._apply_to_data(proj_obj, broadcast)
         return self._data_to_object(product)
 
+    def eigenvector(self, eigenvalue=None):
+        """Get a point corresponding to an eigenvector with the given
+        eigenvalue.
+
+        Parameters
+        ----------
+        eigenvalue : float
+            Eigenvalue for the returned eigenvector. If None, return
+            an arbitrary eigenvector.
+
+        Returns
+        -------
+        Point
+            Point object in projective space giving an eigenvector for
+            the given eigenvalue. The projective coordinates of this
+            point will be degenerate (i.e. zero) if no nonzero
+            eigenvector with this eigenvalue exists.
+
+        """
+        eigvals, eigvecs = np.linalg.eig(self.proj_data.swapaxes(-1, -2))
+        eigvec_coords = np.zeros(self.proj_data.shape[:-1])
+
+        ic = np.ones_like(eigvals)
+        if eigenvalue is not None:
+            ic = np.isclose(eigvals, eigenvalue)
+
+        where_ic = ic.nonzero()
+
+        unind, indind = np.unique(np.array(where_ic[:-1]).T,
+                                  return_index=True, axis=0)
+        eigvec_coords[tuple([*unind.T])] = eigvecs.swapaxes(-1,-2)[
+            tuple([*(np.array(where_ic).T)[indind].T])
+        ]
+
+        return Point(eigvec_coords)
+
+
+
     def _data_to_object(self, data):
         return ProjectiveObject(data)
 
