@@ -476,6 +476,27 @@ class FSA:
                 yield word
 
     def rename_generators(self, rename_map, inplace=True):
+        """Get a new automaton whose edge labels have been renamed by a
+        specified map.
+
+        Parameters
+        ----------
+        rename_map : dict
+            dictionary giving the mapping from old labels to new
+            labels
+
+        inplace : bool
+            If True (the default), modify the current automaton
+            in-place. If False, construct and return a new automaton
+            and leave this one unchanged.
+
+        Returns
+        -------
+        FSA or None
+            If inplace is False, return a new automaton with renamed
+            edge labels. Otherwise, None.
+
+        """
         new_dict = {
             vertex: {
                 rename_map[label]: neighbor
@@ -489,6 +510,22 @@ class FSA:
             return FSA(new_dict, self.start_vertices)
 
     def automaton_multiple(self, multiple):
+        """Get a new automaton, which accepts words in the language of this
+        automaton whose length is a multiple of k for some fixed k.
+
+        Parameters
+        ----------
+        multiple : int
+            Integer k such that every word accepted by the new
+            automaton has length kn for some n.
+
+        Returns
+        -------
+        FSA
+            A finite-state automaton which accepts exactly the words
+            accepted by self whose length is a multiple of k.
+
+        """
         to_visit = deque(self.start_vertices)
         visited = {
             v : False for v in self.vertices()
@@ -514,6 +551,18 @@ class FSA:
         return new_automaton
 
     def even_automaton(self):
+        """Get a new automaton which accepts exactly the the words accepted by
+        this automaton which have even length.
+
+        Alias for automaton_multiple(2).
+
+        Returns
+        -------
+        FSA
+            A finite-state automaton which accepts exactly the words
+            accepted by self whose length is even.
+
+        """
         return self.automaton_multiple(2)
 
 
