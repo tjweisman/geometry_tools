@@ -213,7 +213,8 @@ class FSA:
                 self._in_dict[v] = {}
                 self._graph_dict[v] = {}
 
-    def add_edges(self, edges, elist=False):
+    def add_edges(self, edges, elist=False,
+                  ignore_redundant=True):
         """Add edges to the FSA.
 
         Parameters
@@ -234,6 +235,9 @@ class FSA:
             if head not in self._out_dict[tail]:
                 self._out_dict[tail][head] = []
                 self._in_dict[head][tail] = []
+
+            if ignore_redundant and label in self._out_dict[tail][head]:
+                continue
 
             if elist:
                 self._out_dict[tail][head] += label
@@ -483,6 +487,36 @@ class FSA:
             self._from_graph_dict(new_dict)
         else:
             return FSA(new_dict, self.start_vertices)
+
+    def automaton_multiple(self, multiple):
+        to_visit = deque(self.start_vertices)
+        visited = {
+            v : False for v in self.vertices()
+        }
+        new_automaton = FSA(start_vertices=self.start_vertices)
+        while(len(to_visit) > 0):
+            v = to_visit.popleft()
+            visited[v] = True
+            new_automaton.add_vertices([v])
+
+            for word, neighbor in self.enumerate_fixed_length_paths(
+                multiple,
+                start_vertex=v,
+                with_states=True
+            ):
+                new_automaton.add_vertices([neighbor])
+                new_automaton.add_edges([(v, neighbor, word)],
+                                        elist=False)
+
+                if not visited[neighbor]:
+                    to_visit.append(neighbor)
+
+        return new_automaton
+
+    def even_automaton(self):
+        return self.automaton_multiple(2)
+
+
 
 def load_kbmag_file(filename) -> FSA:
     """Build a finite-state automaton from a GAP record file produced by

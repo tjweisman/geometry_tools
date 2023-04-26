@@ -1763,14 +1763,10 @@ class HyperbolicRepresentation(projective.ProjectiveRepresentation):
         return Isometry(self.transformations(words))
 
     def automaton_accepted(self, automaton, length,
-                           maxlen=True, with_words=False,
-                           start_state=None, end_state=None,
-                           precomputed=None):
+                           with_words=False, **kwargs):
+
         result = projective.ProjectiveRepresentation.automaton_accepted(
-            self, automaton, length, maxlen=maxlen, with_words=with_words,
-            start_state=start_state, end_state=end_state,
-            precomputed=precomputed
-        )
+            self, automaton, length, with_words=with_words, **kwargs)
 
         if with_words:
             transformations, words = result
@@ -1829,7 +1825,7 @@ def spacelike(vectors):
     dim = np.array(vectors).shape[-1]
     return (utils.normsq(vectors, minkowski(dim)) > ERROR_THRESHOLD).all()
 
-def timelike(self, vectors):
+def timelike(vectors):
     """Determine if a vector in R^(n,1) is timelike.
 
     Parameters
@@ -1848,7 +1844,7 @@ def timelike(self, vectors):
     dim = np.array(vectors).shape[-1]
     return (utils.normsq(vectors, minkowski(dim)) < ERROR_THRESHOLD)
 
-def lightlike(self, vectors):
+def lightlike(vectors):
     """Determine if a vector in R^(n,1) is lightlike.
 
     Parameters
@@ -1908,7 +1904,7 @@ def halfspace_to_poincare(points):
 
     return poincare_coords
 
-def timelike_to(self, v, force_oriented=False):
+def timelike_to(v, force_oriented=False):
     """Find an isometry taking the origin of the Poincare/Klein models to
     the given vector v.
 
@@ -1919,7 +1915,7 @@ def timelike_to(self, v, force_oriented=False):
         raise GeometryError( "Cannot find isometry taking a"
         " timelike vector to a non-timelike vector."  )
 
-    dim = np.array(vectors).shape[-1]
+    dim = np.array(v).shape[-1]
     return Isometry(utils.find_isometry(minkowski(dim),
                                         v, force_oriented),
                     column_vectors=False)

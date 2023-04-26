@@ -968,15 +968,11 @@ class ProjectiveRepresentation(representation.Representation):
         return Transformation(self.elements(words), column_vectors=True)
 
     def automaton_accepted(self, automaton, length,
-                           maxlen=True, with_words=False,
-                           start_state=None, end_state=None,
-                           precomputed=None):
+                           with_words=False, **kwargs):
+
         result = representation.Representation.automaton_accepted(
             self, automaton, length,
-            with_words=with_words,
-            start_state=start_state,
-            end_state=end_state,
-            precomputed=precomputed
+            with_words=with_words, **kwargs
         )
 
         if with_words:

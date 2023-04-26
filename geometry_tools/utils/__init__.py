@@ -48,7 +48,9 @@ def permutation_matrix(permutation):
 
     return p_mat
 
-def diagonalize_form(bilinear_form, order_eigenvalues="signed", reverse=False):
+def diagonalize_form(bilinear_form,
+                     order_eigenvalues="signed",
+                     reverse=False):
     r"""Return a matrix conjugating a symmetric real bilinear form to a
     diagonal form.
 

@@ -533,6 +533,17 @@ class Representation:
         self.generators[generator] = matrix
         self.generators[utils.invert_gen(generator)] = np.linalg.inv(matrix)
 
+    def compose(self, hom):
+        """Get a new representation obtained by composing this representation
+        with hom."""
+
+        composed_rep = self.__class__()
+
+        for g, image in self.generators.items():
+            composed_rep[g] = hom(image)
+
+        return composed_rep
+
     def tensor_product(self, rep):
         """Return a tensor product of this representation with `rep`.
 
