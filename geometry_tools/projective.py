@@ -106,6 +106,7 @@ This code produces the image:
 
     """
 
+import itertools
 from copy import copy
 
 import numpy as np
@@ -480,8 +481,6 @@ class ProjectiveObject:
         return cls(newObj)
 
 
-
-
 class Point(ProjectiveObject):
     """A point (or collection of points) in projective space.
     """
@@ -700,6 +699,54 @@ class Polygon(Point):
 
         """
         return Point(self.proj_data)
+
+class Simplex(Point):
+    def __init__(self, vertices):
+        ProjectiveObject.__init__(self, vertices, unit_ndims=2)
+
+    @property
+    def n(self):
+        return self.proj_data.shape[-2]
+
+    def skeleton(self, k):
+        indices = list(itertools.combinations(range(self.n), k))
+        return Simplex(self.proj_data[..., indices, :])
+
+    def faces(self):
+        return self.skeleton(self.n - 1)
+
+    def edges(self):
+        return PointPair(self.skeleton(2))
+
+    def vertices(self):
+        return Point(self)
+
+class Subspace(ProjectiveObject):
+    def __init__(self, proj_data):
+        ProjectiveObject.__init__(self, proj_data, unit_ndims=2)
+
+    @property
+    def n(self):
+        return self.proj_data.shape[-2]
+
+    def intersect(self, other, broadcast="elementwise"):
+        if broadcast == "elementwise":
+            p1, p2 = self.proj_data, other.proj_data
+        elif broadcast == "pairwise":
+            p1, p2 = utils.broadcast_match(self.proj_data,
+                                          other.proj_data, 2)
+        else:
+            raise ValueError(f"Unrecognized broadcast rule: '{broadcast}'")
+
+        spans = np.concatenate((p1, p2), axis=-2)
+
+        u, s, v = np.linalg.svd(spans.swapaxes(-1, -2))
+        int_dim = self.n + other.n - (self.dimension + 1)
+
+        coeffs = v[..., -int_dim:, :self.n]
+
+        return Subspace(utils.matrix_product(coeffs, p1))
+
 
 class ConvexPolygon(Polygon):
     """A finite-sided convex polygon in projective space.

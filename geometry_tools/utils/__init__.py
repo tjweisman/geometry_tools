@@ -584,6 +584,18 @@ def squeeze_excess(array, unit_axes, other_unit_axes):
 
     return np.squeeze(array.T, axis=tuple(to_squeeze)).T
 
+def broadcast_match(a1, a2, unit_axes):
+    c1_ndims = len(a1.shape) - unit_axes
+    c2_ndims = len(a2.shape) - unit_axes
+
+    exp1 = np.expand_dims(a1, tuple(range(c1_ndims, c1_ndims + c2_ndims)))
+    exp2 = np.expand_dims(a2, tuple(range(c1_ndims)))
+
+    tile1 = np.tile(exp1, (1,) * c1_ndims + a2.shape[:c2_ndims] + (1,) * unit_axes)
+    tile2 = np.tile(exp2, a1.shape[:c1_ndims] + (1,) * (c2_ndims + unit_axes))
+
+    return (tile1, tile2)
+
 def matrix_product(array1, array2, unit_axis_1=2, unit_axis_2=2,
                    broadcast="elementwise"):
     """Multiply two ndarrays of ndarrays together.
