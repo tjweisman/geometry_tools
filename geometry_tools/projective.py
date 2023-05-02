@@ -701,24 +701,61 @@ class Polygon(Point):
         return Point(self.proj_data)
 
 class Simplex(Point):
+    """An n-simplex in projective space.
+    """
     def __init__(self, vertices):
+        """
+        Parameters
+        ----------
+        vertices : ProjectiveObject or ndarray
+            Data giving the vertices of the simplex (or a composite of
+            several simplices)
+
+        """
         ProjectiveObject.__init__(self, vertices, unit_ndims=2)
 
     @property
     def n(self):
+        """Number of vertices in the simplex.
+        """
         return self.proj_data.shape[-2]
 
     def skeleton(self, k):
+        """Get the k-skeleton of this simplex, as a composite Simplex.
+
+        Parameters
+        ----------
+        k : int
+            Dimension of the skeleton to get
+
+        Returns
+        -------
+        Simplex
+            Composite Simplex object, with one subobject for each
+            k-dimensional face of this simplex.
+
+        """
         indices = list(itertools.combinations(range(self.n), k))
         return Simplex(self.proj_data[..., indices, :])
 
     def faces(self):
+        """Get the codimension-1 faces of the simplex.
+
+        Alias for self.skeleton(n - 1), where n is the number of
+        vertices in this simplex.
+
+        """
         return self.skeleton(self.n - 1)
 
     def edges(self):
+        """Get the edges of the simplex.
+
+        Alias for PointPair(self.skeleton(2))."""
         return PointPair(self.skeleton(2))
 
     def vertices(self):
+        """Get the vertices of this simplex as a Point object.
+        """
         return Point(self)
 
 class Subspace(ProjectiveObject):
@@ -740,6 +777,8 @@ class Subspace(ProjectiveObject):
 
     @property
     def n(self):
+        """Dimension of the vector space underlying this subspace.
+        """
         return self.proj_data.shape[-2]
 
     def intersect(self, other, broadcast="elementwise"):
@@ -752,7 +791,7 @@ class Subspace(ProjectiveObject):
 
         Parameters
         ----------
-        other : ProjectiveSubspace or ndarray
+        other : Subspace or ndarray
             Subspace to intersect with.
 
         broadcast : {"elementwise", "pairwise"}
@@ -770,12 +809,12 @@ class Subspace(ProjectiveObject):
 
         Returns
         -------
-        ProjectiveSubspace
+        Subspace
             Intersection of self and other.
 
         """
 
-        other_obj = ProjectiveSubspace(other)
+        other_obj = Subspace(other)
 
         if broadcast == "elementwise":
             p1, p2 = self.proj_data, other_obj.proj_data
