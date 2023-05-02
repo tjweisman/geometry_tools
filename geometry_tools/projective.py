@@ -722,7 +722,20 @@ class Simplex(Point):
         return Point(self)
 
 class Subspace(ProjectiveObject):
+    """A projective subspace (or composite object consisting of projective
+    subspaces with the same dimension)
+
+    """
     def __init__(self, proj_data):
+        """
+        Parameters
+        ----------
+        proj_data : ProjectiveObject or ndarray
+            data specifying a spanning set for this projective
+            subspace. These are presumed to be a set of linearly
+            independent vectors.
+
+        """
         ProjectiveObject.__init__(self, proj_data, unit_ndims=2)
 
     @property
@@ -730,11 +743,45 @@ class Subspace(ProjectiveObject):
         return self.proj_data.shape[-2]
 
     def intersect(self, other, broadcast="elementwise"):
+        """Get a subspace giving the intersection of self with other.
+
+        All intersections are presumed to be transverse. So, the
+        dimension of the underlying vector space of the returned
+        subspace is always: (dimension of self) + (dimension of other)
+        - (dimension of ambient vector space).
+
+        Parameters
+        ----------
+        other : ProjectiveSubspace or ndarray
+            Subspace to intersect with.
+
+        broadcast : {"elementwise", "pairwise"}
+            If "elementwise" (the default), and self/other are
+            composite objects, then compute the element-by-element
+            intersection. For this to work properly, self and other
+            must have the same shape (as composite objects).
+
+            If "pairwise", compute intersections between every
+            subspace in self and every subspace in other. If self has
+            a (composite) shape (N1, N2, ... Ni) and other has
+            composite shape (M1, M2, ..., Mj), then the returned
+            object has composite shape (N1, N2, ... Ni, M1, M2, ...,
+            Mj).
+
+        Returns
+        -------
+        ProjectiveSubspace
+            Intersection of self and other.
+
+        """
+
+        other_obj = ProjectiveSubspace(other)
+
         if broadcast == "elementwise":
-            p1, p2 = self.proj_data, other.proj_data
+            p1, p2 = self.proj_data, other_obj.proj_data
         elif broadcast == "pairwise":
             p1, p2 = utils.broadcast_match(self.proj_data,
-                                          other.proj_data, 2)
+                                          other_obj.proj_data, 2)
         else:
             raise ValueError(f"Unrecognized broadcast rule: '{broadcast}'")
 

@@ -585,6 +585,30 @@ def squeeze_excess(array, unit_axes, other_unit_axes):
     return np.squeeze(array.T, axis=tuple(to_squeeze)).T
 
 def broadcast_match(a1, a2, unit_axes):
+    """Tile a pair of arrays so that they can be broadcast against each
+    other, treating the last ndims as a unit.
+
+    It is often not necessary to call this function, since numpy
+    broadcasting will handle this implicitly for many vectorized
+    functions.
+
+    Parameters
+    ----------
+    a1, a2 : ndarray
+        arrays to tile
+    unit_axes : int
+        number of axes to treat as a unit when tiling
+
+    Returns
+    -------
+    (u1, u2) : (ndarray, ndarray)
+        Tiled versions of a1 and a2, respectively.
+
+        If unit_axes is k, and a1 has shape (N1, ..., Ni, L1, ...,
+        Lk), and a2 has shape (M1, ..., Mj, P1, ..., Pk), then u1 has
+        shape (N1, ..., Ni, M1, ..., Mj, L1, ..., Lk) and u2 has shape
+        (N1, ..., Ni, M1, ..., Mj, P1, ..., Pk).
+    """
     c1_ndims = len(a1.shape) - unit_axes
     c2_ndims = len(a2.shape) - unit_axes
 
