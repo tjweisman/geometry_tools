@@ -413,8 +413,11 @@ class Representation:
                     matrices = matrices @ self._word_value(label)
                 matrix_list.append(matrices)
 
+        accepted_matrices = empty_arr
 
-        accepted_matrices = np.concatenate(matrix_list)
+        if len(matrix_list) > 0:
+            accepted_matrices = np.concatenate(matrix_list)
+
         if maxlen:
             additional_result = self._automaton_accepted(
                 automaton, 0,
