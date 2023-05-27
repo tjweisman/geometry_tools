@@ -575,9 +575,34 @@ class FSA:
         """
         return self.automaton_multiple(2)
 
+    def accepts(self, word, start_vertex=None):
+        """Determine if this automaton accepts a given word.
+
+        Parameters
+        ----------
+        word : string
+            word to test for acceptance
+        start_vertex : object
+            The start state for the automaton. If `None` (the
+            default), use the automaton's default start state.
+
+        Returns
+        -------
+        bool
+            True if word is accepted by the automaton, False
+            otherwise.
+
+        """
+        try:
+            self.follow_word(word, start_vertex)
+        except FSAException:
+            return False
+
+        return True
 
 
 def load_kbmag_file(filename) -> FSA:
+
     """Build a finite-state automaton from a GAP record file produced by
     the kbmag program.
 

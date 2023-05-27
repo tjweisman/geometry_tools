@@ -1,6 +1,8 @@
+
 *.egg-info
 build
 dist
 doc
 update_doc
+testing
 *.ipynb_checkpoints
