@@ -392,14 +392,24 @@ class FSA:
         object
             The state of the automaton when it accepts `word`
 
+        Raises
+        ------
+        FSAException
+            Raised if word is not accepted by this automaton.
+
         """
 
         if start_vertex is None:
-            start_vertex = start_vertices[0]
+            start_vertex = self.start_vertices[0]
         vertex = start_vertex
 
         for letter in word:
-            vertex = graph_dict[vertex][letter]
+            try:
+                vertex = self.graph_dict[vertex][letter]
+            except KeyError:
+                raise FSAException(
+                    f"The word '{word}' is not accepted by the automaton."
+                )
 
         return vertex
 
