@@ -584,7 +584,7 @@ class FSA:
             word to test for acceptance
         start_vertex : object
             The start state for the automaton. If `None` (the
-            default), use the automaton's default start state.
+            default), any start state is allowed.
 
         Returns
         -------
@@ -593,12 +593,19 @@ class FSA:
             otherwise.
 
         """
-        try:
-            self.follow_word(word, start_vertex)
-        except FSAException:
-            return False
+        start_vertices = [start_vertex]
+        if start_vertex is None:
+            start_vertices = self.start_vertices
 
-        return True
+        for vertex in start_vertices:
+            try:
+                self.follow_word(word, vertex)
+                return True
+            except FSAException:
+                pass
+
+        return False
+
 
 
 def load_kbmag_file(filename) -> FSA:
