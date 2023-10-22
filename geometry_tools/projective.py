@@ -423,22 +423,25 @@ class ProjectiveObject:
 
         return self.__class__(newobj)
 
-    def change_base_ring(self, base_ring, inplace=False):
+    def change_base_ring(self, base_ring, inplace=False, **kwargs):
         if not utils.SAGE_AVAILABLE:
             raise EnvironmentError(
                 "Cannot change base ring unless running within sage"
             )
 
         if not inplace:
-            newproj = sagewrap.change_base_ring(self.proj_data, base_ring)
+            newproj = sagewrap.change_base_ring(self.proj_data, base_ring,
+                                                **kwargs)
 
             newaux = None
             if self.aux_data is not None:
-                newaux = sagewrap.change_base_ring(self.aux_data, base_ring)
+                newaux = sagewrap.change_base_ring(self.aux_data, base_ring,
+                                                   **kwargs)
 
             newdual = None
             if self.dual_data is not None:
-                newdual = sagewrap.change_base_ring(self.dual_data, base_ring)
+                newdual = sagewrap.change_base_ring(self.dual_data, base_ring,
+                                                    **kwargs)
 
             newobj = ProjectiveObject(newproj, newaux, newdual,
                                       unit_ndims=self.unit_ndims,
@@ -446,11 +449,14 @@ class ProjectiveObject:
                                       dual_ndims=self.dual_ndims)
             return self.__class__(newobj)
 
-        sagewrap.change_base_ring(self.proj_data, base_ring, inplace=True)
+        sagewrap.change_base_ring(self.proj_data, base_ring, inplace=True,
+                                  **kwargs)
         if self.aux_data is not None:
-            sagewrap.change_base_ring(self.aux_data, base_ring, inplace=True)
+            sagewrap.change_base_ring(self.aux_data, base_ring, inplace=True,
+                                      **kwargs)
         if self.dual_data is not None:
-            sagewrap.change_base_ring(self.dual_data, base_ring, inplace=True)
+            sagewrap.change_base_ring(self.dual_data, base_ring, inplace=True,
+                                      **kwargs)
 
     def projective_coords(self, proj_data=None):
         """Wrapper for ProjectiveObject.set, since underlying coordinates are

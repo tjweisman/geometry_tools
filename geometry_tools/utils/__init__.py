@@ -12,6 +12,8 @@ try:
 except ModuleNotFoundError:
     SAGE_AVAILABLE = False
 
+from . import _numpy_wrappers as nwrap
+
 def rotation_matrix(angle):
     r"""Get a 2x2 rotation matrix rotating counterclockwise by the
     specified angle.
@@ -939,6 +941,18 @@ def disk_interactions(c1, r1, c2, r2,
             dists < (r2 - r1),
             dists < (r2 + r1))
 
+def invert(mat, compute_exact=SAGE_AVAILABLE):
+    if not SAGE_AVAILABLE or not compute_exact:
+        return np.linalg.inv(mat)
+    else:
+        return sagewrap.invert(mat)
+
+def kernel(mat, compute_exact=SAGE_AVAILABLE):
+    if not SAGE_AVAILABLE or not compute_exact:
+        return nwrap.kernel(mat)
+    else:
+        return sagewrap.kernel(mat)
+
 def _check_dtype(base_ring, dtype, default_dtype='float64'):
     if base_ring is not None:
         if not SAGE_AVAILABLE:
@@ -955,11 +969,6 @@ def _check_dtype(base_ring, dtype, default_dtype='float64'):
 
     return (base_ring, dtype)
 
-def invert(mat):
-    if not SAGE_AVAILABLE:
-        return np.linalg.inv(mat)
-    else:
-        return sagewrap.invert(mat)
 
 def zeros(shape, base_ring=None, dtype=None, **kwargs):
     base_ring, dtype = _check_dtype(base_ring, dtype)
