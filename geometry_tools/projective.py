@@ -113,7 +113,10 @@ import numpy as np
 from scipy.spatial import ConvexHull
 
 from geometry_tools import utils
-from geometry_tools.utils import sagewrap
+
+if utils.SAGE_AVAILABLE:
+    from geometry_tools.utils import sagewrap
+
 from geometry_tools import representation
 
 
@@ -421,6 +424,11 @@ class ProjectiveObject:
         return self.__class__(newobj)
 
     def change_base_ring(self, base_ring, inplace=False):
+        if not utils.SAGE_AVAILABLE:
+            raise EnvironmentError(
+                "Cannot change base ring unless running within sage"
+            )
+
         if not inplace:
             newproj = sagewrap.change_base_ring(self.proj_data, base_ring)
 

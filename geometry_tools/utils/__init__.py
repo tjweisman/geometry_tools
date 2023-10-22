@@ -5,7 +5,12 @@ this package.
 import numpy as np
 from scipy.optimize import linprog
 
-from . import sagewrap
+try:
+    import sage.all
+    from . import sagewrap
+    SAGE_AVAILABLE = True
+except ModuleNotFoundError:
+    SAGE_AVAILABLE = False
 
 def rotation_matrix(angle):
     r"""Get a 2x2 rotation matrix rotating counterclockwise by the
@@ -934,14 +939,30 @@ def disk_interactions(c1, r1, c2, r2,
             dists < (r2 - r1),
             dists < (r2 + r1))
 
+def _check_dtype(base_ring, dtype, default_dtype='float64'):
+    if base_ring is not None:
+        if not SAGE_AVAILABLE:
+            raise EnvironmentError(
+                "Cannot specify base_ring unless running within sage"
+            )
+        if dtype is not None and dtype != np.dtype('object'):
+            raise TypeError(
+                "Cannot specify base_ring and dtype unless dtype is dtype('object')"
+            )
+        dtype = np.dtype('object')
+    elif dtype is None:
+        dtype = default_dtype
+
+    return (base_ring, dtype)
+
 def invert(mat):
-    if not sagewrap.SAGE_AVAILABLE:
+    if not SAGE_AVAILABLE:
         return np.linalg.inv(mat)
     else:
         return sagewrap.invert(mat)
 
 def zeros(shape, base_ring=None, dtype=None, **kwargs):
-    base_ring, dtype = sagewrap.check_dtype(base_ring, dtype)
+    base_ring, dtype = _check_dtype(base_ring, dtype)
 
     zero_arr = np.zeros(shape, dtype=dtype, **kwargs)
     if base_ring is not None:
@@ -949,7 +970,7 @@ def zeros(shape, base_ring=None, dtype=None, **kwargs):
     return zero_arr
 
 def ones(shape, base_ring=None, dtype=None, **kwargs):
-    base_ring, dtype = sagewrap.check_dtype(base_ring, dtype)
+    base_ring, dtype = _check_dtype(base_ring, dtype)
 
     ones_arr = np.ones(shape, dtype=dtype, **kwargs)
     if base_ring is not None:
@@ -957,7 +978,7 @@ def ones(shape, base_ring=None, dtype=None, **kwargs):
     return ones_arr
 
 def identity(n, base_ring=None, dtype=None, **kwargs):
-    base_ring, dtype = sagewrap.check_dtype(base_ring, dtype)
+    base_ring, dtype = _check_dtype(base_ring, dtype)
 
     identity_arr = np.identity(n, dtype=dtype, **kwargs)
 
