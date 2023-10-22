@@ -161,10 +161,13 @@ import re
 import itertools
 
 import numpy as np
-from scipy.special import binom
+import scipy.special
 
 from . import utils
 from .automata import fsa
+
+def binom(n, k):
+    return int(scipy.special.binom(n, k))
 
 def semi_gens(generators):
     """Get an iterable of semigroup generators from an iterable of group generators.
@@ -533,7 +536,7 @@ class Representation:
             )
 
         self.generators[generator] = matrix
-        self.generators[utils.invert_gen(generator)] = np.linalg.inv(matrix)
+        self.generators[utils.invert_gen(generator)] = utils.invert(matrix)
 
     def compose(self, hom):
         """Get a new representation obtained by composing this representation
@@ -820,7 +823,7 @@ def sl2_irrep(A, n):
     c = A[..., 1, 0]
     d = A[..., 1, 1]
 
-    im = np.zeros(A.shape[:-2] +(n, n))
+    im = np.zeros(A.shape[:-2] +(n, n), dtype=A.dtype)
     r = n - 1
     for k in range(n):
         for j in range(n):
@@ -855,16 +858,18 @@ def sl2_to_so21(A):
         representation.
 
     """
-    killing_conj = np.array([[-0., -1., -0.],
-                             [-1., -0.,  1.],
-                             [-1., -0., -1.]])
+    killing_conj = np.array([[-0, -1, -0],
+                             [-1, -0,  1],
+                             [-1, -0, -1]],
+                            dtype=A.dtype)
+
     permutation = utils.permutation_matrix((2,1,0))
 
     A_3 = sl2_irrep(A, 3)
     return (permutation @ killing_conj @ A_3 @
-            np.linalg.inv(killing_conj) @ permutation)
+            utils.invert(killing_conj) @ permutation)
 
-def o_to_pgl(A, bilinear_form=np.diag((-1., 1., 1.))):
+def o_to_pgl(A, bilinear_form=np.diag((-1, 1, 1))):
     r"""Return the image of an element of \(\mathrm{O}(2, 1)\) under the
     representation \(\mathrm{O}(2,1) \to \mathrm{GL}(2)\).
 
@@ -892,16 +897,18 @@ def o_to_pgl(A, bilinear_form=np.diag((-1., 1., 1.))):
     conj_i = np.eye(3)
 
     if bilinear_form is not None:
-        killing_conj = np.array([[ 0. , -0.5, -0.5],
-                                 [-1. ,  0. ,  0. ],
-                                 [ 0. ,  0.5, -0.5]])
+        #TODO: make this sage-compatible
+        killing_conj = np.array([[ 0, -1/2, -1/2],
+                                 [-1,  0,   0   ],
+                                 [ 0,  1/2, -1/2]],
+                                dtype=A.dtype)
 
         form_conj = utils.diagonalize_form(bilinear_form,
                                       order_eigenvalues="minkowski",
                                       reverse=True)
 
-        conj = form_conj @ np.linalg.inv(killing_conj)
-        conj_i = killing_conj @ np.linalg.inv(form_conj)
+        conj = form_conj @ utils.invert(killing_conj)
+        conj_i = killing_conj @ utils.invert(form_conj)
 
     A_d = conj_i @ A @ conj
 

@@ -339,7 +339,7 @@ def to_standard_triple(triple):
 
     tdata = tpoint.projective_coords()
 
-    res = np.linalg.inv(tdata[..., :2, :])
+    res = utils.invert(tdata[..., :2, :])
     p3_t = np.expand_dims(tdata[..., 2, :],
                           axis=-2) @ res
 

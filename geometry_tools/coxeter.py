@@ -171,7 +171,7 @@ class CoxeterGroup:
         )
 
         return rep.compose(
-            lambda mat: np.linalg.inv(W) @ mat @ W
+            lambda mat: utils.invert(W) @ mat @ W
         )
 
     def geometric_representation(self, **kwargs):
@@ -208,7 +208,7 @@ class CoxeterGroup:
 
         """
         return self.geometric_representation(**kwargs).compose(
-            lambda mat: np.linalg.inv(mat.T)
+            lambda mat: utils.invert(mat.T)
         )
 
 

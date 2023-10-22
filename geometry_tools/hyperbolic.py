@@ -626,7 +626,7 @@ class Subspace(IdealPoint):
                  "dimension {}").format(dual_data.shape[-2])
             )
 
-        refdata = (np.linalg.inv(dual_data) @
+        refdata = (utils.invert(dual_data) @
                    self.minkowski @
                    dual_data)
 
@@ -1725,7 +1725,7 @@ class Isometry(projective.Transformation, HyperbolicObject):
         )
 
         return Isometry((basis_change @ diagonal_loxodromic @
-                        np.linalg.inv(basis_change)),
+                        utils.invert(basis_change)),
                         column_vectors=True)
 
     def standard_rotation(angle, dimension=2):

@@ -4,6 +4,13 @@ this package.
 """
 import numpy as np
 
+try:
+    import sage.all
+    from . import sagewrap
+    SAGE_AVAILABLE = True
+except ModuleNotFoundError:
+    SAGE_AVAILABLE = False
+
 from scipy.optimize import linprog
 
 def rotation_matrix(angle):
@@ -42,9 +49,9 @@ def permutation_matrix(permutation):
 
     """
     n = len(permutation)
-    p_mat = np.zeros((n, n))
+    p_mat = np.zeros((n, n), dtype=int)
     for i,j in enumerate(permutation):
-        p_mat[i,j] = 1.
+        p_mat[i,j] = 1
 
     return p_mat
 
@@ -117,7 +124,7 @@ def diagonalize_form(bilinear_form,
 
         perm = permutation_matrix(order)
 
-    W = U @ D @ np.linalg.inv(perm)
+    W = U @ D @ invert(perm)
 
     return W
 
@@ -363,7 +370,48 @@ def projection(v1, v2, bilinear_form):
             apply_bilinear(v1, v2, bilinear_form).T /
             normsq(v2, bilinear_form).T).T
 
+def orthogonal_complement(vectors, form=None, normalize="form"):
+    """Find an orthogonal complement with respect to a nondegenerate (but
+       possibly indefinite) bilinear form.
+
+    Parameters
+    ----------
+    vectors : ndarray of shape (..., k, n)
+        array of k row vectors for which to find a complement. Each
+        set of k row vectors should be linearly independent.
+
+    form : ndarray of shape `(n, n)`
+        bilinear form to use to find complements. If None (the
+        default), use the standard Euclidean form on R^n.
+
+    normalize : One of {'form', 'euclidean'} or None
+        How to normalize the vectors spanning the orthogonal
+        complement. If 'form' (the default), attempt to return vectors
+        which have unit length with respect to `form.` (Note this may
+        fail if `form` is indefinite, i.e. there are nonzero null
+        vectors. If 'euclidean', then use the standard Euclidean form
+        on R^n to normalize the vectors.
+
+    Returns
+    -------
+    result : ndarray with shape (..., n - k, n)
+        array of n-k row vectors, each of which is orthogonal to all
+        of the k row vectors provided (with respect to `form`).
+
+    """
+    if form is None:
+        form = np.identity(vectors.shape[-1])
+
+    _, _, vh = np.linalg.svd(vectors @ form)
+    kernel = vh[..., vectors.shape[-2]:, :]
+
+    if normalize == 'form':
+        return indefinite_orthogonalize(form, kernel)
+
+    return kernel
+
 def indefinite_orthogonalize(form, matrices):
+
     """Apply the Gram-Schmidt algorithm, but for a possibly indefinite
     bilinear form.
 
@@ -802,7 +850,7 @@ def circle_through(p1, p2, p3):
     mats = np.stack([t_p1, t_p2], axis=-1)
 
     # we'll act on the right
-    t_ctrs = np.squeeze(r_sq @ np.linalg.inv(mats), axis=-2)/2.
+    t_ctrs = np.squeeze(r_sq @ invert(mats), axis=-2)/2.
 
     radii = np.linalg.norm(t_ctrs, axis=-1)
 
@@ -891,3 +939,9 @@ def disk_interactions(c1, r1, c2, r2,
     return (dists < (r1 - r2),
             dists < (r2 - r1),
             dists < (r2 + r1))
+
+def invert(mat):
+    if not SAGE_AVAILABLE:
+        return np.linalg.inv(mat)
+    else:
+        return sagewrap.invert(mat)

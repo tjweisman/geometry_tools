@@ -185,30 +185,52 @@ class ProjectiveObject:
         return self.proj_data.shape[-1] - 1
 
     def _assert_geometry_valid(self, proj_data):
-        if proj_data.ndim < self.unit_ndims:
-            raise GeometryError(
-                ("{} expects an array with ndim at least {}, got array of shape {}"
-                ).format(
-                    self.__class__.__name__, self.unit_ndims, proj_data.shape
+        if proj_data is None and self.unit_ndims == 0:
+            return
+
+        try:
+            if proj_data.ndim < self.unit_ndims:
+                raise GeometryError(
+                    ("{} expects an array with ndim at least {}, got array of shape {}"
+                    ).format(
+                        self.__class__.__name__, self.unit_ndims, proj_data.shape
+                    )
                 )
+        except AttributeError:
+            raise GeometryError(
+                ("Data provided to {} must be a numpy array"
+                ).format(self.__class__.__name__)
             )
+
     def _assert_aux_valid(self, aux_data):
         if aux_data is None and self.aux_ndims == 0:
             return
 
         if aux_data.ndim < self.aux_ndims:
-            raise GeometryError(
-                ("{} expects an auxiliary array with ndim at least {}, got array of shape"
-                ).format(
-                    self.__class__.__name__, self.unit_ndims, proj_data.shape
-                )
-            )
+            raise GeometryError( ("{} expects an auxiliary array with"
+            " ndim at least {}, got array of shape {}" ).format(
+                self.__class__.__name__, self.aux_ndims,
+                proj_data.shape ) )
+
+    def _assert_dual_valid(self, dual_data):
+        if dual_data is None and self.dual_ndims == 0:
+            return
+
+        try:
+            if dual_data.ndim < self.dual_ndims:
+                raise GeometryError( ("{} expects a dual array with"
+                " ndim at least {}, got array of shape {}").format(
+                    self.__class__.__name__, self.dual_ndims,
+                    dual_data.shape) )
+        except AttributeError:
+            raise GeometryError(("Dual data provided to {} must be a"
+            " numpy array").format(self.__class__.__name__))
 
     def _compute_aux_data(self, proj_data):
         return None
 
     def _construct_from_object(self, hyp_obj):
-        """if we're passed a hyperbolic object or an array of hyperbolic
+        """if we're passed a projective object or an array of projective
         objects, build a new one out of them
 
         """
@@ -230,6 +252,9 @@ class ProjectiveObject:
             hyp_array = np.array([obj.proj_data for obj in unrolled_obj])
             aux_array = np.array([obj.aux_data for obj in unrolled_obj])
             dual_array = np.array([obj.dual_data for obj in unrolled_obj])
+
+            if (hyp_array == None).any():
+                hyp_array = None
 
             if (aux_array == None).any():
                 aux_array = None
@@ -259,7 +284,7 @@ class ProjectiveObject:
         """
         return self.proj_data.shape[:-1 * self.unit_ndims]
 
-    def set(self, proj_data, aux_data=None, dual_data=None):
+    def set(self, proj_data=None, aux_data=None, dual_data=None):
         """set the underlying data of the hyperbolic object.
 
         Subclasses may override this method to give special names to
@@ -282,13 +307,22 @@ class ProjectiveObject:
         # don't bother because the only dual geometry we're using is
         # technically also auxilliary...
 
-        proj_data = np.array(proj_data)
+        if proj_data is not None:
+            proj_data = np.array(proj_data)
 
         self._assert_geometry_valid(proj_data)
+
+        if dual_data is not None:
+            dual_data = np.array(dual_data)
+
+        self._assert_dual_valid(dual_data)
+
         if aux_data is None:
             aux_data = self._compute_aux_data(proj_data)
 
         self._assert_aux_valid(aux_data)
+
+
 
         self.proj_data = proj_data
         self.aux_data = aux_data
@@ -833,7 +867,6 @@ class Subspace(ProjectiveObject):
 
         return Subspace(utils.matrix_product(coeffs, p1))
 
-
 class ConvexPolygon(Polygon):
     """A finite-sided convex polygon in projective space.
     """
@@ -923,7 +956,7 @@ class ConvexPolygon(Polygon):
         dim = self.proj_data.shape[-1]
         self.dual_data = utils.find_positive_functional(self.proj_data)
 
-        to_std_aff = np.linalg.inv(utils.find_isometry(np.identity(dim),
+        to_std_aff = utils.invert(utils.find_isometry(np.identity(dim),
                                                        self.dual_data))
 
         standardized_coords = Point(
@@ -987,7 +1020,7 @@ class Transformation(ProjectiveObject):
     def _apply_to_data(self, proj_data, broadcast, unit_ndims=1, dual=False):
         matrix = self.matrix
         if dual:
-            matrix = np.linalg.inv(matrix).swapaxes(-1, -2)
+            matrix = utils.invert(matrix).swapaxes(-1, -2)
         return utils.matrix_product(proj_data,
                                     matrix,
                                     unit_ndims, self.unit_ndims,
@@ -1024,11 +1057,13 @@ class Transformation(ProjectiveObject):
 
         try:
             proj_data = new_obj.proj_data
-            proj_product = self._apply_to_data(new_obj.proj_data, broadcast,
-                                               new_obj.unit_ndims)
+            proj_product = None
+            if proj_data is not None:
+                proj_product = self._apply_to_data(new_obj.proj_data, broadcast,
+                                                   new_obj.unit_ndims)
+
             aux_data = new_obj.aux_data
             aux_product = None
-
             if aux_data is not None:
                 aux_product = self._apply_to_data(new_obj.aux_data, broadcast,
                                                   new_obj.aux_ndims)
@@ -1039,7 +1074,7 @@ class Transformation(ProjectiveObject):
                 dual_product = self._apply_to_data(new_obj.dual_data, broadcast,
                                                    new_obj.dual_ndims)
 
-            new_obj.set(proj_product,
+            new_obj.set(proj_data=proj_product,
                         aux_data=aux_product,
                         dual_data=dual_product)
 
@@ -1080,14 +1115,23 @@ class Transformation(ProjectiveObject):
 
         where_ic = ic.nonzero()
 
+        if len(where_ic) == 1:
+            if len(where_ic[0]) > 0:
+                eigvec_coords = (eigvecs.T)[where_ic[0][0]]
+                return Point(eigvec_coords)
+            raise GeometryError(
+                ("Transformation does not have {} as an approximate eigenvalue").format(
+                    eigenvalue)
+            )
+
         unind, indind = np.unique(np.array(where_ic[:-1]).T,
                                   return_index=True, axis=0)
+
         eigvec_coords[tuple([*unind.T])] = eigvecs.swapaxes(-1,-2)[
             tuple([*(np.array(where_ic).T)[indind].T])
         ]
 
         return Point(eigvec_coords)
-
 
 
     def _data_to_object(self, data):
@@ -1101,7 +1145,7 @@ class Transformation(ProjectiveObject):
         ProjectiveTransformation
             Inverse of this transformation.
         """
-        return self.__class__(np.linalg.inv(self.matrix))
+        return self.__class__(utils.invert(self.matrix))
 
     def __matmul__(self, other):
         return self.apply(other)
