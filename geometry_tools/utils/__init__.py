@@ -3,15 +3,9 @@ this package.
 
 """
 import numpy as np
-
-try:
-    import sage.all
-    from . import sagewrap
-    SAGE_AVAILABLE = True
-except ModuleNotFoundError:
-    SAGE_AVAILABLE = False
-
 from scipy.optimize import linprog
+
+from . import sagewrap
 
 def rotation_matrix(angle):
     r"""Get a 2x2 rotation matrix rotating counterclockwise by the
@@ -941,7 +935,32 @@ def disk_interactions(c1, r1, c2, r2,
             dists < (r2 + r1))
 
 def invert(mat):
-    if not SAGE_AVAILABLE:
+    if not sagewrap.SAGE_AVAILABLE:
         return np.linalg.inv(mat)
     else:
         return sagewrap.invert(mat)
+
+def zeros(shape, base_ring=None, dtype=None, **kwargs):
+    base_ring, dtype = sagewrap.check_dtype(base_ring, dtype)
+
+    zero_arr = np.zeros(shape, dtype=dtype, **kwargs)
+    if base_ring is not None:
+        return sagewrap.change_base_ring(base_ring, zero_arr)
+    return zero_arr
+
+def ones(shape, base_ring=None, dtype=None, **kwargs):
+    base_ring, dtype = sagewrap.check_dtype(base_ring, dtype)
+
+    ones_arr = np.ones(shape, dtype=dtype, **kwargs)
+    if base_ring is not None:
+        return sagewrap.change_base_ring(base_ring, ones_arr)
+    return ones_arr
+
+def identity(n, base_ring=None, dtype=None, **kwargs):
+    base_ring, dtype = sagewrap.check_dtype(base_ring, dtype)
+
+    identity_arr = np.identity(n, dtype=dtype, **kwargs)
+
+    if base_ring is not None:
+        return sagewrap.change_base_ring(base_ring, identity_arr)
+    return identity_arr

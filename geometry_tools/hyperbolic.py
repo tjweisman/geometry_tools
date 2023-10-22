@@ -441,7 +441,7 @@ class Point(HyperbolicObject, projective.Point):
             Point object with Kleinian/Poincare coords (0, 0, ...)
         """
 
-        return Point(np.zeros(shape + (dimension,)), model="klein")
+        return Point(np.zeros(shape + (dimension,), dtype=int), model="klein")
 
 class DualPoint(Point):
     """Model for a "dual point" in hyperbolic space (a point in the

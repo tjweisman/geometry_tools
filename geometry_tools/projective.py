@@ -113,6 +113,7 @@ import numpy as np
 from scipy.spatial import ConvexHull
 
 from geometry_tools import utils
+from geometry_tools.utils import sagewrap
 from geometry_tools import representation
 
 
@@ -399,6 +400,49 @@ class ProjectiveObject:
             raise TypeError("len() of unsized object")
 
         return len(self.proj_data)
+
+    def astype(self, dtype):
+        new_proj = self.proj_data.astype(dtype)
+        new_aux = None
+        new_dual = None
+
+        if self.aux_data is not None:
+            new_aux = self.aux_data.astype(dtype)
+
+        if self.dual_data is not None:
+            new_dual = self.dual_data.astype(dtype)
+
+
+        newobj = ProjectiveObject(new_proj, new_aux, new_dual,
+                                  unit_ndims=self.unit_ndims,
+                                  aux_ndims=self.aux_ndims,
+                                  dual_ndims=self.dual_ndims)
+
+        return self.__class__(newobj)
+
+    def change_base_ring(self, base_ring, inplace=False):
+        if not inplace:
+            newproj = sagewrap.change_base_ring(self.proj_data, base_ring)
+
+            newaux = None
+            if self.aux_data is not None:
+                newaux = sagewrap.change_base_ring(self.aux_data, base_ring)
+
+            newdual = None
+            if self.dual_data is not None:
+                newdual = sagewrap.change_base_ring(self.dual_data, base_ring)
+
+            newobj = ProjectiveObject(newproj, newaux, newdual,
+                                      unit_ndims=self.unit_ndims,
+                                      aux_ndims=self.aux_ndims,
+                                      dual_ndims=self.dual_ndims)
+            return self.__class__(newobj)
+
+        sagewrap.change_base_ring(self.proj_data, base_ring, inplace=True)
+        if self.aux_data is not None:
+            sagewrap.change_base_ring(self.aux_data, base_ring, inplace=True)
+        if self.dual_data is not None:
+            sagewrap.change_base_ring(self.dual_data, base_ring, inplace=True)
 
     def projective_coords(self, proj_data=None):
         """Wrapper for ProjectiveObject.set, since underlying coordinates are

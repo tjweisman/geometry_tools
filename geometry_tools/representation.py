@@ -364,7 +364,7 @@ class Representation:
 
         if length == 0:
             if state is None or as_start or state in automaton.start_vertices:
-                id_array = np.array([np.identity(self.dim)])
+                id_array = np.array([np.identity(self.dim, dtype=self.dtype)])
                 if with_words:
                     return (id_array, [""])
                 return id_array
@@ -480,7 +480,8 @@ class Representation:
         return semi_gens(self.generators.keys())
 
     def __init__(self, representation=None,
-                 generator_names=None):
+                 generator_names=None,
+                 dtype='float64'):
         """
         Parameters
         ----------
@@ -489,10 +490,14 @@ class Representation:
         generator_names : iterable of strings
             Names to use for the generators. These must be initialized
             as arrays later to use the representation properly.
+        dtype : numpy dtype
+            Default data type for matrix entries. Defaults to 'float64'.
 
         """
 
         self._dim = None
+
+        self.dtype = dtype
 
         if representation is not None:
             if generator_names is None:
@@ -515,7 +520,7 @@ class Representation:
                 self.generators[gen.upper()] = None
 
     def _word_value(self, word):
-        matrix = np.identity(self._dim)
+        matrix = np.identity(self._dim, dtype=self.dtype)
         for i, letter in enumerate(word):
             matrix = matrix @ self.generators[letter]
         return matrix
@@ -537,6 +542,9 @@ class Representation:
 
         self.generators[generator] = matrix
         self.generators[utils.invert_gen(generator)] = utils.invert(matrix)
+
+        # always update the dtype (we don't have a hierarchy for this)
+        self.dtype = matrix.dtype
 
     def compose(self, hom):
         """Get a new representation obtained by composing this representation
@@ -578,7 +586,7 @@ class Representation:
             for gen in self.semi_gens():
                 tens = np.tensordot(self[gen], rep[gen], axes=0)
                 elt = np.concatenate(np.concatenate(tens, axis=1), axis=1)
-                product_rep[gen] = np.matrix(elt)
+                product_rep[gen] = np.array(elt)
             return product_rep
 
     def symmetric_square(self):
@@ -759,7 +767,7 @@ def symmetric_inclusion(n):
             ti = tensor_index(i, j, n)
             incl_matrix[ti][si] = 1/2 + (i == j) * 1/2
 
-    return np.matrix(incl_matrix)
+    return np.array(incl_matrix)
 
 def symmetric_projection(n):
     r"""Return a matrix representing the linear surjection
@@ -789,7 +797,7 @@ def symmetric_projection(n):
         u, v = tensor_pos(i,n)
         proj_matrix[_sym_index(u, v, n)][i] = 1
 
-    return np.matrix(proj_matrix)
+    return np.array(proj_matrix)
 
 def sl2_irrep(A, n):
     r"""The irreducible representation \(\mathrm{SL}(2) \to
