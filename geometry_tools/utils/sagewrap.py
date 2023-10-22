@@ -35,19 +35,14 @@ def sage_matrix_list(A):
     mat_flat = A.reshape((-1,) + A.shape[-2:])
     return [sage_matrix(mat) for mat in mat_flat]
 
-def change_base_ring(arr, base_ring, inplace=False,
-                     rational_approx=False):
-    arr = arr.astype('object', copy=(not inplace))
+def change_base_ring(arr, base_ring, rational_approx=False):
+    arr = arr.astype('object')
 
     ring_convert = base_ring
     if rational_approx:
         ring_convert = (lambda x : base_ring(sage.all.QQ(x)))
 
-    if not inplace:
-        return _vectorize(ring_convert)(arr)
-
-    arr[...] = _vectorize(ring_convert)(arr)
-    return arr
+    return _vectorize(ring_convert)(arr)
 
 def invert(A):
     return apply_matrix_func(

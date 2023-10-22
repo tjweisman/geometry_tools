@@ -404,12 +404,12 @@ def orthogonal_complement(vectors, form=None, normalize="form"):
         form = np.identity(vectors.shape[-1])
 
     _, _, vh = np.linalg.svd(vectors @ form)
-    kernel = vh[..., vectors.shape[-2]:, :]
+    kernel_basis = vh[..., vectors.shape[-2]:, :]
 
     if normalize == 'form':
-        return indefinite_orthogonalize(form, kernel)
+        return indefinite_orthogonalize(form, kernel_basis)
 
-    return kernel
+    return kernel_basis
 
 def indefinite_orthogonalize(form, matrices):
 

@@ -429,34 +429,29 @@ class ProjectiveObject:
                 "Cannot change base ring unless running within sage"
             )
 
-        if not inplace:
-            newproj = sagewrap.change_base_ring(self.proj_data, base_ring,
+        newproj = sagewrap.change_base_ring(self.proj_data, base_ring,
+                                            **kwargs)
+
+        newaux = None
+        if self.aux_data is not None:
+            newaux = sagewrap.change_base_ring(self.aux_data, base_ring,
+                                               **kwargs)
+
+        newdual = None
+        if self.dual_data is not None:
+            newdual = sagewrap.change_base_ring(self.dual_data, base_ring,
                                                 **kwargs)
 
-            newaux = None
-            if self.aux_data is not None:
-                newaux = sagewrap.change_base_ring(self.aux_data, base_ring,
-                                                   **kwargs)
-
-            newdual = None
-            if self.dual_data is not None:
-                newdual = sagewrap.change_base_ring(self.dual_data, base_ring,
-                                                    **kwargs)
-
+        if not inplace:
             newobj = ProjectiveObject(newproj, newaux, newdual,
                                       unit_ndims=self.unit_ndims,
                                       aux_ndims=self.aux_ndims,
                                       dual_ndims=self.dual_ndims)
             return self.__class__(newobj)
 
-        sagewrap.change_base_ring(self.proj_data, base_ring, inplace=True,
-                                  **kwargs)
-        if self.aux_data is not None:
-            sagewrap.change_base_ring(self.aux_data, base_ring, inplace=True,
-                                      **kwargs)
-        if self.dual_data is not None:
-            sagewrap.change_base_ring(self.dual_data, base_ring, inplace=True,
-                                      **kwargs)
+        self.proj_data = newproj
+        self.aux_data = newaux
+        self.dual_data = newdual
 
     def projective_coords(self, proj_data=None):
         """Wrapper for ProjectiveObject.set, since underlying coordinates are
@@ -918,12 +913,10 @@ class Subspace(ProjectiveObject):
 
         spans = np.concatenate((p1, p2), axis=-2)
 
-        u, s, v = np.linalg.svd(spans.swapaxes(-1, -2))
-        int_dim = self.n + other.n - (self.dimension + 1)
+        kernel_coeffs = utils.kernel(spans.swapaxes(-1, -2))
+        subspace_coeffs = kernel_coeffs[..., :self.n, :].swapaxes(-1, -2)
 
-        coeffs = v[..., -int_dim:, :self.n]
-
-        return Subspace(utils.matrix_product(coeffs, p1))
+        return Subspace(utils.matrix_product(subspace_coeffs, p1))
 
 class ConvexPolygon(Polygon):
     """A finite-sided convex polygon in projective space.
