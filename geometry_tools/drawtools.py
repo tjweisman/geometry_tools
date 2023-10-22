@@ -149,6 +149,31 @@ class ProjectiveDrawing(Drawing):
                                **default_kwargs)
         self.ax.add_collection(lines)
 
+    def draw_line(self, line, **kwargs):
+        linelist = self.transform @ projective.PointPair(
+            line.flatten_to_unit()
+        )
+        default_kwargs = {
+            "color":"black",
+            "linewidth":1
+        }
+        for key, value in kwargs.items():
+            default_kwargs[key] = value
+
+        coords = linelist.endpoint_affine_coords()
+        c1 = coords[..., 0, :]
+        c2 = coords[..., 1, :]
+
+        ndiff = utils.normalize(c2 - c1)
+
+        dummy_1 = c1 + self.view_diam() * ndiff
+        dummy_2 = c2 - self.view_diam() * ndiff
+
+        dummy_coords = np.stack([dummy_1, dummy_2], axis=-2)
+
+        lines = LineCollection(dummy_coords, **default_kwargs)
+        self.ax.add_collection(lines)
+
 
 
     def draw_nonaff_polygon(self, polygon, **kwargs):
