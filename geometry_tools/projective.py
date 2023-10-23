@@ -307,10 +307,6 @@ class ProjectiveObject:
 
         """
 
-        # TODO: assert dual geometry valid here as well.  Right now we
-        # don't bother because the only dual geometry we're using is
-        # technically also auxilliary...
-
         if proj_data is not None:
             proj_data = np.array(proj_data)
 
@@ -326,11 +322,17 @@ class ProjectiveObject:
 
         self._assert_aux_valid(aux_data)
 
-
-
         self.proj_data = proj_data
-        self.aux_data = aux_data
-        self.dual_data = dual_data
+
+        if self.aux_ndims > 0:
+            self.aux_data = aux_data
+        else:
+            self.aux_data = None
+
+        if self.dual_ndims > 0:
+            self.dual_data = dual_data
+        else:
+            self.dual_data = None
 
     def flatten_to_unit(self, unit=None):
         """Get a flattened version of the projective object.
