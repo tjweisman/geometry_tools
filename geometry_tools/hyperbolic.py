@@ -194,7 +194,7 @@ class HyperbolicObject(projective.ProjectiveObject):
         return minkowski(self.dimension + 1)
 
 
-    def coords(self, model, proj_data=None):
+    def coords(self, model, proj_data=None, **kwargs):
         """Get or set a representation of this hyperbolic object in
         coordinates.
 
@@ -217,24 +217,24 @@ class HyperbolicObject(projective.ProjectiveObject):
 
         """
         if model == Model.KLEIN:
-            return self.kleinian_coords(proj_data)
+            return self.kleinian_coords(proj_data, **kwargs)
         if model == Model.PROJECTIVE:
-            return self.projective_coords(proj_data)
+            return self.projective_coords(proj_data, **kwargs)
 
         raise GeometryError(
             "Unimplemented model for an object of type {}: '{}'".format(
                 self.__class__.__name__, model
             ))
 
-    def kleinian_coords(self, aff_data=None):
-        return self.affine_coords(aff_data, chart_index=0)
+    def kleinian_coords(self, aff_data=None, **kwargs):
+        return self.affine_coords(aff_data, chart_index=0, **kwargs)
 
 class Point(HyperbolicObject, projective.Point):
     """Model for a point (or ndarray of points) in the closure of
     hyperbolic space.
 
     """
-    def __init__(self, point, model=Model.PROJECTIVE):
+    def __init__(self, point, model=Model.PROJECTIVE, **kwargs):
         """
 
         Parameters
@@ -258,14 +258,14 @@ class Point(HyperbolicObject, projective.Point):
         self.dual_ndims = 0
 
         try:
-            self._construct_from_object(point)
+            self._construct_from_object(point, **kwargs)
             return
         except TypeError:
             pass
 
-        self.coords(model, point)
+        self.coords(model, point, **kwargs)
 
-    def hyperboloid_coords(self, proj_data=None):
+    def hyperboloid_coords(self, proj_data=None, **kwargs):
         """Get or set point coordinates in the hyperboloid model.
 
         Parameters
@@ -284,11 +284,11 @@ class Point(HyperbolicObject, projective.Point):
 
         """
         if proj_data is not None:
-            self.set(proj_data)
+            self.set(proj_data, **kwargs)
 
         return hyperboloid_coords(self.proj_data)
 
-    def poincare_coords(self, proj_data=None):
+    def poincare_coords(self, proj_data=None, **kwargs):
         """Get or set point coordinates in the hyperboloid model.
 
         Parameters
@@ -308,11 +308,11 @@ class Point(HyperbolicObject, projective.Point):
         """
         if proj_data is not None:
             klein = poincare_to_kleinian(np.array(proj_data))
-            self.kleinian_coords(klein)
+            self.kleinian_coords(klein, **kwargs)
 
         return kleinian_to_poincare(self.kleinian_coords())
 
-    def halfspace_coords(self, proj_data=None):
+    def halfspace_coords(self, proj_data=None, **kwargs):
         """Get or set point coordinates in the half-space model.
 
         Parameters
@@ -334,10 +334,10 @@ class Point(HyperbolicObject, projective.Point):
         if proj_data is not None:
             poincare = halfspace_to_poincare(np.array(proj_data))
 
-        poincare_coords = self.poincare_coords(poincare)
+        poincare_coords = self.poincare_coords(poincare, **kwargs)
         return poincare_to_halfspace(poincare_coords)
 
-    def coords(self, model, proj_data=None):
+    def coords(self, model, proj_data=None, **kwargs):
         """Get or set a representation of this hyperbolic object in
         coordinates.
 
@@ -360,14 +360,14 @@ class Point(HyperbolicObject, projective.Point):
 
         """
         try:
-            return HyperbolicObject.coords(self, model, proj_data)
+            return HyperbolicObject.coords(self, model, proj_data, **kwargs)
         except GeometryError as e:
             if model == Model.POINCARE:
-                return self.poincare_coords(proj_data)
+                return self.poincare_coords(proj_data, **kwargs)
             if model == Model.HYPERBOLOID:
-                return self.hyperboloid_coords(proj_data)
+                return self.hyperboloid_coords(proj_data, **kwargs)
             if model == Model.HALFSPACE:
-                return self.halfspace_coords(proj_data)
+                return self.halfspace_coords(proj_data, **kwargs)
             raise e
 
     def distance(self, other):
@@ -465,7 +465,7 @@ class IdealPoint(Point):
 
     """
     def _assert_geometry_valid(self, proj_data):
-        super()._assert_geometry_valid(proj_data)
+        Point._assert_geometry_valid(self, proj_data)
 
         if not CHECK_LIGHT_CONE:
             return
@@ -482,7 +482,7 @@ class Subspace(IdealPoint):
     """Model for a geodesic subspace of hyperbolic space.
 
     """
-    def __init__(self, proj_data):
+    def __init__(self, proj_data, **kwargs):
         """
         Parameters
         ----------
@@ -495,10 +495,10 @@ class Subspace(IdealPoint):
             projective model.
 
         """
-        HyperbolicObject.__init__(self, proj_data, unit_ndims=2)
+        HyperbolicObject.__init__(self, proj_data, unit_ndims=2, **kwargs)
 
     def set(self, proj_data, **kwargs):
-        HyperbolicObject.set(self, proj_data)
+        HyperbolicObject.set(self, proj_data, **kwargs)
         self.ideal_basis = proj_data
 
     def ideal_basis_coords(self, model=Model.KLEIN):
@@ -637,7 +637,7 @@ class PointPair(Point, projective.PointPair):
     determined by a pair of points in R^(n,1)
 
     """
-    def __init__(self, endpoint1, endpoint2=None):
+    def __init__(self, endpoint1, endpoint2=None, **kwargs):
         """If `endpoint2` is `None`, interpret `endpoint1` as either a (2
         x...x n) `ndarray` (where n is the dimension of the underlying
         vector space), or else a composite `Point` object which can be
@@ -657,7 +657,7 @@ class PointPair(Point, projective.PointPair):
 
         """
 
-        projective.PointPair.__init__(self, endpoint1, endpoint2)
+        projective.PointPair.__init__(self, endpoint1, endpoint2, **kwargs)
 
     def endpoint_coords(self, model=Model.KLEIN):
         """Get coordinates for the endpoints of this point pair
@@ -718,7 +718,7 @@ class Geodesic(PointPair, Subspace):
 
     """
     def set(self, proj_data, **kwargs):
-        HyperbolicObject.set(self, proj_data)
+        HyperbolicObject.set(self, proj_data, **kwargs)
         self.endpoints = self.proj_data[..., :2, :]
         self.ideal_basis = self.proj_data[..., :2, :]
 
@@ -792,14 +792,14 @@ class Geodesic(PointPair, Subspace):
 class Segment(Geodesic):
     """Model a geodesic segment in hyperbolic space."""
 
-    def __init__(self, endpoint1, endpoint2=None):
+    def __init__(self, endpoint1, endpoint2=None, **kwargs):
         self.unit_ndims = 2
         self.aux_ndims = 0
         self.dual_ndims = 0
 
         if endpoint2 is None:
             try:
-                self._construct_from_object(endpoint1)
+                self._construct_from_object(endpoint1, **kwargs)
                 return
             except (AttributeError, TypeError, GeometryError):
                 pass
@@ -810,18 +810,18 @@ class Segment(Geodesic):
             except (AttributeError, GeometryError) as e:
                 pass
 
-        self.set_endpoints(endpoint1, endpoint2)
+        self.set_endpoints(endpoint1, endpoint2, **kwargs)
 
     def set(self, proj_data, **kwargs):
-        HyperbolicObject.set(self, proj_data)
+        HyperbolicObject.set(self, proj_data, **kwargs)
         self.endpoints = self.proj_data[..., :2, :]
         self.ideal_basis = self.proj_data[..., 2:, :]
 
-    def set_endpoints(self, endpoint1, endpoint2=None):
+    def set_endpoints(self, endpoint1, endpoint2=None, **kwargs):
         # reimplemented to also compute ideal endpoints
         if endpoint2 is None:
             self.endpoints = Point(endpoint1).proj_data
-            self._compute_ideal_endpoints(endpoint1)
+            self._compute_ideal_endpoints(endpoint1, **kwargs)
             return
 
         pt1 = Point(endpoint1)
@@ -831,6 +831,7 @@ class Segment(Geodesic):
         )
 
         self._compute_ideal_endpoints(self.endpoints)
+        self._set_optional(**kwargs)
 
     def _assert_geometry_valid(self, proj_data):
         HyperbolicObject._assert_geometry_valid(self, proj_data)
@@ -937,19 +938,19 @@ class Hyperplane(Subspace):
     """Model for a geodesic hyperplane in hyperbolic space."""
 
     #TODO: reimplement so ideal_basis is aux_data
-    def __init__(self, hyperplane_data):
+    def __init__(self, hyperplane_data, **kwargs):
         self.unit_ndims = 2
         self.aux_ndims = 0
         self.dual_ndims = 0
 
         try:
-            self._construct_from_object(hyperplane_data)
+            self._construct_from_object(hyperplane_data, **kwargs)
             return
         except (TypeError, GeometryError):
             pass
 
         try:
-            self.set(hyperplane_data)
+            self.set(hyperplane_data, **kwargs)
             return
         except GeometryError:
             pass
@@ -981,7 +982,7 @@ class Hyperplane(Subspace):
         return self.proj_data
 
     def set(self, proj_data, **kwargs):
-        HyperbolicObject.set(self, proj_data)
+        HyperbolicObject.set(self, proj_data, **kwargs)
 
         self.spacelike_vector = self.proj_data[..., 0, :]
         self.ideal_basis = self.proj_data[..., 1:, :]
@@ -1054,7 +1055,7 @@ class Hyperplane(Subspace):
 
 class TangentVector(HyperbolicObject):
     """Model for a tangent vector in hyperbolic space."""
-    def __init__(self, point_data, vector=None):
+    def __init__(self, point_data, vector=None, **kwargs):
         """If `vector` is `None`, interpret `point_data` as either an ndarray
         of shape `(..., 2, n)` (where `n` is the dimension of the
         underlying vector space), or else a composite HyperbolicObject
@@ -1086,13 +1087,14 @@ class TangentVector(HyperbolicObject):
             except TypeError:
                 pass
 
-            self.set(point_data)
+            self.set(point_data, **kwargs)
             return
 
-        self._compute_data(point_data, vector)
+        self._project_vector(point_data, vector)
+        self._set_optional(**kwargs)
 
     def _assert_geometry_valid(self, proj_data):
-        super()._assert_geometry_valid(proj_data)
+        HyperbolicObject._assert_geometry_valid(self, proj_data)
 
         if proj_data.shape[-2] != 2:
             raise GeometryError(
@@ -1115,7 +1117,7 @@ class TangentVector(HyperbolicObject):
         if (np.abs(products) > ERROR_THRESHOLD).any():
             raise GeometryError("tangent vector must be orthogonal to point")
 
-    def _compute_data(self, point, vector):
+    def _project_vector(self, point, vector):
         #wrapping these as hyperbolic objects first
         pt = Point(point)
 
@@ -1128,7 +1130,7 @@ class TangentVector(HyperbolicObject):
         self.set(np.stack([pt.proj_data, projected], axis=-2))
 
     def set(self, proj_data, **kwargs):
-        HyperbolicObject.set(self, proj_data)
+        HyperbolicObject.set(self, proj_data, **kwargs)
         self.point = self.proj_data[..., 0, :]
         self.vector = self.proj_data[..., 1, :]
 
@@ -1267,7 +1269,7 @@ class Horosphere(HyperbolicObject):
     """Model for a horosphere in hyperbolic space.
 
     """
-    def __init__(self, center, reference_point=None):
+    def __init__(self, center, reference_point=None, **kwargs):
         """If `reference_point` is `None`, interpret `center` as either:
 
         - a (..., 2, n) `ndarray`, where first row of the last two
@@ -1300,7 +1302,7 @@ class Horosphere(HyperbolicObject):
 
         if reference_point is None:
             try:
-                self._construct_from_object(center)
+                self._construct_from_object(center, **kwargs)
                 return
             except TypeError:
                 pass
@@ -1308,11 +1310,11 @@ class Horosphere(HyperbolicObject):
         self.set_center_ref(center, reference_point)
 
     def set(self, proj_data, **kwargs):
-        HyperbolicObject.set(self, proj_data)
+        HyperbolicObject.set(self, proj_data, **kwargs)
         self.center = proj_data[..., 0, :]
         self.reference = proj_data[..., 1, :]
 
-    def set_center_ref(self, center, reference_point=None):
+    def set_center_ref(self, center, reference_point=None, **kwargs):
         if reference_point is None:
             proj_data = Point(center).proj_data
         else:
@@ -1320,7 +1322,7 @@ class Horosphere(HyperbolicObject):
             ref = Point(reference_point)
             proj_data = np.stack([center.proj_data, ref.proj_data], axis=-2)
 
-        self.set(proj_data)
+        self.set(proj_data, **kwargs)
 
     def sphere_parameters(self, model=Model.POINCARE):
         """Get the center and radius of a sphere giving this horosphere in
@@ -1404,14 +1406,14 @@ class HorosphereArc(Horosphere, PointPair):
     """Model for an arc lying along a horosphere
 
     """
-    def __init__(self, center, p1=None, p2=None):
+    def __init__(self, center, p1=None, p2=None, **kwargs):
         self.unit_ndims = 2
         self.aux_ndims = 0
         self.dual_ndims = 0
 
         if p1 is None and p2 is None:
             try:
-                self._construct_from_object(center)
+                self._construct_from_object(center, **kwargs)
                 return
             except TypeError:
                 pass
@@ -1421,9 +1423,9 @@ class HorosphereArc(Horosphere, PointPair):
             except (AttributeError, GeometryError):
                 pass
 
-        self.set_center_endpoints(center, p1, p2)
+        self.set_center_endpoints(center, p1, p2, **kwargs)
 
-    def set_center_endpoints(self, center, p1=None, p2=None):
+    def set_center_endpoints(self, center, p1=None, p2=None, **kwargs):
         if ((p1 is None and p2 is not None) or
             (p1 is not None and p2 is None)):
             raise GeometryError(
@@ -1439,10 +1441,10 @@ class HorosphereArc(Horosphere, PointPair):
             p2_data = Point(p2).proj_data
             proj_data = np.stack([center_data, p1_data, p2_data], axis=-2)
 
-        self.set(proj_data)
+        self.set(proj_data, **kwargs)
 
     def set(self, proj_data, **kwargs):
-        HyperbolicObject.set(self, proj_data)
+        HyperbolicObject.set(self, proj_data, **kwargs)
         self.center = self.proj_data[..., 0, :]
         self.reference = self.proj_data[..., 1, :]
         self.endpoints = self.proj_data[..., 1:, :]
@@ -1471,15 +1473,15 @@ class BoundaryArc(Geodesic):
     """Model for an arc sitting in the boundary of hyperbolic space.
 
     """
-    def __init__(self, endpoint1, endpoint2=None):
-        PointPair.__init__(self, endpoint1, endpoint2)
+    def __init__(self, endpoint1, endpoint2=None, **kwargs):
+        PointPair.__init__(self, endpoint1, endpoint2, **kwargs)
 
     def set(self, proj_data, **kwargs):
-        HyperbolicObject.set(self, proj_data)
+        HyperbolicObject.set(self, proj_data, **kwargs)
         self.endpoints = proj_data[..., :2, :]
         self.orientation_pt = proj_data[..., 2, :]
 
-    def set_endpoints(self, endpoint1, endpoint2):
+    def set_endpoints(self, endpoint1, endpoint2, **kwargs):
         if endpoint2 is None:
             endpoint_data = Point(endpoint1).proj_data
         else:
@@ -1490,6 +1492,7 @@ class BoundaryArc(Geodesic):
             )
 
         self._build_orientation_point(endpoint_data)
+        self._set_optional(**kwargs)
 
     def orientation(self):
         return np.linalg.det(self.proj_data)
@@ -1555,10 +1558,11 @@ class Polygon(Point, projective.Polygon):
     keep track of auxiliary data, namely the proj_data of the segments
     making up the edges of the polygon.
     """
-    def __init__(self, vertices, aux_data=None):
+    def __init__(self, vertices, aux_data=None, **kwargs):
         self.segment_class = Segment
         HyperbolicObject.__init__(self, vertices, aux_data,
-                                  unit_ndims=2, aux_ndims=3)
+                                  unit_ndims=2, aux_ndims=3,
+                                  **kwargs)
 
     def _compute_aux_data(self, proj_data):
         segments = Segment(proj_data, np.roll(proj_data, -1, axis=-2))
@@ -1578,7 +1582,9 @@ class Polygon(Point, projective.Polygon):
         flat_segments = self.get_edges().flatten_to_unit()
         return flat_segments.circle_parameters(short_arc, degrees, model)
 
-    def regular_polygon(n, radius=None, angle=None, dimension=2):
+    @staticmethod
+    def regular_polygon(n, radius=None, angle=None, dimension=2,
+                        **kwargs):
         """Get a regular polygon with n vertices, inscribed on a circle of
         radius hyp_radius.
 
@@ -1605,22 +1611,24 @@ class Polygon(Point, projective.Polygon):
         mats = cyclic_rep.isometries(words)
 
         vertices = mats.apply(start_vertex, "pairwise_reversed")
-        return Polygon(vertices)
+        return Polygon(vertices, **kwargs)
 
-    def regular_surface_polygon(g, dimension=2):
+    @staticmethod
+    def regular_surface_polygon(g, dimension=2, **kwargs):
         """Get a regular polygon which is the fundamental domain for the
         action of a hyperbolic surface group with genus g.
 
         """
         return Polygon.regular_polygon(4 * g, radius=genus_g_surface_radius(g),
-                                       dimension=dimension)
+                                       dimension=dimension, **kwargs)
 
 class Isometry(projective.Transformation, HyperbolicObject):
     """Model for an isometry of hyperbolic space.
 
     """
-    def __init__(self, proj_data, column_vectors=False):
-        projective.Transformation.__init__(self, proj_data, column_vectors)
+    def __init__(self, proj_data, column_vectors=False, **kwargs):
+        projective.Transformation.__init__(self, proj_data, column_vectors,
+                                           **kwargs)
 
     def _fixpoint_data(self, sort_eigvals=True):
 
@@ -1657,8 +1665,7 @@ class Isometry(projective.Transformation, HyperbolicObject):
         return Geodesic(self.fixed_point_pair())
 
     def isometry_type(self):
-        fixpoint_data = self._fixpoint_data(sort_eigvals=True)
-        fixpoint
+        ...
 
     def fixed_point_pair(self, sort_eigvals=True):
         """Find fixed points for this isometry in the closure of hyperbolic space.

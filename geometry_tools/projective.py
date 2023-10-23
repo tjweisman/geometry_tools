@@ -144,7 +144,7 @@ class ProjectiveObject:
 
     """
     def __init__(self, proj_data, aux_data=None, dual_data=None,
-                 unit_ndims=1, aux_ndims=0, dual_ndims=0):
+                 unit_ndims=1, aux_ndims=0, dual_ndims=0, **kwargs):
         """Parameters
         -----------
 
@@ -174,15 +174,30 @@ class ProjectiveObject:
         dual_ndims : int
             like `unit_ndims`, but for covariant (dual) data.
 
+        base_ring : object
+            *(requires sage).* Base ring for matrix entries of the
+             underlying data for this object. This allows for exact
+             computations in projective space (at the cost of
+             performance) by supplying a ring that supports exact
+             computations. The dtype of the underlying data is
+             automatically converted to "object" if this is specified.
+
+        rational_approx : bool
+            *(requires sage).* If base_ring is specified, coerce
+             floating-point data to a rational approximation before
+             converting to the specified ring. This is useful for
+             combining computations with floating-point values with
+             computations in algebraic number fields.
+
         """
         self.unit_ndims = unit_ndims
         self.aux_ndims = aux_ndims
         self.dual_ndims = dual_ndims
 
         try:
-            self._construct_from_object(proj_data)
+            self._construct_from_object(proj_data, **kwargs)
         except TypeError:
-            self.set(proj_data, aux_data, dual_data)
+            self.set(proj_data, aux_data, dual_data, **kwargs)
 
     @property
     def dimension(self):
@@ -230,10 +245,29 @@ class ProjectiveObject:
             raise GeometryError(("Dual data provided to {} must be a"
             " numpy array").format(self.__class__.__name__))
 
+    def _assert_data_consistent(self, proj_data, aux_data, dual_data):
+        proj_shape = aux_shape = dual_shape = None
+
+        if proj_data is not None:
+            proj_shape = proj_data.shape[:-self.unit_ndims]
+        if aux_data is not None:
+            aux_shape = aux_data.shape[:-self.aux_ndims]
+        if dual_data is not None:
+            dual_shape = dual_data.shape[:-self.dual_ndims]
+
+        shapes = [shape for shape in [proj_shape, aux_shape, dual_shape]
+                  if shape is not None]
+
+        if len(shapes) == 0 or (np.array(shapes) == shapes[0]).all():
+            return
+
+        raise GeometryError( ("Mismatched regular/aux/dual data shapes for {}"
+            ).self.__class__.__name__)
+
     def _compute_aux_data(self, proj_data):
         return None
 
-    def _construct_from_object(self, hyp_obj):
+    def _construct_from_object(self, hyp_obj, **kwargs):
         """if we're passed a projective object or an array of projective
         objects, build a new one out of them
 
@@ -242,7 +276,8 @@ class ProjectiveObject:
         try:
             self.set(hyp_obj.proj_data,
                      aux_data=hyp_obj.aux_data,
-                     dual_data=hyp_obj.dual_data)
+                     dual_data=hyp_obj.dual_data,
+                     **kwargs)
             return
         except AttributeError:
             pass
@@ -267,7 +302,7 @@ class ProjectiveObject:
                 dual_array = None
 
             self.set(hyp_array, aux_data=aux_array,
-                     dual_data=dual_array)
+                     dual_data=dual_array, **kwargs)
             return
 
         except (TypeError, AttributeError, IndexError) as e:
@@ -288,7 +323,7 @@ class ProjectiveObject:
         """
         return self.proj_data.shape[:-1 * self.unit_ndims]
 
-    def set(self, proj_data=None, aux_data=None, dual_data=None):
+    def set(self, proj_data=None, aux_data=None, dual_data=None, **kwargs):
         """set the underlying data of the hyperbolic object.
 
         Subclasses may override this method to give special names to
@@ -304,6 +339,27 @@ class ProjectiveObject:
 
         dual_data : ndarray
             underlying dual data for this projective object.
+
+        base_ring : object
+            *(requires sage).* Base ring for matrix entries of the
+             underlying data for this object. This allows for exact
+             computations in projective space (at the cost of
+             performance) by supplying a ring that supports exact
+             computations. The dtype of the underlying data is
+             automatically converted to "object" if this is specified.
+
+        rational_approx : bool
+            *(requires sage).* If base_ring is specified, coerce
+             floating-point data to a rational approximation before
+             converting to the specified ring. This is useful for
+             combining computations with floating-point values with
+             computations in algebraic number fields.
+
+        Raises
+        ------
+        EnvironmentError
+            Raised if base_ring is specified but sage is not available
+            for import.
 
         """
 
@@ -333,6 +389,17 @@ class ProjectiveObject:
             self.dual_data = dual_data
         else:
             self.dual_data = None
+
+        self._set_optional(**kwargs)
+
+    def _set_optional(self, base_ring=None, rational_approx=False):
+        if base_ring is not None:
+            if not utils.SAGE_AVAILABLE:
+                raise EnvironmentError(
+                    "Cannot specify base ring unless sage is available"
+                )
+            self.change_base_ring(base_ring, inplace=True,
+                                  rational_approx=rational_approx)
 
     def flatten_to_unit(self, unit=None):
         """Get a flattened version of the projective object.
@@ -428,7 +495,7 @@ class ProjectiveObject:
     def change_base_ring(self, base_ring, inplace=False, **kwargs):
         if not utils.SAGE_AVAILABLE:
             raise EnvironmentError(
-                "Cannot change base ring unless running within sage"
+                "Cannot change base ring unless sage is available"
             )
 
         newproj = sagewrap.change_base_ring(self.proj_data, base_ring,
@@ -455,15 +522,15 @@ class ProjectiveObject:
         self.aux_data = newaux
         self.dual_data = newdual
 
-    def projective_coords(self, proj_data=None):
+    def projective_coords(self, proj_data=None, **kwargs):
         """Wrapper for ProjectiveObject.set, since underlying coordinates are
         projective."""
         if proj_data is not None:
-            self.set(proj_data)
+            self.set(proj_data, **kwargs)
 
         return self.proj_data
 
-    def affine_coords(self, aff_data=None, chart_index=0):
+    def affine_coords(self, aff_data=None, chart_index=0, **kwargs):
         """Get or set affine coordinates for this object.
 
         Parameters
@@ -483,7 +550,8 @@ class ProjectiveObject:
 
         """
         if aff_data is not None:
-            self.set(projective_coords(aff_data, chart_index=chart_index))
+            self.set(projective_coords(aff_data, chart_index=chart_index),
+                     **kwargs)
 
         return affine_coords(self.proj_data, chart_index=chart_index,
                              column_vectors=False)
@@ -574,7 +642,7 @@ class Point(ProjectiveObject):
     """A point (or collection of points) in projective space.
     """
 
-    def __init__(self, point, chart_index=None):
+    def __init__(self, point, chart_index=None, **kwargs):
         """Parameters
         ----------
         point : ndarray or ProjectiveObject or iterable
@@ -598,7 +666,7 @@ class Point(ProjectiveObject):
         self.dual_ndims = 0
 
         try:
-            self._construct_from_object(point)
+            self._construct_from_object(point, **kwargs)
             return
         except TypeError:
             pass
@@ -607,6 +675,8 @@ class Point(ProjectiveObject):
             self.projective_coords(point)
         else:
             self.affine_coords(point, chart_index)
+
+        self._set_optional(**kwargs)
 
     def in_affine_chart(self, index):
         return self.proj_data[..., index] != 0
@@ -618,7 +688,7 @@ class PointPair(Point):
     This is mostly useful as an interface for subclasses which provide
     more involved functionality.
     """
-    def __init__(self, endpoint1, endpoint2=None):
+    def __init__(self, endpoint1, endpoint2=None, **kwargs):
         """If `endpoint2` is `None`, interpret `endpoint1` as either an
         `ndarray` of shape (2, ..., n) (where n is the dimension of
         the underlying vector space), or else a composite `Point`
@@ -644,18 +714,18 @@ class PointPair(Point):
 
         if endpoint2 is None:
             try:
-                self._construct_from_object(endpoint1)
+                self._construct_from_object(endpoint1, **kwargs)
                 return
             except (AttributeError, TypeError, GeometryError):
                 pass
 
-        self.set_endpoints(endpoint1, endpoint2)
+        self.set_endpoints(endpoint1, endpoint2, **kwargs)
 
     def set(self, proj_data, **kwargs):
-        ProjectiveObject.set(self, proj_data)
+        ProjectiveObject.set(self, proj_data, **kwargs)
         self.endpoints = self.proj_data[..., :2, :]
 
-    def set_endpoints(self, endpoint1, endpoint2=None):
+    def set_endpoints(self, endpoint1, endpoint2=None, **kwargs):
         """Set the endpoints of a segment.
 
         If `endpoint2` is `None`, expect `endpoint1` to be an array of
@@ -672,12 +742,12 @@ class PointPair(Point):
 
         """
         if endpoint2 is None:
-            self.set(Point(endpoint1).proj_data)
+            self.set(Point(endpoint1).proj_data, **kwargs)
             return
 
         pt1 = Point(endpoint1)
         pt2 = Point(endpoint2)
-        self.set(np.stack([pt1.proj_data, pt2.proj_data], axis=-2))
+        self.set(np.stack([pt1.proj_data, pt2.proj_data], axis=-2), **kwargs)
 
     def get_endpoints(self):
         """Get a Point representing the endpoints of this pair
@@ -737,7 +807,7 @@ class PointPair(Point):
 class Polygon(Point):
     """A finite-sided polygon in projective space.
     """
-    def __init__(self, vertices, aux_data=None):
+    def __init__(self, vertices, aux_data=None, **kwargs):
         """
         Parameters
         ----------
@@ -752,14 +822,15 @@ class Polygon(Point):
 
         """
         ProjectiveObject.__init__(self, vertices, aux_data,
-                                  unit_ndims=2, aux_ndims=3)
+                                  unit_ndims=2, aux_ndims=3,
+                                  **kwargs)
 
     def in_standard_chart(self):
         coord_signs = np.sign(self.projective_coords()[..., 0])
         return np.all(coord_signs == 1, axis=-1) | np.all(coord_signs == -1, axis=-1)
 
-    def set(self, proj_data, aux_data=None, dual_data=None):
-        ProjectiveObject.set(self, proj_data, aux_data)
+    def set(self, proj_data, aux_data=None, dual_data=None, **kwargs):
+        ProjectiveObject.set(self, proj_data, aux_data, **kwargs)
         self.vertices = self.proj_data
         self.edges = self.aux_data
 
@@ -792,7 +863,7 @@ class Polygon(Point):
 class Simplex(Point):
     """An n-simplex in projective space.
     """
-    def __init__(self, vertices):
+    def __init__(self, vertices, **kwargs):
         """
         Parameters
         ----------
@@ -801,7 +872,7 @@ class Simplex(Point):
             several simplices)
 
         """
-        ProjectiveObject.__init__(self, vertices, unit_ndims=2)
+        ProjectiveObject.__init__(self, vertices, unit_ndims=2, **kwargs)
 
     @property
     def n(self):
@@ -852,7 +923,7 @@ class Subspace(ProjectiveObject):
     subspaces with the same dimension)
 
     """
-    def __init__(self, proj_data):
+    def __init__(self, proj_data, **kwargs):
         """
         Parameters
         ----------
@@ -862,7 +933,7 @@ class Subspace(ProjectiveObject):
             independent vectors.
 
         """
-        ProjectiveObject.__init__(self, proj_data, unit_ndims=2)
+        ProjectiveObject.__init__(self, proj_data, unit_ndims=2, **kwargs)
 
     @property
     def n(self):
@@ -924,7 +995,7 @@ class ConvexPolygon(Polygon):
     """A finite-sided convex polygon in projective space.
     """
 
-    def __init__(self, vertices, aux_data=None, dual_data=None):
+    def __init__(self, vertices, aux_data=None, dual_data=None, **kwargs):
         r"""When providing point data for this polygon, non-extreme points
         (i.e. points in the interior of the convex hull) are
         discarded. To determine which points lie in the interior of
@@ -956,7 +1027,7 @@ class ConvexPolygon(Polygon):
 
         ProjectiveObject.__init__(self, vertices, aux_data=aux_data,
                                   dual_data=dual_data, unit_ndims=2,
-                                  aux_ndims=3, dual_ndims=1)
+                                  aux_ndims=3, dual_ndims=1, **kwargs)
     def add_points(self, points, in_place=False):
         """Add points to an existing convex polygon.
 
@@ -1021,8 +1092,8 @@ class ConvexPolygon(Polygon):
         self.proj_data = self.proj_data[vertex_indices]
         self.aux_data = self._compute_aux_data(self.proj_data)
 
-    def set(self, proj_data, aux_data=None, dual_data=None):
-        ProjectiveObject.set(self, proj_data, aux_data, dual_data)
+    def set(self, proj_data, aux_data=None, dual_data=None, **kwargs):
+        ProjectiveObject.set(self, proj_data, aux_data, dual_data, **kwargs)
         if dual_data is None:
             self._convexify()
 
@@ -1030,7 +1101,7 @@ class Transformation(ProjectiveObject):
     """A projective transformation (or a composite object consisting of a
     collection of projective transformations).
     """
-    def __init__(self, proj_data, column_vectors=False):
+    def __init__(self, proj_data, column_vectors=False, **kwargs):
         """By default, the underlying data for a projective
         transformation is a *row matrix* (or an ndarray of row
         matrices), acting on vectors on the *right*.
@@ -1049,12 +1120,12 @@ class Transformation(ProjectiveObject):
         self.dual_ndims = 0
 
         try:
-            self._construct_from_object(proj_data)
+            self._construct_from_object(proj_data, **kwargs)
         except TypeError:
             if column_vectors:
-                self.set(proj_data.swapaxes(-1,-2))
+                self.set(proj_data.swapaxes(-1,-2), **kwargs)
             else:
-                self.set(proj_data)
+                self.set(proj_data, **kwargs)
 
     def _assert_geometry_valid(self, proj_data):
         ProjectiveObject._assert_geometry_valid(self, proj_data)
@@ -1066,7 +1137,7 @@ class Transformation(ProjectiveObject):
                      proj_data.shape))
 
     def set(self, proj_data, **kwargs):
-        ProjectiveObject.set(self, proj_data)
+        ProjectiveObject.set(self, proj_data, **kwargs)
         self.matrix = proj_data
         self.proj_data = proj_data
 
