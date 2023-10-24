@@ -393,6 +393,7 @@ class ProjectiveObject:
         self._set_optional(**kwargs)
 
     def _set_optional(self, base_ring=None, rational_approx=False):
+        self.base_ring = None
         if base_ring is not None:
             if not utils.SAGE_AVAILABLE:
                 raise EnvironmentError(
@@ -400,6 +401,8 @@ class ProjectiveObject:
                 )
             self.change_base_ring(base_ring, inplace=True,
                                   rational_approx=rational_approx)
+
+        self.base_ring = utils.guess_base_ring(self.proj_data)
 
     def flatten_to_unit(self, unit=None):
         """Get a flattened version of the projective object.
@@ -518,6 +521,7 @@ class ProjectiveObject:
                                       dual_ndims=self.dual_ndims)
             return self.__class__(newobj)
 
+        self.base_ring = base_ring
         self.proj_data = newproj
         self.aux_data = newaux
         self.dual_data = newdual
@@ -1080,7 +1084,7 @@ class ConvexPolygon(Polygon):
         dim = self.proj_data.shape[-1]
         self.dual_data = utils.find_positive_functional(self.proj_data)
 
-        to_std_aff = utils.invert(utils.find_isometry(np.identity(dim),
+        to_std_aff = utils.invert(utils.find_isometry(utils.identity(dim),
                                                        self.dual_data))
 
         standardized_coords = Point(
@@ -1211,7 +1215,7 @@ class Transformation(ProjectiveObject):
         product = self._apply_to_data(proj_obj, broadcast)
         return self._data_to_object(product)
 
-    def eigenvector(self, eigenvalue=None):
+    def eigenvector(self, eigenvalue=None, compute_exact=False):
         """Get a point corresponding to an eigenvector with the given
         eigenvalue.
 
@@ -1221,6 +1225,13 @@ class Transformation(ProjectiveObject):
             Eigenvalue for the returned eigenvector. If None, return
             an arbitrary eigenvector.
 
+        compute_exact : bool
+            If True, and sage is available, then (if possible) use
+            sage matrix functions to compute exact entries for the
+            eigenvector found. If sage is not available, or the
+            underlying data of this transformation does not support
+            exact computation, then this parameter has no effect.
+
         Returns
         -------
         Point
@@ -1229,9 +1240,10 @@ class Transformation(ProjectiveObject):
             point will be degenerate (i.e. zero) if no nonzero
             eigenvector with this eigenvalue exists.
 
-        """
-        eigvals, eigvecs = np.linalg.eig(self.proj_data.swapaxes(-1, -2))
-        eigvec_coords = np.zeros(self.proj_data.shape[:-1])
+    """
+        eigvals, eigvecs = utils.eig(self.proj_data.swapaxes(-1, -2),
+                                     compute_exact=compute_exact)
+        eigvec_coords = utils.zeros(self.proj_data.shape[:-1])
 
         ic = np.ones_like(eigvals)
         if eigenvalue is not None:
@@ -1447,14 +1459,17 @@ def projective_coords(points, chart_index=0, column_vectors=False):
     if column_vectors:
         coords = coords.swapaxes(-1, -2)
 
-    result = np.zeros(coords.shape[:-1] + (coords.shape[-1] + 1,),
-                      dtype=coords.dtype)
+    result = utils.zeros(coords.shape[:-1] + (coords.shape[-1] + 1,),
+                         like=coords)
 
     indices = np.arange(coords.shape[-1])
     indices[chart_index:] += 1
 
     result[..., indices] = coords
-    result[..., chart_index] = 1.
+
+    # add 1 to zero, because we want to keep this as a sage integer
+    # type if it is already
+    result[..., chart_index] += 1
 
     if column_vectors:
         result = result.swapaxes(-1, -2)

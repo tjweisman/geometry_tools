@@ -128,6 +128,9 @@ import numpy as np
 from geometry_tools import projective, representation, utils
 from geometry_tools.projective import GeometryError
 
+if utils.SAGE_AVAILABLE:
+    from geometry_tools.utils import sagewrap
+
 #arbitrary
 ERROR_THRESHOLD = 1e-8
 BOUNDARY_THRESHOLD = 1e-5
@@ -191,7 +194,7 @@ class HyperbolicObject(projective.ProjectiveObject):
 
     @property
     def minkowski(self):
-        return minkowski(self.dimension + 1)
+        return minkowski(self.dimension + 1, base_ring=self.base_ring)
 
 
     def coords(self, model, proj_data=None, **kwargs):
@@ -424,7 +427,7 @@ class Point(HyperbolicObject, projective.Point):
         diff = other.proj_data - self.proj_data
         return TangentVector(self, diff).normalized()
 
-    def get_origin(dimension, shape=()):
+    def get_origin(dimension, shape=(), base_ring=None):
         """Get a point (or ndarray of points) at the "origin" of hyperbolic
            space
 
@@ -441,7 +444,8 @@ class Point(HyperbolicObject, projective.Point):
             Point object with Kleinian/Poincare coords (0, 0, ...)
         """
 
-        return Point(np.zeros(shape + (dimension,), dtype=int), model="klein")
+        return Point(utils.zeros(shape + (dimension,),
+                                 base_ring=base_ring), model="klein")
 
 class DualPoint(Point):
     """Model for a "dual point" in hyperbolic space (a point in the
@@ -522,7 +526,7 @@ class Subspace(IdealPoint):
         #underlying data is different.
         return Point(self.ideal_basis).coords(model)
 
-    def spacelike_complement(self):
+    def spacelike_complement(self, compute_exact=True):
         """Get a spacelike point in the orthogonal complement to this subspace
 
         Returns
@@ -535,10 +539,10 @@ class Subspace(IdealPoint):
 
         """
 
-        orthed = self._data_with_dual()
+        orthed = self._data_with_dual(compute_exact=compute_exact)
         return DualPoint(orthed[..., 0, :])
 
-    def _data_with_dual(self):
+    def _data_with_dual(self, compute_exact=True):
         midpoints = np.sum(self.ideal_basis, axis=-2) / self.ideal_basis.shape[-2]
 
         poincare_ctr, poincare_rad = self.sphere_parameters(model=Model.POINCARE)
@@ -554,7 +558,8 @@ class Subspace(IdealPoint):
             axis=-2)
 
         orthed = utils.indefinite_orthogonalize(self.minkowski,
-                                                to_orthogonalize)
+                                                to_orthogonalize,
+                                                compute_exact=compute_exact)
         return np.concatenate([
             np.expand_dims(orthed[..., -1, :], axis=-2),
             self.ideal_basis], axis=-2)
@@ -610,7 +615,7 @@ class Subspace(IdealPoint):
 
         return center, radius
 
-    def reflection_across(self):
+    def reflection_across(self, compute_exact=True):
         """Get a hyperbolic isometry reflecting across this hyperplane.
 
         Returns
@@ -619,7 +624,7 @@ class Subspace(IdealPoint):
             Isometry reflecting across this hyperplane.
 
         """
-        dual_data = self._data_with_dual()
+        dual_data = self._data_with_dual(compute_exact=compute_exact)
         if self.dimension + 1 != dual_data.shape[-2]:
             raise GeometryError(
                 ("Cannot compute a reflection across a subspace of "
@@ -805,7 +810,7 @@ class Segment(Geodesic):
                 pass
 
             try:
-                self.set(endpoint1)
+                self.set(endpoint1, **kwargs)
                 return
             except (AttributeError, GeometryError) as e:
                 pass
@@ -817,11 +822,12 @@ class Segment(Geodesic):
         self.endpoints = self.proj_data[..., :2, :]
         self.ideal_basis = self.proj_data[..., 2:, :]
 
-    def set_endpoints(self, endpoint1, endpoint2=None, **kwargs):
+    def set_endpoints(self, endpoint1, endpoint2=None, base_ring=None,
+                      **kwargs):
         # reimplemented to also compute ideal endpoints
         if endpoint2 is None:
             self.endpoints = Point(endpoint1).proj_data
-            self._compute_ideal_endpoints(endpoint1, **kwargs)
+            self._compute_ideal_endpoints(endpoint1, base_ring=base_ring)
             return
 
         pt1 = Point(endpoint1)
@@ -830,7 +836,7 @@ class Segment(Geodesic):
             [pt1.proj_data, pt2.proj_data], axis=-2)
         )
 
-        self._compute_ideal_endpoints(self.endpoints)
+        self._compute_ideal_endpoints(self.endpoints, base_ring=base_ring)
         self._set_optional(**kwargs)
 
     def _assert_geometry_valid(self, proj_data):
@@ -852,10 +858,13 @@ class Segment(Geodesic):
             raise GeometryError( "segment data at index [..., 1, :,"
             ":] must consist of lightlike vectors" )
 
-    def _compute_ideal_endpoints(self, endpoints):
+    def _compute_ideal_endpoints(self, endpoints, base_ring=None):
         end_data = Point(endpoints).proj_data
+
+        if base_ring is None:
+            base_ring = utils.guess_base_ring(end_data)
         dim = end_data.shape[-1]
-        products = end_data @ minkowski(dim) @ end_data.swapaxes(-1, -2)
+        products = end_data @ minkowski(dim, base_ring) @ end_data.swapaxes(-1, -2)
         a11 = products[..., 0, 0]
         a22 = products[..., 1, 1]
         a12 = products[..., 0, 1]
@@ -978,7 +987,7 @@ class Hyperplane(Subspace):
             raise GeometryError( ("Hyperplane data at index [..., 1, :]"
                                   " must consist of lightlike vectors") )
 
-    def _data_with_dual(self):
+    def _data_with_dual(self, **kwargs):
         return self.proj_data
 
     def set(self, proj_data, **kwargs):
@@ -1055,7 +1064,8 @@ class Hyperplane(Subspace):
 
 class TangentVector(HyperbolicObject):
     """Model for a tangent vector in hyperbolic space."""
-    def __init__(self, point_data, vector=None, **kwargs):
+    def __init__(self, point_data, vector=None, base_ring=None,
+                 **kwargs):
         """If `vector` is `None`, interpret `point_data` as either an ndarray
         of shape `(..., 2, n)` (where `n` is the dimension of the
         underlying vector space), or else a composite HyperbolicObject
@@ -1082,16 +1092,21 @@ class TangentVector(HyperbolicObject):
 
         if vector is None:
             try:
-                self._construct_from_object(point_data)
+                self._construct_from_object(point_data,
+                                            base_ring=base_ring,
+                                            **kwargs)
                 return
             except TypeError:
                 pass
 
-            self.set(point_data, **kwargs)
+            self.set(point_data, base_ring=base_ring, **kwargs)
             return
 
-        self._project_vector(point_data, vector)
-        self._set_optional(**kwargs)
+        if base_ring is None:
+            base_ring = utils.guess_base_ring(vector)
+
+        self._project_vector(point_data, vector, base_ring=base_ring)
+        self._set_optional(base_ring=base_ring, **kwargs)
 
     def _assert_geometry_valid(self, proj_data):
         HyperbolicObject._assert_geometry_valid(self, proj_data)
@@ -1117,7 +1132,7 @@ class TangentVector(HyperbolicObject):
         if (np.abs(products) > ERROR_THRESHOLD).any():
             raise GeometryError("tangent vector must be orthogonal to point")
 
-    def _project_vector(self, point, vector):
+    def _project_vector(self, point, vector, base_ring=None):
         #wrapping these as hyperbolic objects first
         pt = Point(point)
 
@@ -1125,7 +1140,12 @@ class TangentVector(HyperbolicObject):
         #after we project
         vec = HyperbolicObject(vector)
 
-        projected = project_to_hyperboloid(pt.proj_data, vec.proj_data)
+        #cannot use self.minkowski here since we may not have set
+        #underlying data yet
+        projected = project_to_hyperboloid(
+            pt.proj_data, vec.proj_data,
+            minkowski(pt.proj_data.shape[-1], base_ring)
+        )
 
         self.set(np.stack([pt.proj_data, projected], axis=-2))
 
@@ -1146,9 +1166,10 @@ class TangentVector(HyperbolicObject):
 
         """
         normed_vec = utils.normalize(self.vector, self.minkowski)
+
         return TangentVector(self.point, normed_vec)
 
-    def origin_to(self, force_oriented=True):
+    def origin_to(self, force_oriented=True, compute_exact=True):
         """Get an isometry taking the "origin" to this vector.
 
         The "origin" is a tangent vector whose basepoint lies at (0,
@@ -1167,10 +1188,11 @@ class TangentVector(HyperbolicObject):
         Isometry
             Isometry taking the "origin" to this tangent vector.
 
-    """
+        """
         normed = utils.normalize(self.proj_data, self.minkowski)
         isom = utils.find_isometry(self.minkowski, normed,
-                                   force_oriented)
+                                   force_oriented,
+                                   compute_exact=compute_exact)
 
         return Isometry(isom, column_vectors=False)
 
@@ -1231,15 +1253,16 @@ class TangentVector(HyperbolicObject):
         kleinian_shape = list(self.point.shape)
         kleinian_shape[-1] -= 1
 
-        kleinian_pt = np.zeros(kleinian_shape)
+        kleinian_pt = utils.zeros(kleinian_shape, base_ring=self.base_ring)
+
         kleinian_pt[..., 0] = hyp_to_affine_dist(distance)
 
         basepoint = Point(kleinian_pt, model=Model.KLEIN)
 
         return self.origin_to().apply(basepoint, "elementwise")
 
-    @classmethod
-    def get_base_tangent(cls, dimension, shape=()):
+    @staticmethod
+    def get_base_tangent(dimension, shape=(), base_ring=None):
         """Get an "origin" tangent vector.
 
         The basepoint of this tangent vector has coordinates (0, 0,
@@ -1259,11 +1282,12 @@ class TangentVector(HyperbolicObject):
             An "origin" tangent vector.
 
         """
-        origin = Point.get_origin(dimension, shape)
-        vector = np.zeros(() + (dimension + 1,))
-        vector[..., 1] = 1.
 
-        return TangentVector(origin, vector)
+        origin = Point.get_origin(dimension, shape, base_ring=base_ring)
+        vector = utils.zeros((dimension + 1,), base_ring=base_ring)
+        vector[..., 1] += 1
+
+        return TangentVector(origin, vector, base_ring=base_ring)
 
 class Horosphere(HyperbolicObject):
     """Model for a horosphere in hyperbolic space.
@@ -1495,7 +1519,7 @@ class BoundaryArc(Geodesic):
         self._set_optional(**kwargs)
 
     def orientation(self):
-        return np.linalg.det(self.proj_data)
+        return utils.det(self.proj_data)
 
     def flip_orientation(self):
         self.proj_data[..., 2, :] *= -1
@@ -1520,10 +1544,10 @@ class BoundaryArc(Geodesic):
 
         point_data = np.concatenate((endpoints, orientation_pt_1), axis=-2)
 
-        dets = np.linalg.det(point_data)
+        dets = utils.det(point_data)
         point_data[np.abs(dets) < ERROR_THRESHOLD, 2] = orientation_pt_2
 
-        signs = np.linalg.det(point_data)
+        signs = utils.det(point_data)
         point_data[signs < 0, 2] *= -1
 
         self.set(point_data)
@@ -1584,7 +1608,7 @@ class Polygon(Point, projective.Polygon):
 
     @staticmethod
     def regular_polygon(n, radius=None, angle=None, dimension=2,
-                        **kwargs):
+                        base_ring=None, **kwargs):
         """Get a regular polygon with n vertices, inscribed on a circle of
         radius hyp_radius.
 
@@ -1596,31 +1620,47 @@ class Polygon(Point, projective.Polygon):
                 "Must provide either an angle or a radius to regular_polygon"
             )
 
+        compute_exact = (utils.SAGE_AVAILABLE and base_ring is not None)
+
+        pi = np.pi
+        if compute_exact:
+            pi = sagewrap.pi
+
         if radius is None:
-            radius = regular_polygon_radius(n, angle)
+            radius = regular_polygon_radius(n, angle, compute_exact=compute_exact)
 
         hyp_radius = np.array(radius)
         tangent = TangentVector.get_base_tangent(dimension,
-                                                 hyp_radius.shape).normalized()
+                                                 hyp_radius.shape,
+                                                 base_ring=base_ring).normalized()
+
         start_vertex = tangent.point_along(hyp_radius)
 
         cyclic_rep = HyperbolicRepresentation()
-        cyclic_rep["a"] = Isometry.standard_rotation(2 * np.pi / n, dimension=dimension)
+        cyclic_rep["a"] = Isometry.standard_rotation(2 * pi / n, dimension=dimension)
 
         words = ["a" * i for i in range(n)]
         mats = cyclic_rep.isometries(words)
 
         vertices = mats.apply(start_vertex, "pairwise_reversed")
+
         return Polygon(vertices, **kwargs)
 
     @staticmethod
-    def regular_surface_polygon(g, dimension=2, **kwargs):
+    def regular_surface_polygon(g, base_ring=None, **kwargs):
         """Get a regular polygon which is the fundamental domain for the
         action of a hyperbolic surface group with genus g.
 
         """
-        return Polygon.regular_polygon(4 * g, radius=genus_g_surface_radius(g),
-                                       dimension=dimension, **kwargs)
+
+        compute_exact = (utils.SAGE_AVAILABLE and base_ring is not None)
+        radius = genus_g_surface_radius(g, compute_exact=compute_exact)
+
+        if base_ring is not None:
+            radius = base_ring(radius)
+        return Polygon.regular_polygon(
+            4 * g, radius=radius, base_ring=base_ring, **kwargs
+        )
 
 class Isometry(projective.Transformation, HyperbolicObject):
     """Model for an isometry of hyperbolic space.
@@ -1713,8 +1753,11 @@ class Isometry(projective.Transformation, HyperbolicObject):
         diagonally in O(n,1).
 
         """
-        mat = np.zeros((dimension + 1, dimension + 1))
-        mat[0,0] = 1.0
+        mat = utils.zeros((dimension + 1, dimension + 1),
+                          like=block_elliptic)
+
+        # add one to preserve base_ring
+        mat[0,0] += 1
         mat[1:, 1:] = block_elliptic
 
         return Isometry(mat, column_vectors=column_vectors)
@@ -1740,7 +1783,7 @@ class Isometry(projective.Transformation, HyperbolicObject):
 
         WARNING: not vectorized.
         """
-        affine = np.identity(dimension)
+        affine = utils.identity(dimension, like=np.array(angle))
         affine[0:2, 0:2] = utils.rotation_matrix(angle)
 
         return Isometry.elliptic(dimension, affine)
@@ -1781,8 +1824,10 @@ class HyperbolicRepresentation(projective.ProjectiveRepresentation):
 
         return Isometry(result)
 
-def minkowski(dimension):
-    return np.diag(np.concatenate(([-1.0], np.ones(dimension - 1))))
+def minkowski(dimension, base_ring=None):
+    form = utils.identity(dimension, base_ring=base_ring)
+    form[0, 0] = form[0,0] * -1
+    return form
 
 def kleinian_coords(points, column_vectors=False):
     """Get kleinian coordinates for an ndarray of points.
@@ -1911,7 +1956,7 @@ def halfspace_to_poincare(points):
 
     return poincare_coords
 
-def timelike_to(v, force_oriented=False):
+def timelike_to(v, force_oriented=False, compute_exact=True):
     """Find an isometry taking the origin of the Poincare/Klein models to
     the given vector v.
 
@@ -1924,7 +1969,8 @@ def timelike_to(v, force_oriented=False):
 
     dim = np.array(v).shape[-1]
     return Isometry(utils.find_isometry(minkowski(dim),
-                                        v, force_oriented),
+                                        v, force_oriented,
+                                        compute_exact=compute_exact),
                     column_vectors=False)
 
 def sl2r_iso(matrix):
@@ -1938,14 +1984,17 @@ def sl2r_iso(matrix):
     return Isometry(representation.sl2_to_so21(np.array(matrix)),
                     column_vectors=True)
 
-def project_to_hyperboloid(basepoint, tangent_vector):
+def project_to_hyperboloid(basepoint, tangent_vector, form=None):
     """Project a vector in R^(n,1) to lie in the tangent space to the unit
     hyperboloid at a given basepoint.
 
     """
-    dim = basepoint.shape[-1]
+    if form is None:
+        form = minkowski(basepoint.shape[-1])
+
     return tangent_vector - utils.projection(
-        tangent_vector, basepoint, minkowski(dim))
+        tangent_vector, basepoint, form
+    )
 
 def hyp_to_affine_dist(r):
     """Convert distance in hyperbolic space to distance from the origin in
@@ -1964,34 +2013,47 @@ def _loxodromic_basis_change(dimension):
 
     return mat
 
-def regular_polygon_radius(n, interior_angle):
+def regular_polygon_radius(n, interior_angle, compute_exact=True):
     """Find r such that a regular n-gon inscribed on a circle of radius r
     has the given interior angle.
 
     """
+    pi = np.pi
+    if utils.SAGE_AVAILABLE and compute_exact:
+        pi = sagewrap.pi
+
     alpha = interior_angle / 2
-    gamma = np.pi / n
+    gamma = pi / n
     term = ((np.cos(alpha)**2 - np.sin(gamma)**2) /
             ((np.sin(alpha) * np.sin(gamma))**2))
+
     return np.arcsinh(np.sqrt(term))
 
-def polygon_interior_angle(n, hyp_radius):
+def polygon_interior_angle(n, hyp_radius, compute_exact=True):
     """Get the interior angle of a regular n-gon inscribed on a circle
     with the given hyperbolic radius.
 
     """
-    gamma = np.pi / n
+    pi = np.pi
+    if utils.SAGE_AVAILABLE and compute_exact:
+        pi = sagewrap.pi
+
+    gamma = pi / n
     denom = np.sqrt(1 + (np.sin(gamma) * np.sinh(hyp_radius))**2)
     return 2 * np.arcsin(np.cos(gamma) / denom)
 
-def genus_g_surface_radius(g):
+def genus_g_surface_radius(g, compute_exact=True):
     """Find the radius of a regular polygon giving the fundamental domain
     for the action of a hyperbolic surface group with genus g.
 
     """
-    return regular_polygon_radius(4 * g, np.pi / (4*g))
+    pi = np.pi
+    if utils.SAGE_AVAILABLE and compute_exact:
+        pi = sagewrap.pi
 
-def spacelike_to(v, force_oriented=False):
+    return regular_polygon_radius(4 * g, pi / (4*g), compute_exact=compute_exact)
+
+def spacelike_to(v, force_oriented=False, compute_exact=True):
     """Find an isometry taking the second standard basis vector (0, 1, 0,
     ...) to the given vector v.
 
@@ -2006,7 +2068,8 @@ def spacelike_to(v, force_oriented=False):
         raise GeometryError( "Cannot find isometry taking a"
         " spacelike vector to a non-spacelike vector.")
 
-    iso = utils.find_isometry(minkowski(dim), normed)
+    iso = utils.find_isometry(minkowski(dim), normed,
+                              compute_exact=compute_exact)
 
     #find the index of the timelike basis vector
     lengths = np.expand_dims(utils.normsq(iso, minkowski(dim)), axis=-1)

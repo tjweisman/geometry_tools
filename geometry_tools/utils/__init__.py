@@ -153,8 +153,9 @@ def circle_angles(center, coords):
 
     return np.arctan2(ys, xs)
 
-def apply_bilinear(v1, v2, bilinear_form=None):
-    """Apply a bilinar form to a pair of arrays of vectors.
+def apply_bilinear(v1, v2, bilinear_form=None,
+                   broadcast="elementwise"):
+    """Apply a bilinear form to a pair of arrays of vectors.
 
     Parameters
     ----------
@@ -173,10 +174,20 @@ def apply_bilinear(v1, v2, bilinear_form=None):
 
     """
 
-    if bilinear_form is None:
-        bilinear_form = np.identity(v1.shape[-1])
+    intermed = np.expand_dims(v1, -2)
 
-    return ((v1 @ bilinear_form) * v2).sum(-1)
+    if bilinear_form is not None:
+        intermed = matrix_product(
+            np.expand_dims(v1, -2), bilinear_form,
+            broadcast="pairwise"
+        )
+    prod = matrix_product(
+        intermed, np.expand_dims(v2, -1)
+    )
+
+    return prod.squeeze((-1, -2))
+
+    #return np.array(((v1 @ bilinear_form) * v2).sum(-1))
 
 def normsq(vectors, bilinear_form=None):
     """Evaluate the norm squared of an array of vectors, with respect to a
@@ -208,8 +219,10 @@ def normalize(vectors, bilinear_form=None):
         respect to the given bilinear form).
 
     """
-    norms = normsq(vectors, bilinear_form)
-    return vectors / np.sqrt(np.abs(np.expand_dims(norms, axis=-1)))
+    sq_norms = normsq(vectors, bilinear_form)
+    abs_norms = np.sqrt(np.abs(np.expand_dims(sq_norms, axis=-1)))
+
+    return np.divide(vectors, abs_norms, out=vectors, where=(abs_norms != 0))
 
 def short_arc(thetas):
     """Reorder angles so that the counterclockwise arc between them is
@@ -403,16 +416,17 @@ def orthogonal_complement(vectors, form=None, normalize="form"):
     if form is None:
         form = np.identity(vectors.shape[-1])
 
-    _, _, vh = np.linalg.svd(vectors @ form)
-    kernel_basis = vh[..., vectors.shape[-2]:, :]
+    #_, _, vh = np.linalg.svd(vectors @ form)
+    #kernel_basis = vh[..., vectors.shape[-2]:, :]
+
+    kernel_basis = kernel(vectors @ form).swapaxes(-1, -2)
 
     if normalize == 'form':
         return indefinite_orthogonalize(form, kernel_basis)
 
     return kernel_basis
 
-def indefinite_orthogonalize(form, matrices):
-
+def indefinite_orthogonalize(form, matrices, compute_exact=False):
     """Apply the Gram-Schmidt algorithm, but for a possibly indefinite
     bilinear form.
 
@@ -441,7 +455,11 @@ def indefinite_orthogonalize(form, matrices):
 
     n, m = matrices.shape[-2:]
 
-    result = np.zeros_like(matrices)
+    dtype = np.dtype('float64')
+    if SAGE_AVAILABLE and compute_exact and not sagewrap.inexact_type(matrices.dtype):
+        dtype = np.dtype('object')
+
+    result = zeros_like(matrices, dtype=dtype)
 
     #we're using a python for loop, but only over dimension^2 which
     #is probably small
@@ -454,7 +472,8 @@ def indefinite_orthogonalize(form, matrices):
 
     return normalize(result, form)
 
-def find_isometry(form, partial_map, force_oriented=False):
+def find_isometry(form, partial_map, force_oriented=False,
+                  compute_exact=False):
     """find a form-preserving matrix agreeing with a specified map on
     the flag defined by the standard basis.
 
@@ -485,15 +504,18 @@ def find_isometry(form, partial_map, force_oriented=False):
 
     """
 
-    orth_partial = indefinite_orthogonalize(form, partial_map)
+    orth_partial = indefinite_orthogonalize(form, partial_map,
+                                            compute_exact=compute_exact)
     if len(orth_partial.shape) < 2:
         orth_partial = np.expand_dims(orth_partial, axis=0)
 
-    _, _, vh = np.linalg.svd(orth_partial @ form)
+    kernel_basis = kernel(orth_partial @ form).swapaxes(-1, -2)
 
-    kernel = vh[..., orth_partial.shape[-2]:, :]
+    #_, _, vh = np.linalg.svd(orth_partial @ form)
+    #kernel = vh[..., orth_partial.shape[-2]:, :]
 
-    orth_kernel = indefinite_orthogonalize(form, kernel)
+    orth_kernel = indefinite_orthogonalize(form, kernel_basis,
+                                           compute_exact=compute_exact)
     iso = np.concatenate([orth_partial, orth_kernel], axis=-2)
 
     if force_oriented:
@@ -566,7 +588,7 @@ def make_orientation_preserving(matrix):
         `result` has its last row negated.
     """
     preserved = matrix.copy()
-    preserved[np.linalg.det(preserved) < 0, -1, :] *= -1
+    preserved[det(preserved) < 0, -1, :] *= -1
     return preserved
 
 def expand_unit_axes(array, unit_axes, new_axes):
@@ -944,16 +966,42 @@ def disk_interactions(c1, r1, c2, r2,
 def invert(mat, compute_exact=SAGE_AVAILABLE):
     if not SAGE_AVAILABLE or not compute_exact:
         return np.linalg.inv(mat)
-    else:
-        return sagewrap.invert(mat)
+
+    return sagewrap.invert(mat)
 
 def kernel(mat, compute_exact=SAGE_AVAILABLE):
     if not SAGE_AVAILABLE or not compute_exact:
         return nwrap.kernel(mat)
-    else:
-        return sagewrap.kernel(mat)
 
-def _check_dtype(base_ring, dtype, default_dtype='float64'):
+    return sagewrap.kernel(mat)
+
+def eig(mat, compute_exact=SAGE_AVAILABLE):
+    if not SAGE_AVAILABLE or not compute_exact:
+        return np.linalg.eig(mat)
+
+    return sagewrap.eig(mat)
+
+def det(mat):
+    if not SAGE_AVAILABLE:
+        return np.linalg.det(mat)
+    return sagewrap.det(mat)
+
+def guess_base_ring(data):
+    if SAGE_AVAILABLE and data.dtype == np.dtype('O'):
+        return sagewrap.guess_base_ring(data)
+
+def _check_type(base_ring=None, dtype=None, like=None,
+                default_dtype='float64', default_ring=None):
+
+    if default_ring is None and SAGE_AVAILABLE:
+        default_ring = sagewrap.Integer
+
+    if like is not None:
+        if dtype is None:
+            dtype = like.dtype
+        if base_ring is None and dtype == np.dtype('O') and SAGE_AVAILABLE:
+            base_ring = default_ring
+
     if base_ring is not None:
         if not SAGE_AVAILABLE:
             raise EnvironmentError(
@@ -969,28 +1017,31 @@ def _check_dtype(base_ring, dtype, default_dtype='float64'):
 
     return (base_ring, dtype)
 
-
-def zeros(shape, base_ring=None, dtype=None, **kwargs):
-    base_ring, dtype = _check_dtype(base_ring, dtype)
+def zeros(shape, base_ring=None, dtype=None, like=None,
+          **kwargs):
+    base_ring, dtype = _check_type(base_ring, dtype, like)
 
     zero_arr = np.zeros(shape, dtype=dtype, **kwargs)
     if base_ring is not None:
-        return sagewrap.change_base_ring(base_ring, zero_arr)
+        return sagewrap.change_base_ring(zero_arr, base_ring)
     return zero_arr
 
-def ones(shape, base_ring=None, dtype=None, **kwargs):
-    base_ring, dtype = _check_dtype(base_ring, dtype)
+def zeros_like(arr, **kwargs):
+    return zeros(arr.shape, like=arr, **kwargs)
+
+def ones(shape, base_ring=None, dtype=None, like=None, **kwargs):
+    base_ring, dtype = _check_type(base_ring, dtype, like)
 
     ones_arr = np.ones(shape, dtype=dtype, **kwargs)
     if base_ring is not None:
-        return sagewrap.change_base_ring(base_ring, ones_arr)
+        return sagewrap.change_base_ring(ones_arr, base_ring)
     return ones_arr
 
-def identity(n, base_ring=None, dtype=None, **kwargs):
-    base_ring, dtype = _check_dtype(base_ring, dtype)
+def identity(n, base_ring=None, dtype=None, like=None, **kwargs):
+    base_ring, dtype = _check_type(base_ring, dtype, like)
 
     identity_arr = np.identity(n, dtype=dtype, **kwargs)
 
     if base_ring is not None:
-        return sagewrap.change_base_ring(base_ring, identity_arr)
+        return sagewrap.change_base_ring(identity_arr, base_ring)
     return identity_arr
