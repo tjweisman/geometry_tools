@@ -103,13 +103,13 @@ class Drawing:
                          (self.ylim[0] + self.ylim[1])/2])
 
     def set_transform(self, transform):
-        self.transform = transform
+        self.transform = transform.astype('float64')
 
     def add_transform(self, transform):
-        self.transform = transform @ self.transform
+        self.transform = transform.astype('float64') @ self.transform
 
     def precompose_transform(self, transform):
-        self.transform = self.transform @ transform
+        self.transform = self.transform @ transform.astype('float64')
 
     def show(self):
         plt.show()
@@ -137,7 +137,7 @@ class ProjectiveDrawing(Drawing):
         plt.plot(x, y, **default_kwargs)
 
     def draw_proj_segment(self, segment, **kwargs):
-        seglist = self.transform @ segment.flatten_to_unit()
+        seglist = self.transform @ segment.flatten_to_unit().astype('float64')
         default_kwargs = {
             "color":"black",
             "linewidth":1
@@ -151,7 +151,7 @@ class ProjectiveDrawing(Drawing):
 
     def draw_line(self, line, **kwargs):
         linelist = self.transform @ projective.PointPair(
-            line.flatten_to_unit()
+            line.flatten_to_unit().astype('float64')
         )
         default_kwargs = {
             "color":"black",
@@ -259,7 +259,9 @@ class ProjectiveDrawing(Drawing):
         for key, value in kwargs.items():
             default_kwargs[key] = value
 
-        polylist = projective.Polygon(self.transform @ polygon.flatten_to_unit())
+        polylist = projective.Polygon(
+            self.transform @ polygon.flatten_to_unit().astype('float64')
+        )
 
         if assume_affine:
             polys = PolyCollection(polylist.affine_coords(), **default_kwargs)
@@ -316,10 +318,10 @@ class HyperbolicDrawing(Drawing):
 
         self.model = model
 
-        self.transform = hyperbolic.identity(2)
+        self.transform = hyperbolic.identity(2).astype('float64')
 
         if transform is not None:
-            self.transform = transform
+            self.transform = transform.astype('float64')
 
     def draw_plane(self, **kwargs):
         default_kwargs = {
@@ -369,7 +371,7 @@ class HyperbolicDrawing(Drawing):
 
     def draw_geodesic(self, segment,
                       radius_threshold=RADIUS_THRESHOLD, **kwargs):
-        seglist = self.transform @ segment.flatten_to_unit()
+        seglist = self.transform @ segment.flatten_to_unit().astype('float64')
         default_kwargs = {
             "color":"black",
             "linewidth":1
@@ -406,7 +408,7 @@ class HyperbolicDrawing(Drawing):
 
 
     def draw_point(self, point, **kwargs):
-        pointlist = self.transform @ point.flatten_to_unit()
+        pointlist = self.transform @ point.flatten_to_unit().astype('float64')
         default_kwargs = {
             "color" : "black",
             "marker": "o",
@@ -481,7 +483,7 @@ class HyperbolicDrawing(Drawing):
         for key, value in kwargs.items():
             default_kwargs[key] = value
 
-        polylist = self.transform @ polygon.flatten_to_unit()
+        polylist = self.transform @ polygon.flatten_to_unit().astype('float64')
 
         if self.model == Model.KLEIN:
             polys = PolyCollection(polylist.coords("klein"), **default_kwargs)
@@ -505,7 +507,7 @@ class HyperbolicDrawing(Drawing):
         for key, value in kwargs.items():
             default_kwargs[key] = value
 
-        horolist = self.transform @ horoball.flatten_to_unit()
+        horolist = self.transform @ horoball.flatten_to_unit().astype('float64')
         if self.model == Model.POINCARE or self.model == Model.HALFSPACE:
             center, radius = horolist.sphere_parameters(model=self.model)
 
@@ -553,7 +555,7 @@ class HyperbolicDrawing(Drawing):
                     self.model)
             )
 
-        horolist = self.transform @ horoarc.flatten_to_unit()
+        horolist = self.transform @ horoarc.flatten_to_unit().astype('float64')
         endpts = horolist.endpoint_coords(model=self.model)
         centers, radii, thetas = horolist.circle_parameters(model=self.model)
 
@@ -576,7 +578,7 @@ class HyperbolicDrawing(Drawing):
         for key, value in kwargs.items():
             default_kwargs[key] = value
 
-        arclist = self.transform @ boundary_arc.flatten_to_unit()
+        arclist = self.transform @ boundary_arc.flatten_to_unit().astype('float64')
 
         if self.model == Model.POINCARE or self.model == Model.KLEIN:
             centers, radii, thetas = arclist.circle_parameters(model=self.model)
@@ -627,9 +629,9 @@ class CP1Drawing(Drawing):
     def __init__(self, transform=None, **kwargs):
         Drawing.__init__(self, **kwargs)
 
-        self.transform = projective.identity(1)
+        self.transform = projective.identity(1).astype('float64')
         if transform is not None:
-            self.transform = transform
+            self.transform = transform.astype('float64')
 
 
     def draw_disk(self, disks, draw_nonaffine=True,
@@ -641,7 +643,7 @@ class CP1Drawing(Drawing):
         for key, value in kwargs.items():
             default_kwargs[key] = value
 
-        disklist = self.transform @ disks.flatten_to_unit()
+        disklist = self.transform @ disks.flatten_to_unit().astype('float64')
 
         nonaff_in_collection = (draw_nonaffine and
                                 default_kwargs["facecolor"].lower() == "none")
@@ -671,7 +673,7 @@ class CP1Drawing(Drawing):
                 self.ax.add_patch(annulus)
 
     def draw_point(self, point, **kwargs):
-        pointlist = self.transform @ point.flatten_to_unit()
+        pointlist = self.transform @ point.flatten_to_unit().astype('float64')
         default_kwargs = {
             "color" : "black",
             "marker": "o",

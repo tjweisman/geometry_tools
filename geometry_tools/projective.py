@@ -273,6 +273,11 @@ class ProjectiveObject:
 
         """
 
+        type_error = TypeError(
+            "hyp_obj is not a projective object or an iterable of "
+            "projective objects."
+        )
+
         try:
             self.set(hyp_obj.proj_data,
                      aux_data=hyp_obj.aux_data,
@@ -282,33 +287,32 @@ class ProjectiveObject:
         except AttributeError:
             pass
 
+        unrolled_obj = list(hyp_obj)
+
+        if len(unrolled_obj) == 0:
+            raise type_error
+
         try:
-            unrolled_obj = list(hyp_obj)
-
-            if len(unrolled_obj) == 0:
-                raise IndexError
-
             hyp_array = np.array([obj.proj_data for obj in unrolled_obj])
             aux_array = np.array([obj.aux_data for obj in unrolled_obj])
             dual_array = np.array([obj.dual_data for obj in unrolled_obj])
+        except AttributeError:
+            raise type_error
 
-            if (hyp_array == None).any():
-                hyp_array = None
+        if (hyp_array == None).any():
+            hyp_array = None
 
-            if (aux_array == None).any():
-                aux_array = None
+        if (aux_array == None).any():
+            aux_array = None
 
-            if (dual_array == None).any():
-                dual_array = None
+        if (dual_array == None).any():
+            dual_array = None
 
+        try:
             self.set(hyp_array, aux_data=aux_array,
                      dual_data=dual_array, **kwargs)
-            return
-
-        except (TypeError, AttributeError, IndexError) as e:
-            pass
-
-        raise TypeError
+        except TypeError:
+            raise type_error
 
     @property
     def shape(self):
@@ -323,7 +327,8 @@ class ProjectiveObject:
         """
         return self.proj_data.shape[:-1 * self.unit_ndims]
 
-    def set(self, proj_data=None, aux_data=None, dual_data=None, **kwargs):
+    def set(self, proj_data=None, aux_data=None,
+            dual_data=None, **kwargs):
         """set the underlying data of the hyperbolic object.
 
         Subclasses may override this method to give special names to
@@ -363,6 +368,8 @@ class ProjectiveObject:
 
         """
 
+        #TODO: add "like" and "dtype" to kwargs
+
         if proj_data is not None:
             proj_data = np.array(proj_data)
 
@@ -401,8 +408,6 @@ class ProjectiveObject:
                 )
             self.change_base_ring(base_ring, inplace=True,
                                   rational_approx=rational_approx)
-
-        self.base_ring = utils.guess_base_ring(self.proj_data)
 
     def flatten_to_unit(self, unit=None):
         """Get a flattened version of the projective object.
@@ -521,7 +526,6 @@ class ProjectiveObject:
                                       dual_ndims=self.dual_ndims)
             return self.__class__(newobj)
 
-        self.base_ring = base_ring
         self.proj_data = newproj
         self.aux_data = newaux
         self.dual_data = newdual
@@ -641,6 +645,16 @@ class ProjectiveObject:
         # construct an object with the correct type from this underlying data
         return cls(newObj)
 
+    def set_ndims(self, unit_ndims=None, aux_ndims=None, dual_ndims=None):
+        if unit_ndims is not None:
+            self.unit_ndims = unit_ndims
+
+        if aux_ndims is not None:
+            self.aux_ndims = aux_ndims
+
+        if dual_ndims is not None:
+            self.dual_ndims = dual_ndims
+
 
 class Point(ProjectiveObject):
     """A point (or collection of points) in projective space.
@@ -676,11 +690,9 @@ class Point(ProjectiveObject):
             pass
 
         if chart_index is None:
-            self.projective_coords(point)
+            self.projective_coords(point, **kwargs)
         else:
-            self.affine_coords(point, chart_index)
-
-        self._set_optional(**kwargs)
+            self.affine_coords(point, chart_index, **kwargs)
 
     def in_affine_chart(self, index):
         return self.proj_data[..., index] != 0
@@ -692,7 +704,8 @@ class PointPair(Point):
     This is mostly useful as an interface for subclasses which provide
     more involved functionality.
     """
-    def __init__(self, endpoint1, endpoint2=None, **kwargs):
+    def __init__(self, endpoint1, endpoint2=None, unit_ndims=2,
+                 aux_ndims=0, dual_ndims=0, **kwargs):
         """If `endpoint2` is `None`, interpret `endpoint1` as either an
         `ndarray` of shape (2, ..., n) (where n is the dimension of
         the underlying vector space), or else a composite `Point`
@@ -711,10 +724,8 @@ class PointPair(Point):
             The other endpoint of the point pair. If `None`,
             `endpoint1` contains the data for both points in the pair.
 
-    """
-        self.unit_ndims = 2
-        self.aux_ndims = 0
-        self.dual_ndims = 0
+        """
+        self.set_ndims(unit_ndims, aux_ndims, dual_ndims)
 
         if endpoint2 is None:
             try:
@@ -725,9 +736,9 @@ class PointPair(Point):
 
         self.set_endpoints(endpoint1, endpoint2, **kwargs)
 
-    def set(self, proj_data, **kwargs):
-        ProjectiveObject.set(self, proj_data, **kwargs)
-        self.endpoints = self.proj_data[..., :2, :]
+    @property
+    def endpoints(self):
+        return self.proj_data[..., :2, :]
 
     def set_endpoints(self, endpoint1, endpoint2=None, **kwargs):
         """Set the endpoints of a segment.
@@ -833,10 +844,13 @@ class Polygon(Point):
         coord_signs = np.sign(self.projective_coords()[..., 0])
         return np.all(coord_signs == 1, axis=-1) | np.all(coord_signs == -1, axis=-1)
 
-    def set(self, proj_data, aux_data=None, dual_data=None, **kwargs):
-        ProjectiveObject.set(self, proj_data, aux_data, **kwargs)
-        self.vertices = self.proj_data
-        self.edges = self.aux_data
+    @property
+    def vertices(self):
+        return self.proj_data
+
+    @property
+    def edges(self):
+        return self.aux_data
 
     def _compute_aux_data(self, proj_data):
         segments = PointPair(proj_data, np.roll(proj_data, -1, axis=-2))
@@ -1140,10 +1154,9 @@ class Transformation(ProjectiveObject):
                  " matrices, got array with shape {}").format(
                      proj_data.shape))
 
-    def set(self, proj_data, **kwargs):
-        ProjectiveObject.set(self, proj_data, **kwargs)
-        self.matrix = proj_data
-        self.proj_data = proj_data
+    @property
+    def matrix(self):
+        return self.proj_data
 
     def _apply_to_data(self, proj_data, broadcast, unit_ndims=1, dual=False):
         matrix = self.matrix
@@ -1406,7 +1419,7 @@ def affine_coords(points, chart_index=None, column_vectors=False):
             np.min(np.abs(apoints), axis=tuple(range(len(apoints.shape) - 1)))
         )
 
-    if (apoints[..., _chart_index] == 0).any():
+    if (apoints[..., _chart_index].astype('float64') == 0).any():
         if chart_index is not None:
             raise GeometryError(
                 "points don't lie in the specified affine chart"
@@ -1467,9 +1480,9 @@ def projective_coords(points, chart_index=0, column_vectors=False):
 
     result[..., indices] = coords
 
-    # add 1 to zero, because we want to keep this as a sage integer
-    # type if it is already
-    result[..., chart_index] += 1
+    # wrap literal numerical 1 (for sage)
+    one = utils.number(1, like=coords)
+    result[..., chart_index] = one
 
     if column_vectors:
         result = result.swapaxes(-1, -2)

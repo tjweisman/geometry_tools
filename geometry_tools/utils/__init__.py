@@ -2,6 +2,8 @@
 this package.
 
 """
+import warnings
+
 import numpy as np
 from scipy.optimize import linprog
 
@@ -34,7 +36,7 @@ def rotation_matrix(angle):
     return np.array([[np.cos(angle), -1*np.sin(angle)],
                      [np.sin(angle), np.cos(angle)]])
 
-def permutation_matrix(permutation):
+def permutation_matrix(permutation, inverse=False, **kwargs):
     """Return a permutation matrix representing the given permutation.
 
     Parameters
@@ -42,6 +44,9 @@ def permutation_matrix(permutation):
     permutation: iterable
         a sequence of n numbers (indices), specifying a permutation of
         (1, ... n).
+    inverse : bool
+        if True, return the matrix for the inverse of the
+        permutation specified.
 
     Returns
     -------
@@ -50,9 +55,14 @@ def permutation_matrix(permutation):
 
     """
     n = len(permutation)
-    p_mat = np.zeros((n, n), dtype=int)
+    p_mat = zeros((n, n), **kwargs)
+    one = number(1, **kwargs)
+
     for i,j in enumerate(permutation):
-        p_mat[i,j] = 1
+        if inverse:
+            p_mat[j,i] = one
+        else:
+            p_mat[i,j] = one
 
     return p_mat
 
@@ -95,11 +105,12 @@ def diagonalize_form(bilinear_form,
     """
     n, _ = bilinear_form.shape
 
+    # TODO: make this exact when sage is available
     eigs, U = np.linalg.eigh(bilinear_form)
     D = np.diag(1 / np.sqrt(np.abs(eigs)))
 
-
-    perm = np.identity(n)
+    perm = identity(n, like=U)
+    iperm = perm
 
     if order_eigenvalues:
         if order_eigenvalues == "signed":
@@ -123,9 +134,10 @@ def diagonalize_form(bilinear_form,
         if reverse:
             order = np.flip(order)
 
-        perm = permutation_matrix(order)
+        perm = permutation_matrix(order, like=D)
+        iperm = permutation_matrix(order, like=D, inverse=True)
 
-    W = U @ D @ invert(perm)
+    W = U @ D @ iperm
 
     return W
 
@@ -198,7 +210,6 @@ def normsq(vectors, bilinear_form=None):
     """
     return apply_bilinear(vectors, vectors, bilinear_form)
 
-
 def normalize(vectors, bilinear_form=None):
     """Normalize an array of vectors, with respect to a bilinear form.
 
@@ -220,9 +231,11 @@ def normalize(vectors, bilinear_form=None):
 
     """
     sq_norms = normsq(vectors, bilinear_form)
+
     abs_norms = np.sqrt(np.abs(np.expand_dims(sq_norms, axis=-1)))
 
-    return np.divide(vectors, abs_norms, out=vectors, where=(abs_norms != 0))
+    return np.divide(vectors, abs_norms, out=vectors,
+                     where=(abs_norms.astype('float64') != 0))
 
 def short_arc(thetas):
     """Reorder angles so that the counterclockwise arc between them is
@@ -506,6 +519,7 @@ def find_isometry(form, partial_map, force_oriented=False,
 
     orth_partial = indefinite_orthogonalize(form, partial_map,
                                             compute_exact=compute_exact)
+
     if len(orth_partial.shape) < 2:
         orth_partial = np.expand_dims(orth_partial, axis=0)
 
@@ -516,6 +530,7 @@ def find_isometry(form, partial_map, force_oriented=False,
 
     orth_kernel = indefinite_orthogonalize(form, kernel_basis,
                                            compute_exact=compute_exact)
+
     iso = np.concatenate([orth_partial, orth_kernel], axis=-2)
 
     if force_oriented:
@@ -986,10 +1001,6 @@ def det(mat):
         return np.linalg.det(mat)
     return sagewrap.det(mat)
 
-def guess_base_ring(data):
-    if SAGE_AVAILABLE and data.dtype == np.dtype('O'):
-        return sagewrap.guess_base_ring(data)
-
 def _check_type(base_ring=None, dtype=None, like=None,
                 default_dtype='float64', default_ring=None):
 
@@ -997,8 +1008,13 @@ def _check_type(base_ring=None, dtype=None, like=None,
         default_ring = sagewrap.Integer
 
     if like is not None:
-        if dtype is None:
-            dtype = like.dtype
+        try:
+            if dtype is None:
+                dtype = like.dtype
+        except AttributeError:
+            if not _numpy_dtype(like):
+                dtype = np.dtype('O')
+
         if base_ring is None and dtype == np.dtype('O') and SAGE_AVAILABLE:
             base_ring = default_ring
 
@@ -1016,6 +1032,80 @@ def _check_type(base_ring=None, dtype=None, like=None,
         dtype = default_dtype
 
     return (base_ring, dtype)
+
+def _numpy_dtype(val):
+    try:
+        return np.can_cast(val, float)
+    except TypeError:
+        pass
+
+    return False
+
+def guess_literal_ring(data):
+    if not SAGE_AVAILABLE:
+        return None
+
+    try:
+        if data.dtype == np.dtype('O'):
+            return sage.all.QQ
+    except AttributeError:
+        if not _numpy_dtype(data):
+            return sage.all.QQ
+
+    # this is maybe not Pythonic, but it's also not a mistake.
+    return None
+
+def number(val, like=None, dtype=None, base_ring=None):
+    if like is not None and dtype is not None:
+        raise UserWarning(
+            "Passing both 'like' and 'dtype' when specifying a number;"
+            " 'like' parameter is ignored."
+        )
+
+    if base_ring is not None:
+        if dtype is not None:
+            raise UserWarning(
+                "Passing both 'base_ring' and 'dtype' when specifying a number;"
+                " 'dtype' is ignored (assumed to be dtype('O'))"
+            )
+        dtype = np.dtype('O')
+
+        if not SAGE_AVAILABLE:
+            raise UserWarning( "Specifying base_ring when sage is not"
+            "available has no effect."  )
+
+    if not SAGE_AVAILABLE:
+        return val
+
+    if dtype is None and like is not None:
+        try:
+            dtype = like.dtype
+        except AttributeError:
+            if not _numpy_dtype(like):
+                dtype = np.dtype('O')
+
+    if dtype == np.dtype('O'):
+        if isinstance(val, int):
+            # we use SR instead of Integer here, because numpy
+            # sometimes silently converts sage Integers
+            return sage.all.SR(val)
+        if isinstance(val, float):
+            return sage.all.SR(sage.all.QQ(val))
+
+    return val
+
+def pi(exact=False, like=None):
+    if not SAGE_AVAILABLE:
+        return np.pi
+
+    if exact:
+        return sage.all.pi
+
+    if like is not None and not _numpy_dtype(like):
+        return sage.all.pi
+
+    return np.pi
+
 
 def zeros(shape, base_ring=None, dtype=None, like=None,
           **kwargs):
