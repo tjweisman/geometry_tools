@@ -4,5 +4,6 @@ build
 dist
 doc
 update_doc
-testing
+tmp
+testing/old
 *.ipynb_checkpoints
