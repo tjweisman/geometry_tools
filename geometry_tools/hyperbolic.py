@@ -1859,9 +1859,14 @@ class HyperbolicRepresentation(projective.ProjectiveRepresentation):
     being done here at all.
 
     """
-    def __getitem__(self, word):
-        matrix = self._word_value(word)
-        return Isometry(matrix, column_vectors=True)
+
+    @staticmethod
+    def wrap_func(numpy_matrix):
+        return Isometry(numpy_matrix, column_vectors=True)
+
+    @staticmethod
+    def array_wrap_func(numpy_array):
+        return Isometry(numpy_array, column_vectors=True)
 
     def normalize(self, matrix):
         dimension = np.array(matrix).shape[-1]
@@ -1872,19 +1877,7 @@ class HyperbolicRepresentation(projective.ProjectiveRepresentation):
         a sequence of words in the generators.
 
         """
-        return Isometry(self.transformations(words))
-
-    def automaton_accepted(self, automaton, length,
-                           with_words=False, **kwargs):
-
-        result = projective.ProjectiveRepresentation.automaton_accepted(
-            self, automaton, length, with_words=with_words, **kwargs)
-
-        if with_words:
-            transformations, words = result
-            return (Isometry(transformations), words)
-
-        return Isometry(result)
+        return self.elements(words)
 
 def minkowski(dimension, base_ring=None):
     form = utils.identity(dimension, base_ring=base_ring)

@@ -1317,15 +1317,6 @@ class ProjectiveRepresentation(representation.WrappedRepresentation):
     def array_wrap_func(numpy_array):
         return Transformation(numpy_array, column_vectors=True)
 
-    def __getitem__(self, word):
-        matrix = self._word_value(word)
-        return Transformation(matrix, column_vectors=True)
-
-    def __setitem__(self, generator, matrix):
-        transform = Transformation(matrix, column_vectors=True)
-        representation.Representation.__setitem__(self, generator,
-                                                  transform.matrix.T)
-
     def transformations(self, words):
         """Get a composite transformation, representing a sequence of words in
         the generators for this representation.
@@ -1342,36 +1333,7 @@ class ProjectiveRepresentation(representation.WrappedRepresentation):
             transformation for each word in `words`.
 
         """
-        return Transformation(self.elements(words), column_vectors=True)
-
-    def automaton_accepted(self, automaton, length,
-                           with_words=False, **kwargs):
-
-        result = representation.Representation.automaton_accepted(
-            self, automaton, length,
-            with_words=with_words, **kwargs
-        )
-
-        if with_words:
-            matrix_array, words = result
-        else:
-            matrix_array = result
-
-        transformations = Transformation(matrix_array, column_vectors=True)
-
-        if with_words:
-            return transformations, words
-
-        return transformations
-
-    def change_base_ring(self, base_ring=None):
-        return self.compose(lambda M: M.change_base_ring(base_ring))
-
-    def compose(self, hom, **kwargs):
-        def proj_hom(mat):
-            return hom(Transformation(mat, column_vectors=True)).matrix.T
-        return representation.Representation.compose(self, proj_hom)
-
+        return self.elements(words)
 
 def hyperplane_coordinate_transform(normal):
     r"""Find an orthogonal matrix taking the affine chart \(\{\vec{x} :

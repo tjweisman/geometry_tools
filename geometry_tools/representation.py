@@ -164,6 +164,10 @@ import numpy as np
 import scipy.special
 
 from . import utils
+
+if utils.SAGE_AVAILABLE:
+    from .utils import sagewrap
+
 from .automata import fsa
 
 def binom(n, k):
@@ -506,7 +510,7 @@ class Representation:
             self.generators = {}
             # don't recompute inverses for an existing representation
             for gen in generator_names:
-                self.set_generator(gen, representation[gen],
+                self._set_generator(gen, representation.generators[gen],
                                    compute_inverse=False)
 
             self._dim = representation._dim
@@ -530,8 +534,7 @@ class Representation:
     def __getitem__(self, word):
         return self._word_value(word)
 
-    def set_generator(self, generator, matrix,
-                      compute_inverse=True):
+    def _set_generator(self, generator, matrix, compute_inverse=True):
         shape = matrix.shape
 
         if self._dim is None:
@@ -550,22 +553,24 @@ class Representation:
         # always update the dtype (we don't have a hierarchy for this)
         self.dtype = matrix.dtype
 
+    def set_generator(self, *args, **kwargs):
+        self._set_generator(*args, **kwargs)
+
     def __setitem__(self, generator, matrix):
         self.set_generator(generator, matrix, compute_inverse=True)
 
     def change_base_ring(self, base_ring=None):
-        return self.compose(lambda M: utils.change_base_ring(M, base_ring))
+        return self._compose(
+            lambda M: utils.change_base_ring(M, base_ring)
+        )
 
     def conjugate(self, mat, inv_mat=None, **kwargs):
         if inv_mat is None:
-            try:
-                inv_mat = mat.inv()
-            except AttributeError:
-                inv_mat = utils.invert(mat, **kwargs)
+            inv_mat = utils.invert(mat, **kwargs)
 
-        return self.compose(lambda M: inv_mat @ M @ mat)
+        return self._compose(lambda M: inv_mat @ M @ mat)
 
-    def compose(self, hom, compute_inverses=False):
+    def _compose(self, hom, compute_inverses=False):
         """Get a new representation obtained by composing this representation
         with hom."""
 
@@ -580,6 +585,9 @@ class Representation:
                 composed_rep.set_generator(g, hom(image), compute_inverse=False)
 
         return composed_rep
+
+    def compose(self, hom, compute_inverses=False):
+        return self._compose(hom, compute_inverses=compute_inverses)
 
     def tensor_product(self, rep):
         """Return a tensor product of this representation with `rep`.
@@ -633,7 +641,6 @@ class Representation:
         return square_rep
 
 class WrappedRepresentation(Representation):
-
     @staticmethod
     def wrap_func(numpy_matrix):
         return numpy_matrix
@@ -646,12 +653,17 @@ class WrappedRepresentation(Representation):
     def array_wrap_func(numpy_array):
         return numpy_array
 
+    def elements(self, words):
+        return self.__class__.array_wrap_func(
+            Representation.elements(self, words)
+        )
+
     def __getitem__(self, word):
         matrix = self._word_value(word)
         return self.__class__.wrap_func(matrix)
 
     def set_generator(self, generator, matrix, **kwargs):
-        Representation.set_generator(generator,
+        Representation.set_generator(self, generator,
                                      self.__class__.unwrap_func(matrix),
                                      **kwargs)
 
@@ -663,10 +675,18 @@ class WrappedRepresentation(Representation):
             )
         return Representation.compose(self, wrap_hom)
 
+    def conjugate(self, mat, inv_mat=None, **kwargs):
+        if inv_mat is not None:
+            inv_mat = self.__class__.unwrap_func(inv_mat)
+        return Representation.conjugate(
+            self, self.__class__.unwrap_func(mat),
+            inv_mat, **kwargs
+        )
+
     def automaton_accepted(self, automaton, length,
                            with_words=False, **kwargs):
 
-        result = representation.Representation.automaton_accepted(
+        result = Representation.automaton_accepted(
             self, automaton, length,
             with_words=with_words, **kwargs
         )
@@ -682,6 +702,19 @@ class WrappedRepresentation(Representation):
             return wrapped_matrices, words
 
         return wrapped_matrices
+
+class SageMatrixRepresentation(WrappedRepresentation):
+    @staticmethod
+    def wrap_func(numpy_matrix):
+        return sagewrap.sage_matrix(numpy_matrix)
+
+    @staticmethod
+    def unwrap_func(sage_matrix):
+        return numpy.array(sage_matrix)
+
+    @staticmethod
+    def array_wrap_func(numpy_array):
+        return sagewrap.sage_matrix_list(numpy_array)
 
 def sym_index(i, j, n):
     r"""Return coordinate indices for an isomorphism
