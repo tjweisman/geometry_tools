@@ -1299,11 +1299,24 @@ class Transformation(ProjectiveObject):
     def __matmul__(self, other):
         return self.apply(other)
 
-class ProjectiveRepresentation(representation.Representation):
+class ProjectiveRepresentation(representation.WrappedRepresentation):
     """A representation (of a free group) lying in PGL(V). Passing words
     (in the generators) to this representation yields `Transformation`
     objects.
     """
+
+    @staticmethod
+    def wrap_func(numpy_matrix):
+        return Transformation(numpy_matrix, column_vectors=True)
+
+    @staticmethod
+    def unwrap_func(wrapped_matrix):
+        return wrapped_matrix.matrix.T
+
+    @staticmethod
+    def array_wrap_func(numpy_array):
+        return Transformation(numpy_array, column_vectors=True)
+
     def __getitem__(self, word):
         matrix = self._word_value(word)
         return Transformation(matrix, column_vectors=True)
@@ -1350,6 +1363,14 @@ class ProjectiveRepresentation(representation.Representation):
             return transformations, words
 
         return transformations
+
+    def change_base_ring(self, base_ring=None):
+        return self.compose(lambda M: M.change_base_ring(base_ring))
+
+    def compose(self, hom, **kwargs):
+        def proj_hom(mat):
+            return hom(Transformation(mat, column_vectors=True)).matrix.T
+        return representation.Representation.compose(self, proj_hom)
 
 
 def hyperplane_coordinate_transform(normal):

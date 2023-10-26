@@ -67,16 +67,22 @@ def kernel(A):
     )
 
 def eig(A):
-    if A.inexact_type(A.dtype):
+    if inexact_type(A.dtype):
         return np.linalg.eig(A)
 
     mat_flat = list(A.reshape((-1,) + A.shape[-2:]))
 
-    eig_res = [_sage_eig(mat) for mat in mat_flat]
+    eig_res = [_sage_eig(sage_matrix(mat)) for mat in mat_flat]
     eigvals, eigvecs = zip(*eig_res)
 
     return (np.array(eigvals).reshape(A.shape[:-2] + (A.shape[-1],)),
             np.array(eigvecs).reshape(A.shape))
+
+def eigh(A):
+    if inexact_type(A.dtype):
+        return np.linalg.eigh(A)
+
+    return eig(A)
 
 def det(A):
     return apply_matrix_func(

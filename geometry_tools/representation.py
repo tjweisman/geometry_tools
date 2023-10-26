@@ -504,8 +504,10 @@ class Representation:
                 generator_names = list(representation.generators)
 
             self.generators = {}
-            for gen in semi_gens(generator_names):
-                self[gen] = representation[gen]
+            # don't recompute inverses for an existing representation
+            for gen in generator_names:
+                self.set_generator(gen, representation[gen],
+                                   compute_inverse=False)
 
             self._dim = representation._dim
 
@@ -528,7 +530,8 @@ class Representation:
     def __getitem__(self, word):
         return self._word_value(word)
 
-    def __setitem__(self, generator, matrix):
+    def set_generator(self, generator, matrix,
+                      compute_inverse=True):
         shape = matrix.shape
 
         if self._dim is None:
@@ -541,19 +544,40 @@ class Representation:
             )
 
         self.generators[generator] = matrix
-        self.generators[utils.invert_gen(generator)] = utils.invert(matrix)
+        if compute_inverse:
+            self.generators[utils.invert_gen(generator)] = utils.invert(matrix)
 
         # always update the dtype (we don't have a hierarchy for this)
         self.dtype = matrix.dtype
 
-    def compose(self, hom):
+    def __setitem__(self, generator, matrix):
+        self.set_generator(generator, matrix, compute_inverse=True)
+
+    def change_base_ring(self, base_ring=None):
+        return self.compose(lambda M: utils.change_base_ring(M, base_ring))
+
+    def conjugate(self, mat, inv_mat=None, **kwargs):
+        if inv_mat is None:
+            try:
+                inv_mat = mat.inv()
+            except AttributeError:
+                inv_mat = utils.invert(mat, **kwargs)
+
+        return self.compose(lambda M: inv_mat @ M @ mat)
+
+    def compose(self, hom, compute_inverses=False):
         """Get a new representation obtained by composing this representation
         with hom."""
 
         composed_rep = self.__class__()
 
-        for g, image in self.generators.items():
-            composed_rep[g] = hom(image)
+        if compute_inverses:
+            for g in self.semi_gens():
+                image = self.generators[g]
+                composed_rep.set_generator(g, hom(image), compute_inverse=True)
+        else:
+            for g, image in self.generators.items():
+                composed_rep.set_generator(g, hom(image), compute_inverse=False)
 
         return composed_rep
 
@@ -608,6 +632,56 @@ class Representation:
 
         return square_rep
 
+class WrappedRepresentation(Representation):
+
+    @staticmethod
+    def wrap_func(numpy_matrix):
+        return numpy_matrix
+
+    @staticmethod
+    def unwrap_func(wrapped_matrix):
+        return wrapped_matrix
+
+    @staticmethod
+    def array_wrap_func(numpy_array):
+        return numpy_array
+
+    def __getitem__(self, word):
+        matrix = self._word_value(word)
+        return self.__class__.wrap_func(matrix)
+
+    def set_generator(self, generator, matrix, **kwargs):
+        Representation.set_generator(generator,
+                                     self.__class__.unwrap_func(matrix),
+                                     **kwargs)
+
+    def compose(self, hom, **kwargs):
+        def wrap_hom(mat):
+            return self.__class__.unwrap_func(
+                hom(self.__class__.wrap_func(mat)
+                )
+            )
+        return Representation.compose(self, wrap_hom)
+
+    def automaton_accepted(self, automaton, length,
+                           with_words=False, **kwargs):
+
+        result = representation.Representation.automaton_accepted(
+            self, automaton, length,
+            with_words=with_words, **kwargs
+        )
+
+        if with_words:
+            matrix_array, words = result
+        else:
+            matrix_array = result
+
+        wrapped_matrices = self.__class__.array_wrap_func(matrix_array)
+
+        if with_words:
+            return wrapped_matrices, words
+
+        return wrapped_matrices
 
 def sym_index(i, j, n):
     r"""Return coordinate indices for an isomorphism

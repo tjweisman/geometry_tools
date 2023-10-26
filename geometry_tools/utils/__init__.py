@@ -68,7 +68,9 @@ def permutation_matrix(permutation, inverse=False, **kwargs):
 
 def diagonalize_form(bilinear_form,
                      order_eigenvalues="signed",
-                     reverse=False):
+                     reverse=False,
+                     compute_exact=False,
+                     with_inverse=True):
     r"""Return a matrix conjugating a symmetric real bilinear form to a
     diagonal form.
 
@@ -105,31 +107,34 @@ def diagonalize_form(bilinear_form,
     """
     n, _ = bilinear_form.shape
 
-    # TODO: make this exact when sage is available
-    eigs, U = np.linalg.eigh(bilinear_form)
+    eigs, U = eigh(bilinear_form, compute_exact=compute_exact)
+    Uinv = invert(U, compute_exact=compute_exact)
+    Dinv = np.diag(np.sqrt(np.abs(eigs)))
     D = np.diag(1 / np.sqrt(np.abs(eigs)))
 
     perm = identity(n, like=U)
     iperm = perm
 
+    n_eigs = eigs.astype('float64')
+
     if order_eigenvalues:
         if order_eigenvalues == "signed":
-            order = np.argsort(eigs)
+            order = np.argsort(n_eigs)
         if order_eigenvalues == "minkowski":
-            negative = np.count_nonzero(eigs < 0)
-            positive = np.count_nonzero(eigs > 0)
+            negative = np.count_nonzero(n_eigs < 0)
+            positive = np.count_nonzero(n_eigs > 0)
 
             if negative <= positive:
                 order = np.concatenate(
-                    ((eigs < 0).nonzero()[0],
-                     (eigs > 0).nonzero()[0],
-                     (eigs == 0).nonzero()[0])
+                    ((n_eigs < 0).nonzero()[0],
+                     (n_eigs > 0).nonzero()[0],
+                     (n_eigs == 0).nonzero()[0])
                 )
             else:
                 order = np.concatenate(
-                    ((eigs > 0).nonzero()[0],
-                     (eigs < 0).nonzero()[0],
-                     (eigs == 0).nonzero()[0])
+                    ((n_eigs > 0).nonzero()[0],
+                     (n_eigs < 0).nonzero()[0],
+                     (n_eigs == 0).nonzero()[0])
                 )
         if reverse:
             order = np.flip(order)
@@ -139,7 +144,11 @@ def diagonalize_form(bilinear_form,
 
     W = U @ D @ iperm
 
-    return W
+    if not with_inverse:
+        return W
+
+    Winv = perm @ Dinv @ Uinv
+    return (W, Winv)
 
 def circle_angles(center, coords):
     """Return angles relative to the center of a circle.
@@ -996,6 +1005,12 @@ def eig(mat, compute_exact=SAGE_AVAILABLE):
 
     return sagewrap.eig(mat)
 
+def eigh(mat, compute_exact=SAGE_AVAILABLE):
+    if not SAGE_AVAILABLE or not compute_exact:
+        return np.linalg.eigh(mat)
+
+    return sagewrap.eigh(mat)
+
 def det(mat):
     if not SAGE_AVAILABLE:
         return np.linalg.det(mat)
@@ -1135,3 +1150,14 @@ def identity(n, base_ring=None, dtype=None, like=None, **kwargs):
     if base_ring is not None:
         return sagewrap.change_base_ring(identity_arr, base_ring)
     return identity_arr
+
+def change_base_ring(array, base_ring=None):
+    if base_ring is None:
+        return array
+
+    if not SAGE_AVAILABLE:
+        raise EnvironmentError(
+            "Cannot change base ring unless sage is available."
+        )
+
+    return sagewrap.change_base_ring(array, base_ring)

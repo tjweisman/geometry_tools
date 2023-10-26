@@ -11,6 +11,9 @@ from geometry_tools import hyperbolic
 from geometry_tools import utils
 from geometry_tools.automata import fsa, coxeter_automaton
 
+if utils.SAGE_AVAILABLE:
+    from geometry_tools.utils import sagewrap
+
 GENERATOR_NAMES = "abcdefghijklmnopqrstuvwxyz"
 
 class CoxeterGroup:
@@ -50,13 +53,23 @@ class CoxeterGroup:
         elif matrix is not None:
             self.from_coxeter_matrix(matrix)
 
-        self._compute_bilinear_form()
+        #self._compute_bilinear_form()
 
-    def _compute_bilinear_form(self):
-        adjusted_cox_matrix = np.array(self.coxeter_matrix, dtype=float)
-        adjusted_cox_matrix[adjusted_cox_matrix <= 0] = 0.5
+    def bilinear_form(self, exact=False, base_ring=None):
+        if base_ring is not None:
+            exact = True
 
-        self.bilinear_form = -1 * np.cos(np.pi / adjusted_cox_matrix)
+        pi = utils.pi(exact=exact)
+        half = utils.number(0.5, like=pi)
+        adjusted_cox_matrix = np.array(
+            utils.change_base_ring(self.coxeter_matrix, base_ring)
+        )
+        adjusted_cox_matrix[adjusted_cox_matrix.astype(float) <= 0] = half
+
+        return utils.change_base_ring(
+            -1 * np.cos(pi / adjusted_cox_matrix),
+            base_ring=base_ring
+        )
 
     def from_diagram(self, diagram):
         self.generators = defaultdict(dict)
@@ -110,7 +123,9 @@ class CoxeterGroup:
     def cartan_representation(self, cartan_matrix,
                               rename_generators=False,
                               diagonalize=False,
-                              order_eigenvalues="signed"):
+                              order_eigenvalues="signed",
+                              base_ring=None,
+                              exact=True):
         """Find a representation of this Coxeter group determined by a Cartan
         matrix.
 
@@ -145,36 +160,48 @@ class CoxeterGroup:
             a name which is not a single character.
 
         """
+        if base_ring is not None:
+            exact = True
+
         num_gens = len(self.generators)
         rep = Representation()
 
         for i, gen in enumerate(self.ordered_gens):
-            basis_vec = np.zeros(num_gens)
-            basis_vec[i] = 1.0
+            basis_vec = utils.zeros(num_gens, like=cartan_matrix)
+            basis_vec[i] = utils.number(1, like=cartan_matrix)
             diagonal = np.diag(basis_vec)
 
             g_name = gen
             if rename_generators:
                 g_name = GENERATOR_NAMES[i]
 
-            rep[g_name] = (
-                np.identity(num_gens) - diagonal @ cartan_matrix
-            )
+            gen_val = (utils.identity(num_gens, like=cartan_matrix) -
+                       diagonal @ cartan_matrix)
+
+            gen_val = utils.change_base_ring(gen_val, base_ring)
+
+            rep[g_name] = gen_val
 
         if not diagonalize:
             return rep
 
         #TODO: check if Cartan matrix is symmetric for this step
-        W = utils.diagonalize_form(
+        W, Winv = utils.diagonalize_form(
             cartan_matrix / 2,
-            order_eigenvalues=order_eigenvalues
+            order_eigenvalues=order_eigenvalues,
+            compute_exact=exact,
+            with_inverse=True
         )
+
+        W = utils.change_base_ring(W, base_ring)
+        Winv = utils.change_base_ring(Winv, base_ring)
 
         return rep.compose(
-            lambda mat: utils.invert(W) @ mat @ W
+            lambda mat: Winv @ mat @ W
         )
 
-    def geometric_representation(self, **kwargs):
+    def geometric_representation(self, base_ring=None, exact=False,
+                                 **kwargs):
         """Get the geometric representation of the Coxeter group, i.e. the
         dual of the canonical representation.
 
@@ -191,7 +218,11 @@ class CoxeterGroup:
             (which is in turn determined by the Coxeter matrix).
 
         """
-        return self.cartan_representation(2 * self.bilinear_form, **kwargs)
+        return self.cartan_representation(
+            2 * self.bilinear_form(
+                exact=exact, base_ring=base_ring
+            ), exact=exact, base_ring=base_ring, **kwargs
+        )
 
     def canonical_representation(self, **kwargs):
         """Get the canonical representation of this Coxeter group into PGL(n,

@@ -1083,6 +1083,8 @@ class Hyperplane(Subspace):
         except AttributeError:
             matrix = reflection
 
+        # TODO: make this compatible with sage
+
         #numpy's eig expects a matrix operating on the left
         evals, evecs = np.linalg.eig(matrix)
 
