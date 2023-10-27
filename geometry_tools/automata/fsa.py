@@ -51,6 +51,8 @@ from collections import deque, defaultdict
 from . import kbmag_utils, gap_parse
 from .. import utils
 
+from ..utils import words
+
 BUILTIN_DIR = "builtin"
 
 
@@ -702,11 +704,11 @@ def free_automaton(generating_set):
 
     """
     generators = list(generating_set) + [
-        utils.invert_gen(g) for g in generating_set
+        words.invert_gen(g) for g in generating_set
     ]
     graph = {
         g : {h:h for h in generators
-             if utils.invert_gen(h) != g}
+             if words.invert_gen(h) != g}
         for g in [''] + generators
     }
     fsa = FSA(graph, start_vertices=[''])

@@ -850,11 +850,6 @@ def find_positive_functional(positive_points):
 
     return normalize(functionals)
 
-def invert_gen(generator):
-    if generator.lower() == generator:
-        return generator.upper()
-    return generator.lower()
-
 def first_sign_switch(array):
     signs = np.sign(array)
     row_i, col_i = np.nonzero(signs != np.expand_dims(signs[..., 0], axis=-1))
@@ -1108,6 +1103,14 @@ def number(val, like=None, dtype=None, base_ring=None):
             return sage.all.SR(sage.all.QQ(val))
 
     return val
+
+def array_like(array, like=None, base_ring=None, dtype=None):
+    base_ring, dtype = _check_type(base_ring, dtype, like)
+    arr = np.array(array, dtype=dtype)
+
+    if base_ring is not None:
+        return sagewrap.change_base_ring(arr, base_ring)
+    return arr
 
 def pi(exact=False, like=None):
     if not SAGE_AVAILABLE:

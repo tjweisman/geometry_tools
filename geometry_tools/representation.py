@@ -164,6 +164,7 @@ import numpy as np
 import scipy.special
 
 from . import utils
+from .utils.words import invert_gen, formal_inverse, fox_word_derivative
 
 if utils.SAGE_AVAILABLE:
     from .utils import sagewrap
@@ -202,6 +203,57 @@ class Representation:
     @property
     def dim(self):
         return self._dim
+
+    def __init__(self, representation=None,
+                 generator_names=None,
+                 relations=[],
+                 base_ring=None,
+                 dtype='float64'):
+        """
+        Parameters
+        ----------
+        representation : Representation
+            Representation to copy elements from
+        generator_names : iterable of strings
+            Names to use for the generators. These must be initialized
+            as arrays later to use the representation properly.
+        dtype : numpy dtype
+            Default data type for matrix entries. Defaults to 'float64'.
+
+        """
+
+        self._dim = None
+        self.dtype = dtype
+        self.base_ring = base_ring
+        self.relations = [r for r in relations]
+
+        if representation is not None:
+            if base_ring is None:
+                self.base_ring = representation.base_ring
+
+            if generator_names is None:
+                generator_names = list(representation.generators)
+
+            self.generators = {}
+
+            # don't recompute inverses for an existing representation
+            for gen in generator_names:
+                self._set_generator(gen, representation.generators[gen],
+                                   compute_inverse=False)
+
+            self._dim = representation._dim
+
+            self.relations += [r for r in representation.relations]
+
+        else:
+            if generator_names is None:
+                generator_names = []
+
+            self.generators = {name[0].lower():None
+                               for name in semi_gens(generator_names)}
+
+            for gen in list(self.generators):
+                self.generators[gen.upper()] = None
 
     def freely_reduced_elements(self, length, maxlen=True,
                                 with_words=False):
@@ -258,7 +310,7 @@ class Representation:
         else:
             for word in self.free_words_of_length(length - 1):
                 for generator in self.generators:
-                    if len(word) == 0 or generator != utils.invert_gen(word[-1]):
+                    if len(word) == 0 or generator != invert_gen(word[-1]):
                         yield word + generator
 
     def free_words_less_than(self, length):
@@ -368,7 +420,9 @@ class Representation:
 
         if length == 0:
             if state is None or as_start or state in automaton.start_vertices:
-                id_array = np.array([np.identity(self.dim, dtype=self.dtype)])
+                id_array = np.array([utils.identity(self.dim,
+                                                    dtype=self.dtype,
+                                                    base_ring=self.base_ring)])
                 if with_words:
                     return (id_array, [""])
                 return id_array
@@ -483,50 +537,10 @@ class Representation:
         """
         return semi_gens(self.generators.keys())
 
-    def __init__(self, representation=None,
-                 generator_names=None,
-                 dtype='float64'):
-        """
-        Parameters
-        ----------
-        representation : Representation
-            Representation to copy elements from
-        generator_names : iterable of strings
-            Names to use for the generators. These must be initialized
-            as arrays later to use the representation properly.
-        dtype : numpy dtype
-            Default data type for matrix entries. Defaults to 'float64'.
 
-        """
-
-        self._dim = None
-
-        self.dtype = dtype
-
-        if representation is not None:
-            if generator_names is None:
-                generator_names = list(representation.generators)
-
-            self.generators = {}
-            # don't recompute inverses for an existing representation
-            for gen in generator_names:
-                self._set_generator(gen, representation.generators[gen],
-                                   compute_inverse=False)
-
-            self._dim = representation._dim
-
-        else:
-            if generator_names is None:
-                generator_names = []
-
-            self.generators = {name[0].lower():None
-                               for name in semi_gens(generator_names)}
-
-            for gen in list(self.generators):
-                self.generators[gen.upper()] = None
 
     def _word_value(self, word):
-        matrix = np.identity(self._dim, dtype=self.dtype)
+        matrix = utils.identity(self._dim, dtype=self.dtype)
         for i, letter in enumerate(word):
             matrix = matrix @ self.generators[letter]
         return matrix
@@ -534,8 +548,12 @@ class Representation:
     def __getitem__(self, word):
         return self._word_value(word)
 
-    def _set_generator(self, generator, matrix, compute_inverse=True):
+    def _set_generator(self, generator, matrix, compute_inverse=True,
+                       base_ring=None):
         shape = matrix.shape
+
+        if base_ring is None:
+            base_ring = self.base_ring
 
         if self._dim is None:
             self._dim = shape[0]
@@ -546,9 +564,12 @@ class Representation:
                 "Every matrix in the representation must have the same shape"
             )
 
+        # has no effect if base_ring is None
+        matrix = utils.change_base_ring(matrix, base_ring)
+
         self.generators[generator] = matrix
         if compute_inverse:
-            self.generators[utils.invert_gen(generator)] = utils.invert(matrix)
+            self.generators[invert_gen(generator)] = utils.invert(matrix)
 
         # always update the dtype (we don't have a hierarchy for this)
         self.dtype = matrix.dtype
@@ -561,7 +582,8 @@ class Representation:
 
     def change_base_ring(self, base_ring=None):
         return self._compose(
-            lambda M: utils.change_base_ring(M, base_ring)
+            lambda M: utils.change_base_ring(M, base_ring),
+            base_ring=base_ring
         )
 
     def conjugate(self, mat, inv_mat=None, **kwargs):
@@ -570,11 +592,11 @@ class Representation:
 
         return self._compose(lambda M: inv_mat @ M @ mat)
 
-    def _compose(self, hom, compute_inverses=False):
+    def _compose(self, hom, compute_inverses=False, **kwargs):
         """Get a new representation obtained by composing this representation
         with hom."""
 
-        composed_rep = self.__class__()
+        composed_rep = self.__class__(**kwargs)
 
         if compute_inverses:
             for g in self.semi_gens():
@@ -586,8 +608,74 @@ class Representation:
 
         return composed_rep
 
-    def compose(self, hom, compute_inverses=False):
-        return self._compose(hom, compute_inverses=compute_inverses)
+    def _differential(self, word, generator=None, verbose=False):
+        if generator is not None:
+            if verbose:
+                print(
+                    "computing differential of '{}' with respect to {}".format(
+                        word, generator)
+                )
+            word_diff = fox_word_derivative(generator, word)
+            matrix_diff = [
+                coeff * self._word_value(word)
+                for word, coeff in word_diff.items()
+            ]
+            if len(matrix_diff) == 0:
+                return utils.zeros(self.dim, base_ring=self.base_ring)
+
+            return np.sum(matrix_diff, axis=0)
+
+        blocks = [self._differential(word, g, verbose=verbose)
+                  for g in self.semi_gens()]
+
+        return np.concatenate(blocks, axis=-1)
+
+    def subgroup(self, generators, generator_names=None, relations=[],
+                 compute_inverse=True):
+        subrep = self.__class__(relations=relations,
+                                base_ring=self.base_ring,
+                                dtype=self.dtype)
+
+        try:
+            generator_pairs = generators.items()
+        except AttributeError:
+            generator_pairs = zip(GENERATORS[:len(generators)],
+                                  generators)
+
+        if generator_names is not None:
+            generator_pairs = zip(generator_names, generators)
+
+        for g, word in generator_pairs:
+            subrep._set_generator(g, self._word_value(word),
+                                  compute_inverse=compute_inverse)
+            if not compute_inverse:
+                subrep._set_generator(invert_gen(g),
+                                      formal_inverse(word))
+
+        return subrep
+
+    def _differentials(self, words, **kwargs):
+        blocks = [self._differential(word, **kwargs) for word in words]
+        return np.concatenate(blocks, axis=0)
+
+    def differential(self, word, **kwargs):
+        return self._differential(word, **kwargs)
+
+    def differentials(self, words, **kwargs):
+        return self._differentials(words, **kwargs)
+
+    def cocycle_matrix(self, **kwargs):
+        return self.differentials(self.relations, **kwargs)
+
+    def coboundary_matrix(self):
+        blocks = [utils.identity(self._dim, dtype=self.dtype,
+                                 base_ring=self.base_ring) - self.generators[gen]
+                  for gen in self.semi_gens() ]
+
+        return np.concatenate(blocks, axis=0)
+
+    def compose(self, hom, **kwargs):
+        return self._compose(hom, **kwargs)
 
     def tensor_product(self, rep):
         """Return a tensor product of this representation with `rep`.
@@ -673,7 +761,7 @@ class WrappedRepresentation(Representation):
                 hom(self.__class__.wrap_func(mat)
                 )
             )
-        return Representation.compose(self, wrap_hom)
+        return Representation.compose(self, wrap_hom, **kwargs)
 
     def conjugate(self, mat, inv_mat=None, **kwargs):
         if inv_mat is not None:
@@ -710,11 +798,22 @@ class SageMatrixRepresentation(WrappedRepresentation):
 
     @staticmethod
     def unwrap_func(sage_matrix):
-        return numpy.array(sage_matrix)
+        return np.array(sage_matrix)
 
     @staticmethod
     def array_wrap_func(numpy_array):
         return sagewrap.sage_matrix_list(numpy_array)
+
+    def differential(self, word, **kwargs):
+        return sagewrap.sage_matrix(self._differential(word, **kwargs))
+
+    def differentials(self, words, **kwargs):
+        return sagewrap.sage_matrix(self._differentials(words, **kwargs))
+
+    def coboundary_matrix(self):
+        return sagewrap.sage_matrix(
+            WrappedRepresentation.coboundary_matrix(self)
+        )
 
 def sym_index(i, j, n):
     r"""Return coordinate indices for an isomorphism
@@ -938,7 +1037,7 @@ def sl2_irrep(A, n):
     c = A[..., 1, 0]
     d = A[..., 1, 1]
 
-    im = np.zeros(A.shape[:-2] +(n, n), dtype=A.dtype)
+    im = utils.zeros(A.shape[:-2] +(n, n), like=A)
     r = n - 1
     for k in range(n):
         for j in range(n):
@@ -973,10 +1072,10 @@ def sl2_to_so21(A):
         representation.
 
     """
-    killing_conj = np.array([[-0, -1, -0],
-                             [-1, -0,  1],
-                             [-1, -0, -1]],
-                            dtype=A.dtype)
+    killing_conj = utils.array_like([[-0, -1, -0],
+                                     [-1, -0,  1],
+                                     [-1, -0, -1]],
+                                    like=A)
 
     permutation = utils.permutation_matrix((2,1,0))
 
@@ -1008,15 +1107,14 @@ def o_to_pgl(A, bilinear_form=np.diag((-1, 1, 1))):
         this representation.
 
     """
-    conj = np.eye(3)
-    conj_i = np.eye(3)
+    conj = utils.identity(3, like=A)
+    conj_i = utils.identity(3, like=A)
 
     if bilinear_form is not None:
-        #TODO: make this sage-compatible
-        killing_conj = np.array([[ 0, -1/2, -1/2],
-                                 [-1,  0,   0   ],
-                                 [ 0,  1/2, -1/2]],
-                                dtype=A.dtype)
+        killing_conj = utils.array_like([[ 0, -1/2, -1/2],
+                                         [-1,  0,   0   ],
+                                         [ 0,  1/2, -1/2]],
+                                        like=A)
 
         form_conj = utils.diagonalize_form(bilinear_form,
                                       order_eigenvalues="minkowski",
