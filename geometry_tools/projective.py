@@ -112,20 +112,13 @@ from copy import copy
 import numpy as np
 from scipy.spatial import ConvexHull
 
-from geometry_tools import utils
+from . import utils
 
 if utils.SAGE_AVAILABLE:
     from geometry_tools.utils import sagewrap
 
-from geometry_tools import representation
-
-
-class GeometryError(Exception):
-    """Thrown if there's an attempt to construct a geometric object with
-    numerical data that doesn't make sense for that type of object.
-
-    """
-    pass
+from . import representation
+from .base import GeometryError
 
 class ProjectiveObject:
     """Represent some object in projective geometry (possibly a composite

@@ -8,6 +8,8 @@ from . import _numpy_wrappers as nwrap
 
 pi = sage.all.pi
 Integer = sage.all.Integer
+matrix_class = sage.matrix.matrix0.Matrix
+vector_class = sage.structure.element.Vector
 
 def _vectorize(func):
     def vfunc(arr):
@@ -38,6 +40,10 @@ def sage_matrix_func(A, sage_func, expected_shape=None):
                for mat in mat_flat]
 
     return np.array(mat_res, dtype='O').reshape(expected_shape)
+
+def sage_vector_list(v):
+    v_flat = v.reshape((-1, v.shape[-1]))
+    return [sage_vector(vec) for vec in v_flat]
 
 def sage_matrix_list(A):
     mat_flat = A.reshape((-1,) + A.shape[-2:])

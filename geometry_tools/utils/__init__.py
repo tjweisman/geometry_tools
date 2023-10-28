@@ -1011,7 +1011,7 @@ def det(mat):
         return np.linalg.det(mat)
     return sagewrap.det(mat)
 
-def _check_type(base_ring=None, dtype=None, like=None,
+def check_type(base_ring=None, dtype=None, like=None,
                 default_dtype='float64', default_ring=None):
 
     if default_ring is None and SAGE_AVAILABLE:
@@ -1105,7 +1105,7 @@ def number(val, like=None, dtype=None, base_ring=None):
     return val
 
 def array_like(array, like=None, base_ring=None, dtype=None):
-    base_ring, dtype = _check_type(base_ring, dtype, like)
+    base_ring, dtype = check_type(base_ring, dtype, like)
     arr = np.array(array, dtype=dtype)
 
     if base_ring is not None:
@@ -1127,7 +1127,7 @@ def pi(exact=False, like=None):
 
 def zeros(shape, base_ring=None, dtype=None, like=None,
           **kwargs):
-    base_ring, dtype = _check_type(base_ring, dtype, like)
+    base_ring, dtype = check_type(base_ring, dtype, like)
 
     zero_arr = np.zeros(shape, dtype=dtype, **kwargs)
     if base_ring is not None:
@@ -1138,7 +1138,7 @@ def zeros_like(arr, **kwargs):
     return zeros(arr.shape, like=arr, **kwargs)
 
 def ones(shape, base_ring=None, dtype=None, like=None, **kwargs):
-    base_ring, dtype = _check_type(base_ring, dtype, like)
+    base_ring, dtype = check_type(base_ring, dtype, like)
 
     ones_arr = np.ones(shape, dtype=dtype, **kwargs)
     if base_ring is not None:
@@ -1146,7 +1146,7 @@ def ones(shape, base_ring=None, dtype=None, like=None, **kwargs):
     return ones_arr
 
 def identity(n, base_ring=None, dtype=None, like=None, **kwargs):
-    base_ring, dtype = _check_type(base_ring, dtype, like)
+    base_ring, dtype = check_type(base_ring, dtype, like)
 
     identity_arr = np.identity(n, dtype=dtype, **kwargs)
 

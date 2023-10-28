@@ -125,11 +125,11 @@ from enum import Enum
 
 import numpy as np
 
-from geometry_tools import projective, representation, utils
-from geometry_tools.projective import GeometryError
+from . import projective, representation, utils
+from .base import GeometryError
 
 if utils.SAGE_AVAILABLE:
-    from geometry_tools.utils import sagewrap
+    from .utils import sagewrap
 
 #arbitrary
 ERROR_THRESHOLD = 1e-8

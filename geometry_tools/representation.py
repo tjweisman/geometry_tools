@@ -746,7 +746,12 @@ class WrappedRepresentation(Representation):
             )
         return Representation.compose(self, wrap_hom, **kwargs)
 
-    def conjugate(self, mat, inv_mat=None, **kwargs):
+    def conjugate(self, mat, inv_mat=None, wrap=True, **kwargs):
+        if not wrap:
+            return Representation.conjugate(
+                self, mat, inv_mat, **kwargs
+            )
+
         if inv_mat is not None:
             inv_mat = self.__class__.unwrap_func(inv_mat)
         return Representation.conjugate(
