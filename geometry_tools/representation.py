@@ -164,7 +164,7 @@ import numpy as np
 import scipy.special
 
 from . import utils
-from .utils.words import invert_gen, formal_inverse, fox_word_derivative
+from .utils import words
 
 if utils.SAGE_AVAILABLE:
     from .utils import sagewrap
@@ -173,27 +173,6 @@ from .automata import fsa
 
 def binom(n, k):
     return int(scipy.special.binom(n, k))
-
-def semi_gens(generators):
-    """Get an iterable of semigroup generators from an iterable of group generators.
-
-    Given a sequence of lowercase/uppercase letters, return only the
-    lowercase ones.
-
-    Parameters
-    ----------
-    generators : iterable of strings
-        Sequence of semigroup generators
-
-    Yields
-    ------
-    gen : string
-        the lowercase characters in `generators`
-
-    """
-    for gen in generators:
-        if re.match("[a-z]", gen):
-            yield gen
 
 class Representation:
     """Model a representation for a finitely generated group
@@ -250,7 +229,7 @@ class Representation:
                 generator_names = []
 
             self.generators = {name[0].lower():None
-                               for name in semi_gens(generator_names)}
+                               for name in words.asym_gens(generator_names)}
 
             for gen in list(self.generators):
                 self.generators[gen.upper()] = None
@@ -284,7 +263,7 @@ class Representation:
             `False`, just return `elements`.
 
         """
-        automaton = fsa.free_automaton(list(self.semi_gens()))
+        automaton = fsa.free_automaton(list(self.asym_gens()))
         return self.automaton_accepted(automaton, length,
                                        maxlen=maxlen,
                                        with_words=with_words)
@@ -310,7 +289,7 @@ class Representation:
         else:
             for word in self.free_words_of_length(length - 1):
                 for generator in self.generators:
-                    if len(word) == 0 or generator != invert_gen(word[-1]):
+                    if len(word) == 0 or generator != words.invert_gen(word[-1]):
                         yield word + generator
 
     def free_words_less_than(self, length):
@@ -523,8 +502,9 @@ class Representation:
             [self._word_value(word) for word in words]
         )
 
-    def semi_gens(self):
-        """Iterate over group generator names for this representation.
+    def asym_gens(self):
+        """Iterate over asymmetric group generator names for this
+           representation.
 
         Only iterate over group generators (lowercase letters), not
         semigroup generators (upper and lowercase letters).
@@ -534,8 +514,8 @@ class Representation:
         gen : string
             group generator names
 
-        """
-        return semi_gens(self.generators.keys())
+    """
+        return words.asym_gens(self.generators.keys())
 
 
 
@@ -569,7 +549,7 @@ class Representation:
 
         self.generators[generator] = matrix
         if compute_inverse:
-            self.generators[invert_gen(generator)] = utils.invert(matrix)
+            self.generators[words.invert_gen(generator)] = utils.invert(matrix)
 
         # always update the dtype (we don't have a hierarchy for this)
         self.dtype = matrix.dtype
@@ -599,7 +579,7 @@ class Representation:
         composed_rep = self.__class__(**kwargs)
 
         if compute_inverses:
-            for g in self.semi_gens():
+            for g in self.asym_gens():
                 image = self.generators[g]
                 composed_rep.set_generator(g, hom(image), compute_inverse=True)
         else:
@@ -615,7 +595,7 @@ class Representation:
                     "computing differential of '{}' with respect to {}".format(
                         word, generator)
                 )
-            word_diff = fox_word_derivative(generator, word)
+            word_diff = words.fox_word_derivative(generator, word)
             matrix_diff = [
                 coeff * self._word_value(word)
                 for word, coeff in word_diff.items()
@@ -626,7 +606,7 @@ class Representation:
             return np.sum(matrix_diff, axis=0)
 
         blocks = [self._differential(word, g, verbose=verbose)
-                  for g in self.semi_gens()]
+                  for g in self.asym_gens()]
 
         return np.concatenate(blocks, axis=-1)
 
@@ -649,8 +629,8 @@ class Representation:
             subrep._set_generator(g, self._word_value(word),
                                   compute_inverse=compute_inverse)
             if not compute_inverse:
-                subrep._set_generator(invert_gen(g),
-                                      formal_inverse(word))
+                subrep._set_generator(words.invert_gen(g),
+                                      words.formal_inverse(word))
 
         return subrep
 
@@ -670,7 +650,7 @@ class Representation:
     def coboundary_matrix(self):
         blocks = [utils.identity(self._dim, dtype=self.dtype,
                                  base_ring=self.base_ring) - self.generators[gen]
-                  for gen in self.semi_gens() ]
+                  for gen in self.asym_gens() ]
 
         return np.concatenate(blocks, axis=0)
 
@@ -703,7 +683,7 @@ class Representation:
             )
         else:
             product_rep = Representation()
-            for gen in self.semi_gens():
+            for gen in self.asym_gens():
                 tens = np.tensordot(self[gen], rep[gen], axes=0)
                 elt = np.concatenate(np.concatenate(tens, axis=1), axis=1)
                 product_rep[gen] = np.array(elt)
@@ -723,7 +703,7 @@ class Representation:
         incl = symmetric_inclusion(self._dim)
         proj = symmetric_projection(self._dim)
         square_rep = Representation()
-        for g in self.semi_gens():
+        for g in self.asym_gens():
             square_rep[g] = proj * tensor_rep[g] * incl
 
         return square_rep
@@ -755,7 +735,10 @@ class WrappedRepresentation(Representation):
                                      self.__class__.unwrap_func(matrix),
                                      **kwargs)
 
-    def compose(self, hom, **kwargs):
+    def compose(self, hom, wrap=True, **kwargs):
+        if not wrap:
+            return Representation.compose(self, hom, **kwargs)
+
         def wrap_hom(mat):
             return self.__class__.unwrap_func(
                 hom(self.__class__.wrap_func(mat)

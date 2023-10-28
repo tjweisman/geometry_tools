@@ -9,6 +9,27 @@ def invert_gen(generator):
 def formal_inverse(word):
     return "".join([invert_gen(g) for g in word[::-1]])
 
+def asym_gens(generators):
+    """Get an iterable of semigroup generators from an iterable of group generators.
+
+    Given a sequence of lowercase/uppercase letters, return only the
+    lowercase ones.
+
+    Parameters
+    ----------
+    generators : iterable of strings
+        Sequence of semigroup generators
+
+    Yields
+    ------
+    gen : string
+        the lowercase characters in `generators`
+
+    """
+    for gen in generators:
+        if re.match("[a-z]", gen):
+            yield gen
+
 def simplify_word(word):
     simp = ""
     for let in word:
