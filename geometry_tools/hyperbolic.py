@@ -125,7 +125,7 @@ from enum import Enum
 
 import numpy as np
 
-from . import projective, representation, utils
+from . import projective, representation, utils, lie
 from .base import GeometryError
 
 if utils.SAGE_AVAILABLE:
@@ -2041,7 +2041,7 @@ def sl2r_iso(matrix):
 
     """
 
-    return Isometry(representation.sl2_to_so21(np.array(matrix)),
+    return Isometry(lie.sl2_to_so21(np.array(matrix)),
                     column_vectors=True)
 
 def project_to_hyperboloid(basepoint, tangent_vector, form=None):

@@ -164,17 +164,12 @@ import numpy as np
 import scipy.special
 
 from .automata import fsa
-from . import liegroup
+from . import lie
 from . import utils
 from .utils import words
 
 if utils.SAGE_AVAILABLE:
     from .utils import sagewrap
-
-
-
-def binom(n, k):
-    return int(scipy.special.binom(n, k))
 
 class Representation:
     """Model a representation for a finitely generated group
@@ -184,6 +179,14 @@ class Representation:
     @property
     def dim(self):
         return self._dim
+
+    @property
+    def dtype(self):
+        return self._dtype
+
+    @property
+    def base_ring(self):
+        return self._base_ring
 
     @staticmethod
     def wrap_func(numpy_matrix):
@@ -220,13 +223,13 @@ class Representation:
         """
 
         self._dim = None
-        self.dtype = dtype
-        self.base_ring = base_ring
+        self._dtype = dtype
+        self._base_ring = base_ring
         self.relations = [r for r in relations]
 
         if representation is not None:
             if base_ring is None:
-                self.base_ring = representation.base_ring
+                self._base_ring = representation.base_ring
 
             if generator_names is None:
                 generator_names = list(representation.generators)
@@ -556,10 +559,8 @@ class Representation:
 
     def _set_generator(self, generator, matrix, compute_inverse=True,
                        base_ring=None):
-        shape = matrix.shape
 
-        if base_ring is None:
-            base_ring = self.base_ring
+        shape = matrix.shape
 
         if self._dim is None:
             self._dim = shape[0]
@@ -570,15 +571,16 @@ class Representation:
                 "Every matrix in the representation must have the same shape"
             )
 
-        # has no effect if base_ring is None
-        matrix = utils.change_base_ring(matrix, base_ring)
+        if base_ring is not None:
+            matrix = utils.change_base_ring(matrix, base_ring)
+            self._base_ring = base_ring
 
         self.generators[generator] = matrix
         if compute_inverse:
             self.generators[words.invert_gen(generator)] = utils.invert(matrix)
 
         # always update the dtype (we don't have a hierarchy for this)
-        self.dtype = matrix.dtype
+        self._dtype = matrix.dtype
 
     def set_generator(self, generator, matrix, **kwargs):
         self._set_generator(generator,
@@ -593,6 +595,19 @@ class Representation:
             lambda M: utils.change_base_ring(M, base_ring),
             base_ring=base_ring
         )
+
+    def change_dtype(self, dtype):
+        base_ring = self.base_ring
+        if dtype != np.dtype('O'):
+            base_ring = None
+
+        new_rep = self._compose(
+            lambda M: M.astype(dtype),
+            dtype=dtype
+        )
+        new_rep._base_ring = base_ring
+
+        return new_rep
 
     def conjugate(self, mat, inv_mat=None, unwrap=True, **kwargs):
         if not unwrap:
@@ -735,16 +750,11 @@ class Representation:
         if dtype is None:
             dtype = self.dtype
 
-        def gln_adjoint_hom(mat, inv=None):
-            if inv is None:
-                inv = utils.invert(mat)
+        gln_adjoint = lie.hom.gln_adjoint(
+            base_ring=base_ring, dtype=dtype
+        )
 
-            return liegroup.linear_matrix_action(
-                lambda M: mat @ M @ inv, self.dim, dtype=dtype,
-                base_ring=base_ring
-            )
-
-        return self._compose(gln_adjoint_hom, base_ring=base_ring,
+        return self._compose(gln_adjoint, base_ring=base_ring,
                              dtype=dtype, **kwargs)
 
     def sln_adjoint(self, base_ring=None, dtype=None, **kwargs):
@@ -754,16 +764,11 @@ class Representation:
         if dtype is None:
             dtype = self.dtype
 
-        def sln_adjoint_hom(mat, inv=None):
-            if inv is None:
-                inv = utils.invert(mat)
+        sln_adjoint = lie.hom.sln_adjoint(
+            base_ring=base_ring, dtype=dtype
+        )
 
-            return liegroup.sln_linear_action(
-                lambda M: mat @ M @ inv, self.dim, dtype=dtype,
-                base_ring=base_ring
-            )
-
-        return self._compose(sln_adjoint_hom, base_ring=base_ring,
+        return self._compose(sln_adjoint, base_ring=base_ring,
                              dtype=dtype, **kwargs)
 
     def tensor_product(self, rep):
@@ -1030,138 +1035,3 @@ def symmetric_projection(n):
         proj_matrix[_sym_index(u, v, n)][i] = 1
 
     return np.array(proj_matrix)
-
-def sl2_irrep(A, n):
-    r"""The irreducible representation \(\mathrm{SL}(2) \to
-    \mathrm{SL}(n)\), via the action on homogeneous polynomials.
-
-    Given an element of \(\mathrm{SL}(2)\) as a 2x2 array, compute a
-    matrix giving the action of this matrix on symmetric polynomials
-    in elements of the standard basis \(\{e_1, e_2\}\). The (ordered)
-    basis for the new matrix is given by the degree-(n-1) monomials
-    \(\{e_1^{0} e_2^{n-1}, e_1^{1} e_2^{n-2}, \ldots, e_1^{n-1}e_2^{0}\}\).
-
-    Parameters
-    ----------
-    A : ndarray
-        Array of shape `(..., 2, 2)`, giving a matrix (or array of
-        matrices) to represent.
-    n : int
-        Dimension of the irreducible representation.
-
-    Returns
-    -------
-    result : ndarray
-        Array of shape `(..., n, n)` giving the representation of
-        `A` under the `dim`-dimensional irreducible representation of
-        \(\mathrm{SL}(2)\).
-
-    """
-
-    a = A[..., 0, 0]
-    b = A[..., 0, 1]
-    c = A[..., 1, 0]
-    d = A[..., 1, 1]
-
-    im = utils.zeros(A.shape[:-2] +(n, n), like=A)
-    r = n - 1
-    for k in range(n):
-        for j in range(n):
-            for i in range(max(0, j - r + k), min(j+1, k+1)):
-                im[..., j,k] += (binom(k,i) * binom(r - k, j - i)
-                          * a**i * c**(k - i) * b**(j - i)
-                          * d**(r - k - j + i))
-    return im
-
-def sl2_to_so21(A):
-    r"""Return the image of an element of \(\mathrm{SL}(2, \mathbb{R})\)
-    under the isomorphism \(\mathrm{SL}(2, \mathbb{R}) \to
-    \mathrm{SO}(2,1)\).
-
-    Here \(\mathrm{SO}(2,1)\) preserves the symmetric bilinear form
-    determined by the matrix `diag(-1, 1, 1)` (in the standard basis on
-    \(\mathbb{R}^3\)).
-
-    An inverse for this representation is given by the function
-    `o_to_pgl`.
-
-    Parameters
-    ----------
-    A : ndarray
-        Array of shape `(..., 2, 2)` giving a matrix (or array of
-        matrices) in \(\mathrm{SL}(2, \mathbb{R})\).
-
-    Returns
-    -------
-    result : ndarray
-        Array of shape `(..., 3, 3)` giving the image of `A` under the
-        representation.
-
-    """
-    killing_conj = utils.array_like([[-0, -1, -0],
-                                     [-1, -0,  1],
-                                     [-1, -0, -1]],
-                                    like=A)
-
-    permutation = utils.permutation_matrix((2,1,0))
-
-    A_3 = sl2_irrep(A, 3)
-    return (permutation @ killing_conj @ A_3 @
-            utils.invert(killing_conj) @ permutation)
-
-def o_to_pgl(A, bilinear_form=np.diag((-1, 1, 1))):
-    r"""Return the image of an element of \(\mathrm{O}(2, 1)\) under the
-    representation \(\mathrm{O}(2,1) \to \mathrm{GL}(2)\).
-
-    On \(\mathrm{SO}(2, 1)\), this restricts to an inverse of the
-    isomorphism \(\mathrm{SL}(2, \mathbb{R}) \to \mathrm{SO}(2, 1)\)
-    given by the function `sl2_to_so21`.
-
-    Parameters
-    ----------
-    A : ndarray
-        Array of shape `(..., 3, 3)` giving a matrix (or array of
-        matrices) preserving a bilinear form of signature (2, 1).
-    bilinear_form : ndarray
-        3x3 matrix giving the bilinear form preserved by `A`. By
-        default, the diagonal form `diag(-1, 1, 1)`.
-
-    Returns
-    -------
-    result : ndarray
-        Array of shape `(..., 2, 2)` giving the image of `A` under
-        this representation.
-
-    """
-    conj = utils.identity(3, like=A)
-    conj_i = utils.identity(3, like=A)
-
-    if bilinear_form is not None:
-        killing_conj = utils.array_like([[ 0, -1/2, -1/2],
-                                         [-1,  0,   0   ],
-                                         [ 0,  1/2, -1/2]],
-                                        like=A)
-
-        form_conj = utils.diagonalize_form(bilinear_form,
-                                      order_eigenvalues="minkowski",
-                                      reverse=True)
-
-        conj = form_conj @ utils.invert(killing_conj)
-        conj_i = killing_conj @ utils.invert(form_conj)
-
-    A_d = conj_i @ A @ conj
-
-    a = np.sqrt(np.abs(A_d[0][0]))
-    b = np.sqrt(np.abs(A_d[2][0]))
-    c = np.sqrt(np.abs(A_d[0][2]))
-    d = np.sqrt(np.abs(A_d[2][2]))
-
-    if A_d[0][1] < 0:
-        b = b * -1
-    if A_d[1][0] < 0:
-        c = c * -1
-    if A_d[1][2] * A_d[0][1] < 0:
-        d = d * -1
-
-    return np.array([[a, b],
-                     [c, d]])
