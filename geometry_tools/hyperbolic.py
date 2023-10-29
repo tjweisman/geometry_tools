@@ -1879,6 +1879,11 @@ class HyperbolicRepresentation(projective.ProjectiveRepresentation):
         """
         return self.elements(words)
 
+    def gln_adjoint(self, **kwargs):
+        return projective.ProjectiveRepresentation(
+            projective.ProjectiveRepresentation.gln_adjoint(self, **kwargs)
+        )
+
 def minkowski(dimension, base_ring=None):
     form = utils.identity(dimension, base_ring=base_ring)
     form[0, 0] = form[0,0] * -1

@@ -36,16 +36,20 @@ def _convert_matrix(matrix, like=None, autoconvert=True):
 
     return matrix
 
-def matrix_entry_coordinates(i, j, n):
-    return i * n + j
-
 def basis_matrix(i, j, n, as_sage=False, **kwargs):
-    bm = utils.zeros(n, **kwargs)
+    bm = utils.zeros((n,n), **kwargs)
     one = utils.number(1, **kwargs)
     bm[i,j] = one
 
     if as_sage:
         return sagewrap.sage_matrix(bm)
+    return bm
+
+def sln_basis_matrix(i, j, n, as_sage=False, **kwargs):
+    bm = basis_matrix(i, j, n, as_sage=as_sage, **kwargs)
+    if i == j:
+        one = utils.number(1, **kwargs)
+        bm[n-1, n-1] = -one
     return bm
 
 
@@ -123,3 +127,65 @@ def coords_to_sln_lie_algebra(coord_vector, dtype=None,
 
     return _convert_matrix(gln_coords, like=coord_vector,
                            autoconvert=autoconvert)
+
+def linear_matrix_action(linear_map, n,
+                         dtype=None,
+                         base_ring=None,
+                         like=None,
+                         wrap_func=None,
+                         unwrap_func=None):
+
+    base_ring, dtype = utils.check_type(base_ring, dtype, like)
+    map_matrix = utils.zeros((n*n, n*n), base_ring, dtype)
+
+    for i in range(n):
+        for j in range(n):
+            bm = basis_matrix(i, j, n, like=map_matrix)
+
+            if wrap_func is not None:
+                bm = wrap_func(bm)
+
+            b_image = linear_map(bm)
+
+            if unwrap_func is not None:
+                b_image = unwrap_func(b_image)
+
+            map_matrix[:, i*n + j] = gln_lie_algebra_coords(
+                b_image, autoconvert=False
+            )
+
+    if wrap_func is not None:
+        map_matrix = wrap_func(map_matrix)
+
+    return map_matrix
+
+def sln_linear_action(linear_map, n,
+                      dtype=None, base_ring=None, like=None,
+                      wrap_func=None, unwrap_func=None, **kwargs):
+
+    base_ring, dtype = utils.check_type(base_ring, dtype, like)
+    map_matrix = utils.zeros((n**2 - 1, n**2 - 1), base_ring, dtype)
+
+    for i in range(n):
+        for j in range(n):
+            if i == n - 1 and j == n - 1:
+                break
+
+            bm = sln_basis_matrix(i, j, n, like=map_matrix)
+
+            if wrap_func is not None:
+                bm = wrap_func(bm)
+
+            b_image = linear_map(bm)
+
+            if unwrap_func is not None:
+                b_image = unwrap_func(b_image)
+
+            map_matrix[:, i*n + j] = sln_lie_algebra_coords(
+                b_image, autoconvert=False
+            )
+
+    if wrap_func is not None:
+        map_matrix = wrap_func(map_matrix)
+
+    return map_matrix

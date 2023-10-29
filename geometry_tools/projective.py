@@ -1292,7 +1292,7 @@ class Transformation(ProjectiveObject):
     def __matmul__(self, other):
         return self.apply(other)
 
-class ProjectiveRepresentation(representation.WrappedRepresentation):
+class ProjectiveRepresentation(representation.Representation):
     """A representation (of a free group) lying in PGL(V). Passing words
     (in the generators) to this representation yields `Transformation`
     objects.

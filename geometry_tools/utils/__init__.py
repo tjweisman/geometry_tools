@@ -1025,8 +1025,8 @@ def check_type(base_ring=None, dtype=None, like=None,
             if not _numpy_dtype(like):
                 dtype = np.dtype('O')
 
-        if base_ring is None and dtype == np.dtype('O') and SAGE_AVAILABLE:
-            base_ring = default_ring
+    if base_ring is None and dtype == np.dtype('O') and SAGE_AVAILABLE:
+        base_ring = default_ring
 
     if base_ring is not None:
         if not SAGE_AVAILABLE:
