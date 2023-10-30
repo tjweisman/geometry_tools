@@ -1,5 +1,4 @@
 
-- make Coxeter representation code slightly more slick
-- make a way to get fixpoints of isometries
-- port the hyperbolic code to projective code
-- document everything
+- write unit tests
+- finish porting over my old Sage code for various Lie group morphisms
+- update documentation, README.md, and example files for all those good new Sage features

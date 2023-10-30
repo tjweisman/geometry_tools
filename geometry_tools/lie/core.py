@@ -1,3 +1,4 @@
+import itertools
 import numpy as np
 import scipy.special
 
@@ -149,7 +150,6 @@ def linear_matrix_action(linear_map, n, **kwargs):
     return map_matrix
 
 def sln_linear_action(linear_map, n, **kwargs):
-
     base_ring, dtype = utils.check_type(**kwargs)
     map_matrix = utils.zeros((n**2 - 1, n**2 - 1), base_ring, dtype)
 
@@ -229,6 +229,18 @@ def sl2_irrep(A, n):
                           * a**i * c**(k - i) * b**(j - i)
                           * d**(r - k - j + i))
     return im
+
+def sln_killing_form(n, **kwargs):
+    sln_dim = n*n - 1
+    form = utils.zeros((sln_dim, sln_dim), **kwargs)
+    for i,j in itertools.product(range(n), range(n)):
+        for k,l in itertools.product(range(n), range(n)):
+            if (i,j) != (n-1, n-1) and (k, l) != (n-1, n-1):
+                bm1 = sln_basis_matrix(i, j, n, **kwargs)
+                bm2 = sln_basis_matrix(k, l, n, **kwargs)
+                form_val = np.trace(bm1 @ bm2)
+                form[i * n + j, k * n + l] = form_val
+    return form
 
 def o_to_pgl(A, bilinear_form=np.diag((-1, 1, 1))):
     r"""Return the image of an element of \(\mathrm{O}(2, 1)\) under the
