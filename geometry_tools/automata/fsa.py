@@ -110,11 +110,19 @@ class FSA:
         if graph_dict:
             self._from_graph_dict(vert_dict)
         else:
-            self._out_dict = copy.deepcopy(vert_dict)
+            self._out_dict = FSA._defaultify_out_dict(vert_dict)
+
             self._build_in_dict()
             self._build_graph_dict()
 
         self.start_vertices = start_vertices
+
+    @staticmethod
+    def _defaultify_out_dict(out_dict):
+        return {
+            key: defaultdict(list, copy.deepcopy(value))
+            for key, value in out_dict.items()
+        }
 
     def _from_graph_dict(self, graph_dict):
         self._graph_dict = copy.deepcopy(graph_dict)
@@ -165,6 +173,9 @@ class FSA:
     def in_dict(self):
         return self._in_dict
 
+    def has_edge(self, tail, head):
+        return len(self._out_dict[tail][head]) > 0
+
     def edges_out(self, vertex):
         """Get the list of edges directed away from a vertex.
         """
@@ -196,7 +207,7 @@ class FSA:
         if len(self._out_dict[tail][head]) == 1:
             return self._out_dict[tail][head][0]
         else:
-            raise ValueError("ambiguous edge removal: there is not exactly"
+            raise ValueError("ambiguous edge specification: there is not exactly"
                             f" one edge between {tail} and {head}" )
 
     def edge_labels(self, tail, head):
@@ -211,9 +222,9 @@ class FSA:
         """
         for v in vertices:
             if v not in self._out_dict:
-                self._out_dict[v] = {}
-                self._in_dict[v] = {}
-                self._graph_dict[v] = {}
+                self._out_dict[v] = defaultdict(list)
+                self._in_dict[v] = defaultdict(list)
+                self._graph_dict[v] = defaultdict(dict)
 
     def add_edges(self, edges, elist=False,
                   ignore_redundant=True):
@@ -234,6 +245,9 @@ class FSA:
         for e in edges:
             tail, head, label = e
 
+            # no-op if vertices are already in FSA
+            self.add_vertices([tail, head])
+
             if head not in self._out_dict[tail]:
                 self._out_dict[tail][head] = []
                 self._in_dict[head][tail] = []
@@ -244,7 +258,7 @@ class FSA:
             if elist:
                 self._out_dict[tail][head] += label
                 self._in_dict[head][tail] += label
-                for l in labels:
+                for l in label:
                     self._graph_dict[tail][l] = head
 
             else:
@@ -267,8 +281,8 @@ class FSA:
             self._out_dict[w].pop(vertex)
 
             for lab in list(self._graph_dict[w]):
-                if self._graph_dict[lab] == vertex:
-                    self._graph_dict.pop(lab)
+                if self._graph_dict[w][lab] == vertex:
+                    self._graph_dict[w].pop(lab)
 
         self._out_dict.pop(vertex)
         self._in_dict.pop(vertex)
@@ -277,7 +291,7 @@ class FSA:
     def vertices(self):
         return self._out_dict.keys()
 
-    def edges(self):
+    def edges(self, with_labels=False):
         """Get all of the edges of this FSA
 
         Yields
@@ -287,13 +301,16 @@ class FSA:
             in the automaton
 
         """
-        for v, nbrs in self._out_dict.items():
-            for w in nbrs:
-                yield (v, w)
+        for v, nbrs in self._graph_dict.items():
+            for label, w in nbrs.items():
+                if with_labels:
+                    yield (v, w, label)
+                else:
+                    yield (v, w)
 
     def recurrent(self, inplace=False):
         """Find a version of the automaton which is recurrent, i.e. which has
-        no dead ends.
+        no (forward or backward) dead ends.
 
         Parameters
         ----------
@@ -310,13 +327,15 @@ class FSA:
         """
 
         to_modify = self
-        if inplace:
+
+        if not inplace:
             to_modify = copy.deepcopy(self)
 
         still_pruning = True
         while still_pruning:
             still_pruning = False
-            for v in to_modify._out_dict.keys():
+            vertices = list(to_modify._out_dict.keys())
+            for v in vertices:
                 if (len(to_modify._out_dict[v]) == 0 or
                     len(to_modify._in_dict[v]) == 0):
                     to_modify.delete_vertex(v)
@@ -495,7 +514,8 @@ class FSA:
         ----------
         rename_map : dict
             dictionary giving the mapping from old labels to new
-            labels
+            labels. Must provide a mapping for every label appearing
+            in the original automaton.
 
         inplace : bool
             If True (the default), modify the current automaton
@@ -508,7 +528,7 @@ class FSA:
             If inplace is False, return a new automaton with renamed
             edge labels. Otherwise, None.
 
-        """
+    """
         new_dict = {
             vertex: {
                 rename_map[label]: neighbor

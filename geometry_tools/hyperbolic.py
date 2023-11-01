@@ -491,9 +491,12 @@ class IdealPoint(Point):
                 " hyperbolic 1-space"
             )
 
+
         like = theta
         if dtype is not None:
             like = None
+
+
 
         one = utils.number(1, like=like, dtype=dtype, base_ring=base_ring)
 
@@ -501,6 +504,10 @@ class IdealPoint(Point):
                              like=like, dtype=dtype, base_ring=base_ring)
 
         result[..., 0] = one
+
+        # TODO: replace this with a utils function that accepts dtype
+        # and base_ring data, so that cos and sin have a sage type if
+        # theta does also.
         result[..., 1] = np.cos(theta)
         result[..., 2] = np.sin(theta)
 

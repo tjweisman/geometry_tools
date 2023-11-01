@@ -1465,7 +1465,7 @@ def projective_coords(points, chart_index=0, column_vectors=False):
 
     return result
 
-def identity(dimension):
+def identity(dimension, **kwargs):
     """Get the identity projective transformation.
 
     Parameters
@@ -1480,7 +1480,7 @@ def identity(dimension):
 
     """
 
-    return Transformation(np.identity(dimension + 1))
+    return Transformation(utils.identity(dimension + 1, **kwargs))
 
 def affine_linear_map(linear_map, chart_index=0, column_vectors=True):
     """Get a projective transformation restricting to a linear map on a

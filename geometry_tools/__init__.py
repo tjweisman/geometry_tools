@@ -7,7 +7,7 @@ The package is mostly built on top of [numpy](https://numpy.org/), [matplotlib](
 
 - work (again, numerically) with representations of finitely generated groups into \(\textrm{O}(d, 1)\), \(\textrm{GL}(d, \mathbb{R})\), and \(\textrm{GL}(d, \mathbb{C})\)
 
-- use finite-state automata to do some simple computations in word-hyperbolic groups 
+- use finite-state automata to do some simple computations in word-hyperbolic groups
 
 - draw nice pictures in the hyperbolic plane, the real projective plane, and the complex projective line
 
@@ -183,7 +183,7 @@ from geometry_tools import hyperbolic, coxeter, drawtools
 triangle_group = coxeter.TriangleGroup((2,3,7))
 triangle_rep = triangle_group.hyperbolic_rep()
 
-# find a fundamental domain for the action by finding 
+# find a fundamental domain for the action by finding
 # fixed points of length-2 elements
 vertices = triangle_rep.isometries(["ab", "bc", "ca"]).fixed_point()
 fund_triangle = hyperbolic.Polygon(vertices)
@@ -195,8 +195,10 @@ pos_isometries = triangle_rep.automaton_accepted(triangle_fsa, 15)
 # draw the translated triangles
 fig = drawtools.HyperbolicDrawing(model="poincare")
 fig.draw_plane()
-fig.draw_polygon(pos_isometries @ fund_triangle, 
+fig.draw_polygon(pos_isometries @ fund_triangle,
                  facecolor="royalblue", edgecolor="none")
 ```
 
 """
+
+from .base import *
