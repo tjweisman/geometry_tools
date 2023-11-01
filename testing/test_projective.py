@@ -4,7 +4,7 @@ import numpy as np
 from geometry_tools import projective
 from geometry_tools import GeometryError
 
-from common import *
+from geometry_tools.utils.testing import *
 
 @pytest.fixture
 def points():
