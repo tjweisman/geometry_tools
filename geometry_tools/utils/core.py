@@ -1123,6 +1123,7 @@ def pi(exact=False, like=None):
 
 def zeros(shape, base_ring=None, dtype=None, like=None,
           **kwargs):
+
     base_ring, dtype = check_type(base_ring, dtype, like)
 
     zero_arr = np.zeros(shape, dtype=dtype, **kwargs)

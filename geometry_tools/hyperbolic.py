@@ -394,12 +394,15 @@ class Point(HyperbolicObject, projective.Point):
 
         """
         #TODO: allow for pairwise distances
-        products = utils.apply_bilinear(self.proj_data, other.proj_data,
+        self_hyp = self.hyperboloid_coords()
+        other_hyp = other.hyperboloid_coords()
+
+        products = utils.apply_bilinear(self_hyp, other_hyp,
                                         self.minkowski)
 
         return np.arccosh(np.abs(products))
 
-    def origin_to(self):
+    def origin_to(self, force_oriented=True, compute_exact=True):
         """Get an isometry taking an "origin" point to this point
 
         Returns
@@ -411,7 +414,15 @@ class Point(HyperbolicObject, projective.Point):
             orientation-preserving.
 
         """
-        return timelike_to(self.proj_data)
+        normed = np.expand_dims(
+            utils.normalize(self.proj_data, self.minkowski),
+            axis=-2
+        )
+        isom = utils.find_isometry(self.minkowski, normed,
+                                   force_oriented,
+                                   compute_exact=compute_exact)
+
+        return Isometry(isom, column_vectors=False)
 
     def unit_tangent_towards(self, other):
         """Get a unit tangent vector with this basepoint, pointing at another point
@@ -492,13 +503,15 @@ class IdealPoint(Point):
             )
 
 
-        like = theta
+        # INTENDED BEHAVIOR: if this function is passed a Sage
+        # integer, and no base_ring or dtype information is provided,
+        # the returned result should have dtype('float64').
+        like = np.array(theta)
         if dtype is not None:
             like = None
 
-
-
         one = utils.number(1, like=like, dtype=dtype, base_ring=base_ring)
+
 
         result = utils.zeros(np.array(theta).shape + (dimension + 1,),
                              like=like, dtype=dtype, base_ring=base_ring)
@@ -1739,7 +1752,7 @@ class Isometry(projective.Transformation, HyperbolicObject):
 
         # find fixpoints in projective space, and their eigenvalues and minkowski norms
 
-        eigvals, eigvecs = np.linalg.eig(self.proj_data.swapaxes(-1, -2))
+        eigvals, eigvecs = utils.eig(self.proj_data.swapaxes(-1, -2))
         norms = utils.normsq(eigvecs.swapaxes(-1, -2),  self.minkowski)
 
         # 1 for eigenvectors which actually lie in H^n, 0 for outside vectors
@@ -1810,6 +1823,7 @@ class Isometry(projective.Transformation, HyperbolicObject):
         return Point(fixpoint_data[..., 0, :])
 
 
+    @staticmethod
     def elliptic(dimension, block_elliptic, column_vectors=True):
         """Get an elliptic isometry stabilizing the origin in the
         Poincare/Klein models.
@@ -1829,6 +1843,7 @@ class Isometry(projective.Transformation, HyperbolicObject):
 
         return Isometry(mat, column_vectors=column_vectors)
 
+    @staticmethod
     def standard_loxodromic(dimension, parameter):
         """Get a loxodromic isometry whose axis intersects the origin.
 

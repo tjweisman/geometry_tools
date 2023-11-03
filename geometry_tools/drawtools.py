@@ -36,6 +36,7 @@ from matplotlib.transforms import Affine2D
 from matplotlib.path import Path
 
 from geometry_tools import hyperbolic, utils, projective, complex_projective
+from geometry_tools import GeometryError
 from geometry_tools.hyperbolic import Model
 
 #I played around with this a bit, but it's an eyeball test
@@ -123,8 +124,17 @@ class ProjectiveDrawing(Drawing):
         if transform is not None:
             self.transform = transform
 
+    def preprocess_object(self, obj):
+        if obj.dimension != 2:
+            raise GeometryError(
+                ("Cannot draw a {}-dimensional object in 2-dimensional "
+                 "projective space").format(obj.dimension)
+            )
+
+        return self.transform @ obj.flatten_to_unit().astype('float64')
+
     def draw_point(self, point, **kwargs):
-        pointlist = self.transform @ point.flatten_to_unit()
+        pointlist = self.preprocess_object(point)
         default_kwargs = {
             "color" : "black",
             "marker": "o",
@@ -137,7 +147,7 @@ class ProjectiveDrawing(Drawing):
         plt.plot(x, y, **default_kwargs)
 
     def draw_proj_segment(self, segment, **kwargs):
-        seglist = self.transform @ segment.flatten_to_unit().astype('float64')
+        seglist = self.preprocess_object(segment)
         default_kwargs = {
             "color":"black",
             "linewidth":1
@@ -150,9 +160,8 @@ class ProjectiveDrawing(Drawing):
         self.ax.add_collection(lines)
 
     def draw_line(self, line, **kwargs):
-        linelist = self.transform @ projective.PointPair(
-            line.flatten_to_unit().astype('float64')
-        )
+        linelist = projective.PointPair(self.preprocess_object(line))
+
         default_kwargs = {
             "color":"black",
             "linewidth":1
@@ -252,16 +261,16 @@ class ProjectiveDrawing(Drawing):
 
 
     def draw_polygon(self, polygon, assume_affine=True, **kwargs):
+        polylist = projective.Polygon(
+            self.preprocess_object(polygon)
+        )
+
         default_kwargs = {
             "facecolor": "none",
             "edgecolor": "black"
         }
         for key, value in kwargs.items():
             default_kwargs[key] = value
-
-        polylist = projective.Polygon(
-            self.transform @ polygon.flatten_to_unit().astype('float64')
-        )
 
         if assume_affine:
             polys = PolyCollection(polylist.affine_coords(), **default_kwargs)
@@ -323,6 +332,16 @@ class HyperbolicDrawing(Drawing):
         if transform is not None:
             self.transform = transform.astype('float64')
 
+
+    def preprocess_object(self, obj):
+        if obj.dimension != 2:
+            raise GeometryError(
+                ("Cannot draw a {}-dimensional object in 2-dimensional "
+                 "hyperbolic space").format(obj.dimension)
+            )
+        return self.transform @ obj.flatten_to_unit().astype('float64')
+
+
     def draw_plane(self, **kwargs):
         default_kwargs = {
             "facecolor": "aliceblue",
@@ -371,7 +390,7 @@ class HyperbolicDrawing(Drawing):
 
     def draw_geodesic(self, segment,
                       radius_threshold=RADIUS_THRESHOLD, **kwargs):
-        seglist = self.transform @ segment.flatten_to_unit().astype('float64')
+        seglist = self.preprocess_object(segment)
         default_kwargs = {
             "color":"black",
             "linewidth":1
@@ -408,7 +427,7 @@ class HyperbolicDrawing(Drawing):
 
 
     def draw_point(self, point, **kwargs):
-        pointlist = self.transform @ point.flatten_to_unit().astype('float64')
+        pointlist = self.preprocess_object(point)
         default_kwargs = {
             "color" : "black",
             "marker": "o",
@@ -483,7 +502,7 @@ class HyperbolicDrawing(Drawing):
         for key, value in kwargs.items():
             default_kwargs[key] = value
 
-        polylist = self.transform @ polygon.flatten_to_unit().astype('float64')
+        polylist = self.preprocess_object(polygon)
 
         if self.model == Model.KLEIN:
             polys = PolyCollection(polylist.coords("klein"), **default_kwargs)
@@ -507,7 +526,8 @@ class HyperbolicDrawing(Drawing):
         for key, value in kwargs.items():
             default_kwargs[key] = value
 
-        horolist = self.transform @ horoball.flatten_to_unit().astype('float64')
+        horolist = self.preprocess_object(horoball)
+
         if self.model == Model.POINCARE or self.model == Model.HALFSPACE:
             center, radius = horolist.sphere_parameters(model=self.model)
 
@@ -555,7 +575,7 @@ class HyperbolicDrawing(Drawing):
                     self.model)
             )
 
-        horolist = self.transform @ horoarc.flatten_to_unit().astype('float64')
+        horolist = self.preprocess_object(horoarc)
         endpts = horolist.endpoint_coords(model=self.model)
         centers, radii, thetas = horolist.circle_parameters(model=self.model)
 
@@ -578,7 +598,7 @@ class HyperbolicDrawing(Drawing):
         for key, value in kwargs.items():
             default_kwargs[key] = value
 
-        arclist = self.transform @ boundary_arc.flatten_to_unit().astype('float64')
+        arclist = self.transform @ self.preprocess_object(boundary_arc)
 
         if self.model == Model.POINCARE or self.model == Model.KLEIN:
             centers, radii, thetas = arclist.circle_parameters(model=self.model)
@@ -633,6 +653,14 @@ class CP1Drawing(Drawing):
         if transform is not None:
             self.transform = transform.astype('float64')
 
+    def preprocess_object(self, obj):
+        if obj.dimension != 1:
+            raise GeometryError(
+                ("Cannot draw a {}-dimensional object in 1-dimensional "
+                 "complex projective space").format(obj.dimension)
+            )
+        return self.transform @ obj.flatten_to_unit().astype('float64')
+
 
     def draw_disk(self, disks, draw_nonaffine=True,
                   **kwargs):
@@ -643,7 +671,7 @@ class CP1Drawing(Drawing):
         for key, value in kwargs.items():
             default_kwargs[key] = value
 
-        disklist = self.transform @ disks.flatten_to_unit().astype('float64')
+        disklist = self.preprocess_object(disks)
 
         nonaff_in_collection = (draw_nonaffine and
                                 default_kwargs["facecolor"].lower() == "none")
@@ -673,7 +701,7 @@ class CP1Drawing(Drawing):
                 self.ax.add_patch(annulus)
 
     def draw_point(self, point, **kwargs):
-        pointlist = self.transform @ point.flatten_to_unit().astype('float64')
+        pointlist = self.preprocess_object(point)
         default_kwargs = {
             "color" : "black",
             "marker": "o",

@@ -9,7 +9,10 @@ SCRIPT_DIR = os.path.dirname(__file__)
 OUTPUT_DIR = os.path.join("sage", "automatic")
 
 TO_PREPARSE = [
-    "test_projective.py"
+    "test_projective.py",
+    "test_automata.py",
+    "test_hyperbolic.py",
+    "test_representation.py"
 ]
 
 IMPORT_LINE = "from sage.all import RealNumber, Integer\n"
