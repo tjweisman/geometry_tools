@@ -8,8 +8,9 @@ from .. import utils
 if utils.SAGE_AVAILABLE:
     from ..utils import sagewrap
 
-def binom(n, k):
-    return int(scipy.special.binom(n, k))
+def binom(n, k, **kwargs):
+    return utils.number(scipy.special.binom(n, k),
+                        **kwargs)
 
 def _convert_vector(vector, like=None, autoconvert=True):
     is_sage_obj = False
@@ -225,7 +226,7 @@ def sl2_irrep(A, n):
     for k in range(n):
         for j in range(n):
             for i in range(max(0, j - r + k), min(j+1, k+1)):
-                im[..., j,k] += (binom(k,i) * binom(r - k, j - i)
+                im[..., j,k] += (binom(k, i, like=A) * binom(r - k, j - i, like=A)
                           * a**i * c**(k - i) * b**(j - i)
                           * d**(r - k - j + i))
     return im
@@ -242,7 +243,8 @@ def sln_killing_form(n, **kwargs):
                 form[i * n + j, k * n + l] = form_val
     return form
 
-def o_to_pgl(A, bilinear_form=np.diag((-1, 1, 1))):
+def o_to_pgl(A, bilinear_form=np.diag([-1, 1, 1]),
+             exact=True):
     r"""Return the image of an element of \(\mathrm{O}(2, 1)\) under the
     representation \(\mathrm{O}(2,1) \to \mathrm{GL}(2)\).
 
@@ -270,27 +272,36 @@ def o_to_pgl(A, bilinear_form=np.diag((-1, 1, 1))):
     conj_i = utils.identity(3, like=A)
 
     if bilinear_form is not None:
-        killing_conj = utils.array_like([[ 0, -1/2, -1/2],
-                                         [-1,  0,   0   ],
-                                         [ 0,  1/2, -1/2]],
+        bilinear_form = utils.array_like(bilinear_form,
+                                         like=A)
+
+        two = utils.number(2, like=A)
+        killing_conj = utils.array_like([[ 0, -1, -1],
+                                         [-2,  0,   0],
+                                         [ 0,  1, -1]],
                                         like=A)
+
+        killing_conj = killing_conj / two
 
         form_conj, form_conj_i = utils.diagonalize_form(
             bilinear_form,
             order_eigenvalues="minkowski",
             reverse=True,
-            with_inverse=True)
+            with_inverse=True,
+            compute_exact=exact
+        )
 
         conj = form_conj @ utils.invert(killing_conj)
         conj_i = killing_conj @ form_conj_i
 
     A_d = conj_i @ A @ conj
 
-    a = np.sqrt(np.abs(A_d[0][0]))
-    b = np.sqrt(np.abs(A_d[2][0]))
-    c = np.sqrt(np.abs(A_d[0][2]))
-    d = np.sqrt(np.abs(A_d[2][2]))
+    a = np.sqrt(np.abs(A_d[0, 0]))
+    b = np.sqrt(np.abs(A_d[0, 2]))
+    c = np.sqrt(np.abs(A_d[2, 0]))
+    d = np.sqrt(np.abs(A_d[2, 2]))
 
+    # TODO: make this vector-safe, right now the docstring is a lie
     if A_d[0][1] < 0:
         b = b * -1
     if A_d[1][0] < 0:
@@ -331,8 +342,9 @@ def sl2_to_so21(A):
                                      [-1, -0, -1]],
                                     like=A)
 
-    permutation = utils.permutation_matrix((2,1,0))
+    permutation = utils.permutation_matrix((2,1,0), like=A)
 
     A_3 = sl2_irrep(A, 3)
+
     return (permutation @ killing_conj @ A_3 @
             utils.invert(killing_conj) @ permutation)

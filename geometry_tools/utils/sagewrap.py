@@ -8,6 +8,7 @@ from . import _numpy_wrappers as nwrap
 
 pi = sage.all.pi
 Integer = sage.all.Integer
+SR = sage.all.SR
 matrix_class = sage.matrix.matrix0.Matrix
 vector_class = sage.structure.element.Vector
 

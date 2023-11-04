@@ -29,5 +29,8 @@ def sln_adjoint(**kwargs):
 def gln_adjoint(**kwargs):
     return _wrap_hom(lie.gln_adjoint, **kwargs)
 
-def sl2_to_so21():
-    return _wrap_hom(lie.sl2_to_so21)
+def sl2_to_so21(**kwargs):
+    return _wrap_hom(lie.sl2_to_so21, **kwargs)
+
+def so21_to_sl2(**kwargs):
+    return _wrap_hom(lie.o_to_pgl, **kwargs)

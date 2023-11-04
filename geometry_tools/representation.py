@@ -662,7 +662,7 @@ class Representation:
 
         return composed_rep
 
-    def compose(self, hom, hom_in_wrapped=True, hom_out_wrapped=True,
+    def compose(self, hom, hom_in_wrapped=False, hom_out_wrapped=False,
                 **kwargs):
 
         hom_1 = hom
@@ -845,6 +845,13 @@ class SageMatrixRepresentation(Representation):
         return sagewrap.sage_matrix(
             Representation.coboundary_matrix(self)
         )
+
+    def compose(self, hom, hom_in_wrapped=True,
+                hom_out_wrapped=False, **kwargs):
+        return Representation.compose(self, hom,
+                                      hom_in_wrapped=hom_in_wrapped,
+                                      hom_out_wrapped=hom_out_wrapped,
+                                      **kwargs)
 
 def sym_index(i, j, n):
     r"""Return coordinate indices for an isomorphism

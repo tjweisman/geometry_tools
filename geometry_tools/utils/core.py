@@ -1,4 +1,5 @@
 import warnings
+import functools
 
 import numpy as np
 from scipy.optimize import linprog
@@ -12,7 +13,7 @@ except ModuleNotFoundError:
 
 from . import _numpy_wrappers as nwrap
 
-def rotation_matrix(angle):
+def rotation_matrix(angle, like=None, **kwargs):
     r"""Get a 2x2 rotation matrix rotating counterclockwise by the
     specified angle.
 
@@ -29,8 +30,11 @@ def rotation_matrix(angle):
         \end{pmatrix}\)
 
     """
-    return np.array([[np.cos(angle), -1*np.sin(angle)],
-                     [np.sin(angle), np.cos(angle)]])
+    if like is None:
+        like = angle
+    return array_like([[cos(angle), -1*sin(angle)],
+                       [sin(angle), cos(angle)]],
+                      like=like, **kwargs)
 
 def permutation_matrix(permutation, inverse=False, **kwargs):
     """Return a permutation matrix representing the given permutation.
@@ -1008,10 +1012,13 @@ def det(mat):
     return sagewrap.det(mat)
 
 def check_type(base_ring=None, dtype=None, like=None,
-                default_dtype='float64', default_ring=None):
+                default_dtype='float64', integer_type=True):
 
-    if default_ring is None and SAGE_AVAILABLE:
+    default_ring = None
+    if SAGE_AVAILABLE:
         default_ring = sagewrap.Integer
+        if not integer_type:
+            default_ring = sagewrap.SR
 
     if like is not None:
         try:
@@ -1100,9 +1107,39 @@ def number(val, like=None, dtype=None, base_ring=None):
 
     return val
 
-def array_like(array, like=None, base_ring=None, dtype=None):
-    base_ring, dtype = check_type(base_ring, dtype, like)
-    arr = np.array(array, dtype=dtype)
+def wrap_elementary(func):
+    @functools.wraps(func)
+    def wrapped(arg, like=None, base_ring=None, dtype=None, **kwargs):
+        if not SAGE_AVAILABLE:
+            return func(arg, **kwargs)
+
+        else:
+            if like is None:
+                like = arg
+            packaged = array_like(arg, like=like,
+                                  base_ring=base_ring,
+                                  dtype=dtype,
+                                  integer_type=False)
+
+            return func(packaged, **kwargs)
+
+    return wrapped
+
+@wrap_elementary
+def cos(arg):
+    return np.cos(arg)
+
+@wrap_elementary
+def sin(arg):
+    return np.sin(arg)
+
+def array_like(array, like=None, base_ring=None, dtype=None,
+               integer_type=False, **kwargs):
+
+    base_ring, dtype = check_type(base_ring, dtype, like,
+                                  integer_type=integer_type)
+
+    arr = np.array(array, dtype=dtype, **kwargs)
 
     if base_ring is not None:
         return sagewrap.change_base_ring(arr, base_ring)

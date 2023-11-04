@@ -30,7 +30,7 @@ obtain an isometry of the hyperbolic plane is to use the isomorphism from
 from geometry_tools import hyperbolic
 
 # get a loxodromic isometry and a point in H^2
-hyp_iso = hyperbolic.sl2r_iso([[2., 0.], [0., -1./2]])
+hyp_iso = hyperbolic.sl2_iso([[2., 0.], [0., -1./2]])
 point = hyperbolic.get_point([0., 0.])
 
 # apply the isometry to the point
@@ -58,7 +58,7 @@ p2 = hyperbolic.Point([0.1, 0.], model="klein")
 pts = hyperbolic.Point([p1, p2])
 
 # get a parabolic isometry
-iso = hyperbolic.sl2r_iso([[1., 1.], [0., 1.]])
+iso = hyperbolic.sl2_iso([[1., 1.], [0., 1.]])
 
 (iso @ pts).coords(model="klein")
 ```
@@ -80,7 +80,7 @@ from numpy import pi
 # make a free group representation by mapping the generators to loxodromic
 # isometries with perpendicular axes
 free_rep = hyperbolic.HyperbolicRepresentation()
-free_rep["a"] = hyperbolic.sl2r_iso([[3., 0], [0., 1./3]])
+free_rep["a"] = hyperbolic.sl2_iso([[3., 0], [0., 1./3]])
 rot = hyperbolic.Isometry.standard_rotation(pi / 2)
 free_rep["b"] = rot @ free_rep["a"] @ rot.inv()
 
@@ -1824,7 +1824,8 @@ class Isometry(projective.Transformation, HyperbolicObject):
 
 
     @staticmethod
-    def elliptic(dimension, block_elliptic, column_vectors=True):
+    def elliptic(dimension, block_elliptic, column_vectors=True,
+                 like=None, **kwargs):
         """Get an elliptic isometry stabilizing the origin in the
         Poincare/Klein models.
 
@@ -1833,12 +1834,14 @@ class Isometry(projective.Transformation, HyperbolicObject):
 
         """
 
-        # WRAPLITERAL
+        if like is None:
+            like = block_elliptic
+
         mat = utils.zeros((dimension + 1, dimension + 1),
-                          like=block_elliptic)
+                          like=like, **kwargs)
 
         # add one to preserve base_ring
-        mat[0,0] += 1
+        mat[0,0] = utils.number(1, like=like, **kwargs)
         mat[1:, 1:] = block_elliptic
 
         return Isometry(mat, column_vectors=column_vectors)
@@ -1860,17 +1863,32 @@ class Isometry(projective.Transformation, HyperbolicObject):
                         utils.invert(basis_change)),
                         column_vectors=True)
 
-    # TODO: specify base ring for rotation
-    def standard_rotation(angle, dimension=2):
+    @staticmethod
+    def standard_rotation(angle, dimension=2, like=None, **kwargs):
         """Get a rotation about the origin by a fixed angle.
 
         WARNING: not vectorized.
         """
 
-        affine = utils.identity(dimension, like=angle)
-        affine[0:2, 0:2] = utils.rotation_matrix(angle)
+        if like is None:
+            like = angle
 
-        return Isometry.elliptic(dimension, affine)
+        affine = utils.identity(
+            dimension, like=like, **kwargs
+        )
+        affine[0:2, 0:2] = utils.rotation_matrix(
+            angle, like=like, **kwargs
+        )
+
+        return Isometry.elliptic(dimension, affine,
+                                 like=like, **kwargs)
+
+    @staticmethod
+    def from_sl2(matrix, **kwargs):
+        return sl2_iso(matrix, **kwargs)
+
+    def to_sl2(self, exact=True):
+        return lie.o_to_pgl(self.proj_data.swapaxes(-1,-2), exact=exact)
 
 class HyperbolicRepresentation(projective.ProjectiveRepresentation):
     """Model a representation for a finitely generated group
@@ -1901,10 +1919,16 @@ class HyperbolicRepresentation(projective.ProjectiveRepresentation):
         """
         return self.elements(words)
 
+    def compose(self, hom, **kwargs):
+        return projective.ProjectiveRepresentation(self).compose(hom, **kwargs)
+
+
     def gln_adjoint(self, **kwargs):
         return projective.ProjectiveRepresentation(
             projective.ProjectiveRepresentation.gln_adjoint(self, **kwargs)
         )
+
+
 
 def minkowski(dimension, base_ring=None):
     form = utils.identity(dimension, base_ring=base_ring)
@@ -2000,14 +2024,15 @@ def lightlike(vectors):
 
 
 def kleinian_to_poincare(points):
-    euc_norms = utils.normsq(points)
+    euc_norms = np.atleast_1d(utils.normsq(points))
+
     #we take absolute value to combat roundoff error
     mult_factor = 1 / (1 + np.sqrt(np.abs(1 - euc_norms)))
 
     return (points.T * mult_factor.T).T
 
 def poincare_to_kleinian(points):
-    euc_norms = utils.normsq(points)
+    euc_norms = np.atleast_1d(utils.normsq(points))
     mult_factor = 2 / (1 + euc_norms)
 
     return (points.T * mult_factor.T).T
@@ -2055,7 +2080,7 @@ def timelike_to(v, force_oriented=False, compute_exact=True):
                                         compute_exact=compute_exact),
                     column_vectors=False)
 
-def sl2r_iso(matrix):
+def sl2_iso(matrix, **kwargs):
     """Convert 2x2 matrices to isometries.
 
     matrix is an array of shape (..., 2, 2), and interpreted as an
@@ -2063,7 +2088,9 @@ def sl2r_iso(matrix):
 
     """
 
-    return Isometry(lie.sl2_to_so21(np.array(matrix)),
+    m_array = utils.array_like(matrix, **kwargs)
+
+    return Isometry(lie.sl2_to_so21(m_array),
                     column_vectors=True)
 
 def project_to_hyperboloid(basepoint, tangent_vector, form=None):
