@@ -55,3 +55,5 @@ words in an arbitrary Coxeter group. See the documentation for
 coxeter.CoxeterGroup.automaton().
 
     """
+
+from . import fsa, kbmag_utils, coxeter_automaton, gap_parse

@@ -50,6 +50,18 @@ def transform():
     )
 
 @pytest.fixture
+def random_diagonal():
+    return projective.Transformation(
+        np.diag(5 - 10 * np.random.rand(3))
+    )
+
+@pytest.fixture
+def random_transform():
+    return projective.Transformation(
+        5 - 10 * np.random.rand(3,3)
+    )
+
+@pytest.fixture
 def transform_array(transform, identity):
     return projective.Transformation(
         [transform,
@@ -281,3 +293,14 @@ def test_iterate_points(points, point_array):
 def test_iterate_polygons(polygons):
     for polygon in polygons:
         assert_numpy_equivalent(polygon, polygon)
+
+def test_diagonalize(random_diagonal, random_transform):
+    diagonalizable = random_transform @ random_diagonal @ random_transform.inv()
+
+    conj = diagonalizable.diagonalize()
+    diagonalized = conj.inv() @ diagonalizable @ conj
+
+    assert np.allclose(
+        diagonalized.matrix,
+        np.diag(np.diag(diagonalized.matrix))
+    )

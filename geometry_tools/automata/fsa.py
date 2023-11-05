@@ -43,12 +43,14 @@ list(cox_aut.enumerate_words(3))
      'cba']
 
     """
-
-import pkg_resources
+import os
 import copy
+import importlib.resources
 from collections import deque, defaultdict
 
+
 from . import kbmag_utils, gap_parse
+from .. import automata
 from .. import utils
 
 from ..utils import words
@@ -693,10 +695,20 @@ def load_builtin(filename):
         finite-state automaton read from this file
 
     """
-    aut_string = pkg_resources.resource_string(
-        __name__, "{}/{}".format(BUILTIN_DIR, filename)
-    )
-    record, _ = gap_parse.parse_record(aut_string.decode('utf-8'))
+    try:
+        builtin_path = importlib.resources.files(automata) / BUILTIN_DIR / filename
+        with open(builtin_path) as builtin_file:
+            aut_string = builtin_file.read()
+    except AttributeError as e:
+        # we still support python 3.8 since it's not EOL yet
+        from pkg_resources import resource_string as resource_bytes
+        aut_bytes = resource_bytes(
+            __name__, "{}/{}".format(BUILTIN_DIR, filename)
+        )
+        aut_string = aut_bytes.decode('utf-8')
+
+
+    record, _ = gap_parse.parse_record(aut_string)
     return _from_gap_record(record)
 
 
@@ -705,7 +717,16 @@ def list_builtins():
     subpackage.
 
     """
-    return pkg_resources.resource_listdir(__name__, BUILTIN_DIR)
+    try:
+        builtin_dir = importlib.resources.files(automata) / BUILTIN_DIR
+        return [
+            os.path.basename(name)
+            for name in builtin_dir.iterdir()
+        ]
+    except AttributeError as e:
+        # we still support python 3.8 since it's not EOL
+        from pkg_resources import resource_listdir
+        return resource_listdir(__name__, BUILTIN_DIR)
 
 def free_automaton(generating_set):
     """Return an automaton accepting freely reduced words in a set of
