@@ -26,7 +26,7 @@ def svd_kernel(mat, assume_full_rank=False, matching_rank=True,
                 "this function with matching_rank=False."
             )
 
-        kernel_dim = np.atleast_1d(kernel_dims)[0]
+        kernel_dim = (kernel_dims).flatten()[0]
 
     if matching_rank:
         return v[..., -kernel_dim:, :].swapaxes(-1, -2)

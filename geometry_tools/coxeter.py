@@ -243,7 +243,7 @@ class CoxeterGroup:
         )
 
 
-    def cartan_matrix(self, parameters):
+    def cartan_matrix(self, parameters, **kwargs):
         """Get a Cartan matrix for this Coxeter group by specifying
         off-diagonal parameters.
 
@@ -280,7 +280,7 @@ class CoxeterGroup:
             Cartan matrix, specified by the parameters as described above.
 
         """
-        cartan = 2 * self.bilinear_form[:]
+        cartan = 2 * self.bilinear_form(**kwargs)
 
         def specified(index):
             try:
