@@ -348,3 +348,12 @@ def sl2_to_so21(A):
 
     return (permutation @ killing_conj @ A_3 @
             utils.invert(killing_conj) @ permutation)
+
+def block_include(A, dimension):
+    A_dim = A.shape[-1]
+    arr = utils.zeros((dimension, dimension),
+                      like=A)
+
+    arr[:A_dim, :A_dim] = A
+    arr[A_dim:, A_dim:] = utils.identity(dimension - A_dim, like=A)
+    return arr

@@ -549,7 +549,10 @@ class Representation:
     """
         return words.asym_gens(self.generators.keys())
 
-
+    def dual(self):
+        return self._compose(
+            lambda M: utils.invert(M).T
+        )
 
     def _word_value(self, word):
         matrix = utils.identity(self._dim, dtype=self.dtype)
@@ -596,7 +599,7 @@ class Representation:
             base_ring=base_ring
         )
 
-    def change_dtype(self, dtype):
+    def astype(self, dtype):
         base_ring = self.base_ring
         if dtype != np.dtype('O'):
             base_ring = None

@@ -1109,21 +1109,38 @@ def number(val, like=None, dtype=None, base_ring=None):
 
 def wrap_elementary(func):
     @functools.wraps(func)
-    def wrapped(arg, like=None, base_ring=None, dtype=None, **kwargs):
+    def wrapped(*args, like=None, base_ring=None, dtype=None, **kwargs):
         if not SAGE_AVAILABLE:
-            return func(arg, **kwargs)
+            return func(*args, **kwargs)
 
         else:
-            if like is None:
-                like = arg
-            packaged = array_like(arg, like=like,
-                                  base_ring=base_ring,
-                                  dtype=dtype,
-                                  integer_type=False)
+            packaged_args = []
+            arg_ring = None
+            if base_ring is not None:
+                arg_ring = sagewrap.SR
 
-            return func(packaged, **kwargs)
+            for arg in args:
+                arg_like = like
+                if arg_like is None:
+                    arg_like = arg
+
+                packaged_args.append(
+                    array_like(arg, like=arg_like,
+                               base_ring=arg_ring,
+                               dtype=dtype,
+                               integer_type=False)
+                )
+
+            return sagewrap.change_base_ring(
+                func(*packaged_args, **kwargs),
+                base_ring
+            )
 
     return wrapped
+
+@wrap_elementary
+def power(base, exp):
+    return np.power(base, exp)
 
 @wrap_elementary
 def cos(arg):
@@ -1188,7 +1205,8 @@ def identity(n, base_ring=None, dtype=None, like=None, **kwargs):
         return sagewrap.change_base_ring(identity_arr, base_ring)
     return identity_arr
 
-def change_base_ring(array, base_ring=None):
+def change_base_ring(array, base_ring=None,
+                     rational_approx=False):
     if base_ring is None:
         return array
 
@@ -1197,4 +1215,5 @@ def change_base_ring(array, base_ring=None):
             "Cannot change base ring unless sage is available."
         )
 
-    return sagewrap.change_base_ring(array, base_ring)
+    return sagewrap.change_base_ring(array, base_ring,
+                                     rational_approx=rational_approx)

@@ -122,8 +122,10 @@ class ProjectiveDrawing(Drawing):
 
     _LineCollection = LineCollection
 
-    def __init__(self, transform=None, **kwargs):
+    def __init__(self, transform=None, chart_index=0, **kwargs):
         Drawing.__init__(self, **kwargs)
+
+        self.chart_index = chart_index
 
         self.transform = projective.identity(2)
         if transform is not None:
@@ -148,8 +150,19 @@ class ProjectiveDrawing(Drawing):
         for key, value in kwargs.items():
             default_kwargs[key] = value
 
-        x, y = pointlist.affine_coords().T
+        x, y = pointlist.affine_coords(chart_index=self.chart_index).T
         plt.plot(x, y, **default_kwargs)
+
+    def draw_curve(self, points, **kwargs):
+        pointlist = self.preprocess_object(points)
+        default_kwargs = {
+            "color" : "black",
+        }
+        for key, value in kwargs.items():
+            default_kwargs[key] = value
+
+        x, y = pointlist.affine_coords(chart_index=self.chart_index).T
+        self.ax.plot(x, y, **default_kwargs)
 
     def draw_proj_segment(self, segment, **kwargs):
         seglist = self.preprocess_object(segment)
@@ -160,8 +173,9 @@ class ProjectiveDrawing(Drawing):
         for key, value in kwargs.items():
             default_kwargs[key] = value
 
-        lines = self.__class__._LineCollection(seglist.endpoint_affine_coords(),
-                                               **default_kwargs)
+        lines = self.__class__._LineCollection(
+            seglist.endpoint_affine_coords(chart_index=self.chart_index),
+            **default_kwargs)
         self.ax.add_collection(lines)
 
     def draw_line(self, line, **kwargs):
@@ -174,7 +188,7 @@ class ProjectiveDrawing(Drawing):
         for key, value in kwargs.items():
             default_kwargs[key] = value
 
-        coords = linelist.endpoint_affine_coords()
+        coords = linelist.endpoint_affine_coords(chart_index=self.chart_index)
         c1 = coords[..., 0, :]
         c2 = coords[..., 1, :]
 

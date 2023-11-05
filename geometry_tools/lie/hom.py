@@ -34,3 +34,6 @@ def sl2_to_so21(**kwargs):
 
 def so21_to_sl2(**kwargs):
     return _wrap_hom(lie.o_to_pgl, **kwargs)
+
+def block_include(n, **kwargs):
+    return _wrap_hom(lie.block_include, n, **kwargs)

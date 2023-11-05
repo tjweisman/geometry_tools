@@ -9,7 +9,7 @@ with open(path.join(setup_dir, 'README.md'),
 
 setup(
     name="geometry_tools",
-    version="0.4",
+    version="0.5",
     packages=find_packages(),
     include_package_data=True,
 

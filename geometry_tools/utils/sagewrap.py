@@ -54,11 +54,17 @@ def guess_base_ring(arr):
     return sage_vector(arr.flatten()).base_ring()
 
 def change_base_ring(arr, base_ring, rational_approx=False):
-    arr = arr.astype('object')
+    if base_ring is None:
+        return arr
+
+    arr = np.array(arr, dtype='object')
 
     ring_convert = base_ring
     if rational_approx:
         ring_convert = (lambda x : base_ring(sage.all.QQ(x)))
+
+    if arr.shape == ():
+        return ring_convert(arr.flatten()[0])
 
     return _vectorize(ring_convert)(arr)
 

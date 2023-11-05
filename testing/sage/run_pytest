@@ -1,1 +1,1 @@
-sage --python -m pytest -v
+sage --python -m pytest -v --pdb
