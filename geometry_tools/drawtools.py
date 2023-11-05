@@ -344,9 +344,10 @@ class Drawing3D(Drawing):
 class ProjectiveDrawing3D(ProjectiveDrawing, Drawing3D):
     _LineCollection = Line3DCollection
 
-    def __init__(self, transform=None, **kwargs):
+    def __init__(self, transform=None, chart_index=0, **kwargs):
         Drawing3D.__init__(self, **kwargs)
 
+        self.chart_index = chart_index
         self.transform = projective.identity(3)
 
         if transform is not None:
