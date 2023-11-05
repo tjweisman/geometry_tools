@@ -1275,6 +1275,40 @@ class Transformation(ProjectiveObject):
 
         return Point(eigvec_coords)
 
+    def diagonalize(self, return_inv=False, **kwargs):
+        """Get a matrix diagonalizing this projective transformation.
+
+        If self is a diagonalizable transformation, this function
+        returns a Transformation object representing a projective
+        transformation M such that M.inv() @ (self) @ M is diagonal.
+
+        No claims are made about the behavior of this function if M is
+        not diagonalizable. The function may throw an error, or it may
+        return nonsense - no effort has been made on this front.
+
+        Parameters
+        ----------
+        return_inv : bool
+            If True, return a pair of Transformations, giving M and
+            M.inv(). Otherwise, just return M.
+
+        Returns
+        -------
+        Transformation
+            Projective transformation M diagonalizing this
+            transformation.
+
+        """
+
+        _, conj = utils.eig(self.proj_data.swapaxes(-1, -2),
+                            **kwargs)
+
+        conj_transform = Transformation(conj, column_vectors=True)
+
+        if not return_inv:
+            return conj_transform
+
+        return conj_transform, conj_transform.inv()
 
     def _data_to_object(self, data):
         return ProjectiveObject(data)
