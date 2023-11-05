@@ -475,7 +475,7 @@ def indefinite_orthogonalize(form, matrices, compute_exact=False):
     n, m = matrices.shape[-2:]
 
     dtype = np.dtype('float64')
-    if SAGE_AVAILABLE and compute_exact and not sagewrap.inexact_type(matrices.dtype):
+    if SAGE_AVAILABLE and compute_exact and not sagewrap.inexact_type(matrices):
         dtype = np.dtype('object')
 
     result = zeros_like(matrices, dtype=dtype)
