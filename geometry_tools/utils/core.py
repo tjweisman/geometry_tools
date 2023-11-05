@@ -989,34 +989,44 @@ def indefinite_form(p, q, neg_first=True, **kwargs):
 
     return form_mat
 
-def invert(mat, compute_exact=SAGE_AVAILABLE):
-    if not SAGE_AVAILABLE or not compute_exact:
-        return np.linalg.inv(mat)
-
-    return sagewrap.invert(mat)
-
-def kernel(mat, compute_exact=SAGE_AVAILABLE):
-    if not SAGE_AVAILABLE or not compute_exact:
-        return numerical.svd_kernel(mat)
-
-    return sagewrap.kernel(mat)
-
-def eig(mat, compute_exact=SAGE_AVAILABLE):
-    if not SAGE_AVAILABLE or not compute_exact:
-        return np.linalg.eig(mat)
-
-    return sagewrap.eig(mat)
-
-def eigh(mat, compute_exact=SAGE_AVAILABLE):
-    if not SAGE_AVAILABLE or not compute_exact:
-        return np.linalg.eigh(mat)
-
-    return sagewrap.eigh(mat)
-
-def det(mat):
+def matrix_func(func):
     if not SAGE_AVAILABLE:
-        return np.linalg.det(mat)
-    return sagewrap.det(mat)
+        return func
+
+    # get sage_func now, so if there's a name issue we'll throw an
+    # error when the wrapped function is defined (rather than when
+    # it's called)
+    sage_func = getattr(sagewrap, func.__name__)
+
+    @functools.wraps(func)
+    def wrapped(*args, compute_exact=SAGE_AVAILABLE,
+                **kwargs):
+        if not compute_exact:
+            return func(*args, **kwargs)
+
+        return sage_func(*args, **kwargs)
+
+    return wrapped
+
+@matrix_func
+def invert(mat):
+    return np.linalg.inv(mat)
+
+@matrix_func
+def kernel(mat):
+    return numerical.svd_kernel(mat)
+
+@matrix_func
+def eig(mat):
+    return np.linalg.eig(mat)
+
+@matrix_func
+def eigh(mat):
+    return np.linalg.eigh(mat)
+
+@matrix_func
+def det(mat):
+    return np.linalg.det(mat)
 
 def check_type(base_ring=None, dtype=None, like=None,
                 default_dtype='float64', integer_type=True):
