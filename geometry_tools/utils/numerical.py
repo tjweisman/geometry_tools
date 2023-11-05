@@ -9,7 +9,8 @@ def svd_kernel(mat, assume_full_rank=False, matching_rank=True,
 
     _, s, v = np.linalg.svd(mat)
 
-    min_kernel_dim = mat.shape[-1] - mat.shape[-2]
+    min_kernel_dim = max(mat.shape[-1] - mat.shape[-2], 0)
+
     if assume_full_rank:
         kernel_dim = min_kernel_dim
     else:
@@ -30,7 +31,7 @@ def svd_kernel(mat, assume_full_rank=False, matching_rank=True,
     if matching_rank:
         return v[..., -kernel_dim:, :].swapaxes(-1, -2)
 
-    possible_dims = np.unique(kernel_dims, )
+    possible_dims = np.unique(kernel_dims)
     kernel_bases = []
     kernel_dim_loc = []
 

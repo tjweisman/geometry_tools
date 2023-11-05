@@ -367,3 +367,59 @@ def bilinear_form_differential(form, like=None, **kwargs):
         like=like, **kwargs
     )
     return diff
+
+def subspace_action(mat, subspace, compute_exact=False,
+                    broadcast="elementwise", **kwargs):
+    subspace_mats = subspace
+
+    #can't use atleast_2d since we want a column vector here
+    if len(subspace.shape) == 1:
+        subspace_mats = np.expand_dims(subspace, axis=-1)
+
+    if mat.shape[-1] != mat.shape[-2]:
+        raise ValueError("Matrix must be square to compute restriction to a subspace")
+
+    if subspace_mats.shape[-2] != mat.shape[-1]:
+        raise ValueError((
+            "Matrix of shape {} does not act on a subspace in an ambient space of "
+            "dimension {}"
+        ).format(mats.shape[-1], subspace_mats.shape[-2])
+        )
+
+    subspace_dim = subspace_mats.shape[-1]
+
+    img_subspace = utils.matrix_product(
+        mat, subspace_mats, broadcast=broadcast
+    )
+
+    img_mat = np.concatenate(
+        [subspace, img_subspace],
+        axis=-1
+    )
+
+    try:
+        kernel = utils.kernel(img_mat, compute_exact=compute_exact,
+                              **kwargs)
+        if (kernel.shape[-2] != 2 * subspace_dim or
+            kernel.shape[-1] != subspace_dim):
+            raise ValueError
+    except ValueError:
+        raise ValueError(
+            "Given matri(x/ces) does not preserve the given subspace(s)"
+        )
+
+    left_coeffs = kernel[..., :subspace_dim, :]
+    right_coeffs = -kernel[..., subspace_dim:, :]
+    right_coeffs_inv = utils.invert(right_coeffs,
+                                    compute_exact=compute_exact,
+                                    **kwargs)
+
+    return utils.matrix_product(left_coeffs, right_coeffs_inv)
+
+def form_adjoint_action(mat, form, inv=None, **kwargs):
+    lie_alg_kernel_mat = lie.bilinear_form_differential(form, **kwargs)
+    lie_alg_basis = utils.kernel(lie_alg_kernel_mat, **kwargs)
+    gln_adjoint_mat = lie.gln_adjoint(mat, inv=inv, **kwargs)
+    return lie.subspace_action(gln_adjoint_mat,
+                               lie_alg_basis,
+                               **kwargs)

@@ -989,19 +989,31 @@ def indefinite_form(p, q, neg_first=True, **kwargs):
 
     return form_mat
 
+def symmetric_part(bilinear_form):
+    return (bilinear_form + bilinear_form.swapaxes(-1, -2)) / 2
+
+def antisymmetric_part(bilinear_form):
+    return (bilinear_form - bilinear_form.swapaxes(-1, -2)) / 2
+
 def matrix_func(func):
-    if not SAGE_AVAILABLE:
-        return func
 
     # get sage_func now, so if there's a name issue we'll throw an
     # error when the wrapped function is defined (rather than when
     # it's called)
-    sage_func = getattr(sagewrap, func.__name__)
+    if SAGE_AVAILABLE:
+        sage_func = getattr(sagewrap, func.__name__)
 
     @functools.wraps(func)
     def wrapped(*args, compute_exact=SAGE_AVAILABLE,
                 **kwargs):
-        if not compute_exact:
+        if not SAGE_AVAILABLE and compute_exact:
+            raise UserWarning((
+                "calling {} with compute_exact=True but Sage is not "
+                "available; falling back on numerical computations."
+            ).format(func.__name__)
+            )
+
+        if not SAGE_AVAILABLE or not compute_exact:
             return func(*args, **kwargs)
 
         return sage_func(*args, **kwargs)
