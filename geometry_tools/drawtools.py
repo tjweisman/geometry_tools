@@ -32,6 +32,8 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Circle, Arc, PathPatch, Rectangle, Polygon, Annulus
 from matplotlib.collections import LineCollection, PolyCollection, EllipseCollection
 
+from mpl_toolkits.mplot3d.art3d import Line3DCollection
+
 from matplotlib.transforms import Affine2D
 from matplotlib.path import Path
 
@@ -117,6 +119,9 @@ class Drawing:
 
 
 class ProjectiveDrawing(Drawing):
+
+    _LineCollection = LineCollection
+
     def __init__(self, transform=None, **kwargs):
         Drawing.__init__(self, **kwargs)
 
@@ -155,8 +160,8 @@ class ProjectiveDrawing(Drawing):
         for key, value in kwargs.items():
             default_kwargs[key] = value
 
-        lines = LineCollection(seglist.endpoint_affine_coords(),
-                               **default_kwargs)
+        lines = self.__class__._LineCollection(seglist.endpoint_affine_coords(),
+                                               **default_kwargs)
         self.ax.add_collection(lines)
 
     def draw_line(self, line, **kwargs):
@@ -180,7 +185,7 @@ class ProjectiveDrawing(Drawing):
 
         dummy_coords = np.stack([dummy_1, dummy_2], axis=-2)
 
-        lines = LineCollection(dummy_coords, **default_kwargs)
+        lines = self.__class__._LineCollection(dummy_coords, **default_kwargs)
         self.ax.add_collection(lines)
 
 
@@ -284,6 +289,86 @@ class ProjectiveDrawing(Drawing):
 
         self.draw_nonaff_polygon(polylist[~in_chart], **default_kwargs)
 
+class Drawing3D(Drawing):
+    def __init__(self,
+                 ax=None,
+                 fig=None,
+                 xlim=(-5., 5.),
+                 ylim=(-5., 5.),
+                 zlim=(-5., 5.),
+                 axis="off"):
+
+        if ax is None or fig is None:
+            fig = plt.figure()
+            ax = fig.add_subplot(projection="3d")
+
+            self.fig, self.ax = fig, ax
+
+            self.ax.axis(axis)
+            self.xlim, self.ylim, self.zlim = xlim, ylim, zlim
+
+            self.ax.set_xlim(xlim)
+            self.ax.set_ylim(ylim)
+            self.ax.set_zlim(zlim)
+
+            self.width = self.xlim[1] - self.xlim[0]
+            self.height = self.ylim[1] - self.ylim[0]
+            self.depth = self.zlim[1] - self.zlim[0]
+
+    def view_diam(self):
+        return np.sqrt(
+            self.width**2 + self.height**2 + self.depth**2
+        )
+
+    def view_ctr(self):
+        return np.array(
+            (self.xlim[0] + self.xlim[1]) / 2,
+            (self.ylim[0] + self.ylim[1]) / 2,
+            (self.zlim[0] + self.zlim[1]) / 2
+        )
+
+class ProjectiveDrawing3D(ProjectiveDrawing, Drawing3D):
+    _LineCollection = Line3DCollection
+
+    def __init__(self, transform=None, **kwargs):
+        Drawing3D.__init__(self, **kwargs)
+
+        self.transform = projective.identity(3)
+
+        if transform is not None:
+            self.transform = transform
+
+    def preprocess_object(self, obj):
+        if obj.dimension != 3:
+            raise GeometryError(
+                ("Cannot draw a {}-dimensional object in 3-dimensional "
+                 "projective space").format(obj.dimension)
+            )
+        return self.transform @ obj.flatten_to_unit().astype('float64')
+
+    def draw_point(self, point, **kwargs):
+        pointlist = self.preprocess_object(point)
+        default_kwargs = {
+            "color" : "black",
+            "marker": "o",
+            "linestyle":"none"
+        }
+        for key, value in kwargs.items():
+            default_kwargs[key] = value
+
+        x, y, z = pointlist.affine_coords().T
+        self.ax.plot(x, y, z, **default_kwargs)
+
+    def draw_curve(self, points, **kwargs):
+        pointlist = self.preprocess_object(points)
+        default_kwargs = {
+            "color" : "black",
+        }
+        for key, value in kwargs.items():
+            default_kwargs[key] = value
+
+        x, y, z = pointlist.affine_coords().T
+        self.ax.plot(x, y, z, **default_kwargs)
 
 
 class HyperbolicDrawing(Drawing):
