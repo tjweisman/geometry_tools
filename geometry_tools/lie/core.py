@@ -357,3 +357,13 @@ def block_include(A, dimension):
     arr[:A_dim, :A_dim] = A
     arr[A_dim:, A_dim:] = utils.identity(dimension - A_dim, like=A)
     return arr
+
+def bilinear_form_differential(form, like=None, **kwargs):
+    if like is None:
+        like = form
+    diff = linear_matrix_action(
+        lambda mat: mat.T @ form + form @ mat,
+        form.shape[-1],
+        like=like, **kwargs
+    )
+    return diff

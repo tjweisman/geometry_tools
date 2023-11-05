@@ -4,14 +4,14 @@ import functools
 import numpy as np
 from scipy.optimize import linprog
 
+from . import numerical
+
 try:
     import sage.all
     from . import sagewrap
     SAGE_AVAILABLE = True
 except ModuleNotFoundError:
     SAGE_AVAILABLE = False
-
-from . import _numpy_wrappers as nwrap
 
 def rotation_matrix(angle, like=None, **kwargs):
     r"""Get a 2x2 rotation matrix rotating counterclockwise by the
@@ -438,9 +438,6 @@ def orthogonal_complement(vectors, form=None, normalize="form"):
     if form is None:
         form = np.identity(vectors.shape[-1])
 
-    #_, _, vh = np.linalg.svd(vectors @ form)
-    #kernel_basis = vh[..., vectors.shape[-2]:, :]
-
     kernel_basis = kernel(vectors @ form).swapaxes(-1, -2)
 
     if normalize == 'form':
@@ -533,9 +530,6 @@ def find_isometry(form, partial_map, force_oriented=False,
         orth_partial = np.expand_dims(orth_partial, axis=0)
 
     kernel_basis = kernel(orth_partial @ form).swapaxes(-1, -2)
-
-    #_, _, vh = np.linalg.svd(orth_partial @ form)
-    #kernel = vh[..., orth_partial.shape[-2]:, :]
 
     orth_kernel = indefinite_orthogonalize(form, kernel_basis,
                                            compute_exact=compute_exact)
@@ -982,6 +976,19 @@ def disk_interactions(c1, r1, c2, r2,
             dists < (r2 - r1),
             dists < (r2 + r1))
 
+def indefinite_form(p, q, neg_first=True, **kwargs):
+    n = p + q
+
+    mult = 1
+    if neg_first:
+        mult = -1
+
+    form_mat = zeros((n,n), **kwargs)
+    form_mat[:p, :p] = mult * identity(p, **kwargs)
+    form_mat[p:, p:] = -mult * identity(q, **kwargs)
+
+    return form_mat
+
 def invert(mat, compute_exact=SAGE_AVAILABLE):
     if not SAGE_AVAILABLE or not compute_exact:
         return np.linalg.inv(mat)
@@ -990,7 +997,7 @@ def invert(mat, compute_exact=SAGE_AVAILABLE):
 
 def kernel(mat, compute_exact=SAGE_AVAILABLE):
     if not SAGE_AVAILABLE or not compute_exact:
-        return nwrap.kernel(mat)
+        return numerical.svd_kernel(mat)
 
     return sagewrap.kernel(mat)
 
@@ -1173,7 +1180,6 @@ def pi(exact=False, like=None):
         return sage.all.pi
 
     return np.pi
-
 
 def zeros(shape, base_ring=None, dtype=None, like=None,
           **kwargs):

@@ -4,7 +4,7 @@ from sage.all import vector as sage_vector
 
 import numpy as np
 
-from . import _numpy_wrappers as nwrap
+from . import numerical
 
 pi = sage.all.pi
 Integer = sage.all.Integer
@@ -75,7 +75,7 @@ def invert(A):
 
 def kernel(A):
     return apply_matrix_func(
-        A, nwrap.kernel, lambda M: M.right_kernel_matrix().T,
+        A, numerical.svd_kernel, lambda M: M.right_kernel_matrix().T,
         expected_shape=(A.shape[:-2] + (A.shape[-1], A.shape[-1] - A.shape[-2]))
     )
 

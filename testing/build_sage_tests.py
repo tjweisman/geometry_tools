@@ -12,7 +12,8 @@ TO_PREPARSE = [
     "test_projective.py",
     "test_automata.py",
     "test_hyperbolic.py",
-    "test_representation.py"
+    "test_representation.py",
+    "test_drawing.py"
 ]
 
 IMPORT_LINE = "from sage.all import RealNumber, Integer\n"

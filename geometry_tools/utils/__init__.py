@@ -5,7 +5,7 @@ this package.
 
 from .core import *
 
-from . import cp1, words, testing
+from . import cp1, words, testing, numerical
 
 # loaded in core, but whatever
 if SAGE_AVAILABLE:
