@@ -5,6 +5,7 @@ import numpy as np
 from scipy.optimize import linprog
 
 from . import numerical
+from . import types
 
 try:
     import sage.all
@@ -445,7 +446,7 @@ def orthogonal_complement(vectors, form=None, normalize="form"):
 
     return kernel_basis
 
-def indefinite_orthogonalize(form, matrices, compute_exact=False):
+def indefinite_orthogonalize(form, matrices, compute_exact=True):
     """Apply the Gram-Schmidt algorithm, but for a possibly indefinite
     bilinear form.
 
@@ -475,10 +476,10 @@ def indefinite_orthogonalize(form, matrices, compute_exact=False):
     n, m = matrices.shape[-2:]
 
     dtype = np.dtype('float64')
-    if SAGE_AVAILABLE and compute_exact and not sagewrap.inexact_type(matrices):
+    if SAGE_AVAILABLE and compute_exact and not types.inexact_type(matrices):
         dtype = np.dtype('object')
 
-    result = zeros_like(matrices, dtype=dtype)
+    result = zeros(matrices.shape, dtype=dtype)
 
     #we're using a python for loop, but only over dimension^2 which
     #is probably small
@@ -492,7 +493,7 @@ def indefinite_orthogonalize(form, matrices, compute_exact=False):
     return normalize(result, form)
 
 def find_isometry(form, partial_map, force_oriented=False,
-                  compute_exact=False):
+                  compute_exact=True):
     """find a form-preserving matrix agreeing with a specified map on
     the flag defined by the standard basis.
 
@@ -1018,13 +1019,6 @@ def matrix_func(func):
     @functools.wraps(func)
     def wrapped(*args, compute_exact=SAGE_AVAILABLE,
                 **kwargs):
-        if not SAGE_AVAILABLE and compute_exact:
-            raise UserWarning((
-                "calling {} with compute_exact=True but Sage is not "
-                "available; falling back on numerical computations."
-            ).format(func.__name__)
-            )
-
         if not SAGE_AVAILABLE or not compute_exact:
             return func(*args, **kwargs)
 
@@ -1053,7 +1047,7 @@ def det(mat):
     return np.linalg.det(mat)
 
 def check_type(base_ring=None, dtype=None, like=None,
-                default_dtype='float64', integer_type=True):
+               default_dtype='float64', integer_type=True):
 
     default_ring = None
     if SAGE_AVAILABLE:
@@ -1086,6 +1080,14 @@ def check_type(base_ring=None, dtype=None, like=None,
         dtype = default_dtype
 
     return (base_ring, dtype)
+
+def complex_type(**kwargs):
+    base_ring, dtype = check_type(integer_type=False, **kwargs)
+
+    if np.can_cast(dtype, 'float'):
+        return base_ring, np.dtype('complex')
+
+    return base_ring, dtype
 
 def _numpy_dtype(val):
     try:
@@ -1197,6 +1199,10 @@ def cos(arg):
 def sin(arg):
     return np.sin(arg)
 
+@wrap_elementary
+def conjugate(arg):
+    return np.conjugate(arg)
+
 def real(arg):
     if not SAGE_AVAILABLE or _numpy_dtype(arg):
         return np.real(arg)
@@ -1215,6 +1221,9 @@ def imag(arg):
 def array_like(array, like=None, base_ring=None, dtype=None,
                integer_type=False, **kwargs):
 
+    if like is None:
+        like = array
+
     base_ring, dtype = check_type(base_ring, dtype, like,
                                   integer_type=integer_type)
 
@@ -1224,6 +1233,8 @@ def array_like(array, like=None, base_ring=None, dtype=None,
         return sagewrap.change_base_ring(arr, base_ring)
     return arr
 
+#TODO: probably want to change this so signature matches other
+#sage/numpy compatibility functions
 def pi(exact=False, like=None):
     if not SAGE_AVAILABLE:
         return np.pi
@@ -1235,6 +1246,17 @@ def pi(exact=False, like=None):
         return sage.all.pi
 
     return np.pi
+
+def unit_imag(**kwargs):
+    if not SAGE_AVAILABLE:
+        return 1j
+
+    base_ring, dtype = complex_type(**kwargs)
+    if np.can_cast(dtype, np.dtype("complex")):
+        return 1j
+
+    return sagewrap.I
+
 
 def zeros(shape, base_ring=None, dtype=None, like=None,
           **kwargs):

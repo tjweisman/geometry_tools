@@ -7,7 +7,9 @@ from sage.all import vector as sage_vector
 import numpy as np
 
 from . import numerical
+from . import types
 
+I = sage.all.I
 pi = sage.all.pi
 Integer = sage.all.Integer
 SR = sage.all.SR
@@ -33,16 +35,13 @@ def _sage_eig(mat):
     D, P = mat.eigenmatrix_right()
     return (D.diagonal(), P)
 
-def inexact_type(array):
-    try:
-        dtype = array.dtype
-    except AttributeError:
-        return False
-
-    return not np.can_cast(dtype, int) and np.can_cast(dtype, float)
+    #return not np.can_cast(dtype, int) and (
+    #    np.can_cast(dtype, np.dtype("complex")) or
+    #    np.can_cast(dtype, float)
+    #)
 
 def apply_matrix_func(A, numpy_func, sage_func, expected_shape=None):
-    if inexact_type(A):
+    if is_linalg_type(A):
         return numpy_func(A)
 
     return sage_matrix_func(A, sage_func, expected_shape)
@@ -94,7 +93,7 @@ def kernel(A, assume_full_rank=False, matching_rank=True,
     if assume_full_rank and not matching_rank:
         raise ValueError("matching_rank must be True if assume_full_rank is True")
 
-    if inexact_type(A):
+    if is_linalg_type(A):
         return numerical.svd_kernel(A, assume_full_rank=assume_full_rank,
                                     matching_rank=matching_rank,
                                     with_dimensions=with_dimensions,
@@ -158,7 +157,7 @@ def kernel(A, assume_full_rank=False, matching_rank=True,
     return (possible_dims, tuple(kernel_bases), tuple(kernel_dim_loc))
 
 def eig(A):
-    if inexact_type(A):
+    if is_linalg_type(A):
         return np.linalg.eig(A)
 
     mat_flat = list(A.reshape((-1,) + A.shape[-2:]))
@@ -170,7 +169,7 @@ def eig(A):
             ndarray_mat(eigvecs).reshape(A.shape))
 
 def eigh(A):
-    if inexact_type(A):
+    if is_linalg_type(A):
         return np.linalg.eigh(A)
 
     return eig(A)

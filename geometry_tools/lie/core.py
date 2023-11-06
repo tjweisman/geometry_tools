@@ -440,10 +440,10 @@ def slc_to_slr(mat, **kwargs):
     return result
 
 def herm2_bilinear_form(**kwargs):
-    """Return the bilinear form given by the determinant on the vector space
-    of 2x2 Hermitian matrices.
+    """Return the bilinear form given by the determinant on the (real)
+    vector space of 2x2 Hermitian matrices.
 
-    The space of Hermitian matrices has basis:
+    The space of Hermitian matrices has real basis:
     [[1, 0], [0, 0]],
 
     [[0, 0], [0, 1]],
@@ -454,4 +454,83 @@ def herm2_bilinear_form(**kwargs):
 
     """
 
-    raise NotImplementedError
+    I = utils.unit_imag(**kwargs)
+    base_ring, dtype = utils.complex_type(**kwargs)
+
+    # we're NOT wrapping these in np.array first
+    b1 = [[1, 0], [0, 0]]
+    b2 = [[0, 0], [0, 1]]
+    b3 = [[0, 1], [1, 0]]
+    b4 = [[0, I], [-I, 0]]
+
+    basis = [
+        utils.array_like(bi, base_ring=base_ring, dtype=dtype)
+        for bi in [b1, b2, b3, b4]
+    ]
+    bilinear_form = utils.zeros((4,4), **kwargs)
+    for i, M1 in enumerate(basis):
+        for j, M2 in enumerate(basis):
+            bilinear_form[i,j] = (
+                utils.det(-(M1 + M2)) + utils.det(M1)  + utils.det(M2)
+            ) / 2
+
+    return bilinear_form
+
+def sl2c_herm_action(mat, like=None, force_real=True, **kwargs):
+    """Get the action of an element of SL(2, C) on the 4-dimensional real
+    vector space of 2x2 Hermitian matrices.
+
+    The space of Hermitian matrices has real basis:
+    [[1, 0], [0, 0]],
+
+    [[0, 0], [0, 1]],
+
+    [[0, 1], [1, 0]],
+
+    [[0, i], [-i, i]]
+
+    """
+    if like is None:
+        like = mat
+
+    I = utils.unit_imag(like=like, **kwargs)
+    base_ring, dtype = utils.complex_type(like=like, **kwargs)
+
+    #action on 4x4 complex matrices
+    mat_map = linear_matrix_action(
+        lambda A: mat @ A @ utils.conjugate(mat.swapaxes(-1, -2)), 2,
+        base_ring=base_ring, dtype=dtype
+    )
+
+    basischange = utils.array_like(
+        [[1, 0, 0, 0],
+         [0, 0, 1, I],
+         [0, 0, 1, -I],
+         [0, 1, 0, 0]],
+        base_ring=base_ring,
+        dtype=dtype
+    )
+
+    action = utils.invert(basischange) @ mat_map @ basischange
+    if force_real:
+        return utils.real(action)
+
+    return action
+
+def sl2c_to_so31(mat, like=None, **kwargs):
+    """Apply the exceptional Lie group isomorphism SL(2, C) to SO(3,1),
+    where SO(3,1) preserves a diagonal form in R^4.
+
+    """
+    if like is None:
+        like = mat
+
+    basischange = utils.array_like(
+        [[1, -1, 0, 0],
+         [1, 1, 0, 0],
+         [0, 0, 1, 0],
+         [0, 0, 0, 1]
+        ], like=like, **kwargs)
+
+    herm_action = sl2c_herm_action(mat, like=like, **kwargs)
+    return utils.invert(basischange) @ herm_action @ basischange

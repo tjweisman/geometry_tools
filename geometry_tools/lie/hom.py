@@ -6,8 +6,7 @@ from .. import utils
 def _has_inv_param(hom):
     params = inspect.signature(hom).parameters.values()
     for param in params:
-        if (param.name == "inv" or
-            param.kind == param.VAR_KEYWORD):
+        if param.name == "inv":
             return True
     return False
 
@@ -38,6 +37,9 @@ def so21_to_sl2(**kwargs):
 
 def slc_to_slr(**kwargs):
     return _wrap_hom(lie.slc_to_slr, **kwargs)
+
+def sl2c_to_so31(**kwargs):
+    return _wrap_hom(lie.sl2c_to_so31, **kwargs)
 
 def block_include(n, **kwargs):
     return _wrap_hom(lie.block_include, n, **kwargs)
