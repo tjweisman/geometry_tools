@@ -32,7 +32,7 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Circle, Arc, PathPatch, Rectangle, Polygon, Annulus
 from matplotlib.collections import LineCollection, PolyCollection, EllipseCollection
 
-from mpl_toolkits.mplot3d.art3d import Line3DCollection
+from mpl_toolkits.mplot3d.art3d import Line3DCollection, Poly3DCollection
 
 from matplotlib.transforms import Affine2D
 from matplotlib.path import Path
@@ -121,6 +121,7 @@ class Drawing:
 class ProjectiveDrawing(Drawing):
 
     _LineCollection = LineCollection
+    _PolyCollection = PolyCollection
 
     def __init__(self, transform=None, chart_index=0, **kwargs):
         Drawing.__init__(self, **kwargs)
@@ -292,13 +293,14 @@ class ProjectiveDrawing(Drawing):
             default_kwargs[key] = value
 
         if assume_affine:
-            polys = PolyCollection(polylist.affine_coords(), **default_kwargs)
+            polys = self.__class__._PolyCollection(polylist.affine_coords(
+                chart_index=self.chart_index), **default_kwargs)
             self.ax.add_collection(polys)
             return
 
         in_chart = polylist.in_standard_chart()
-        affine_polys = PolyCollection(polylist[in_chart].affine_coords(),
-                                      **default_kwargs)
+        affine_polys = self.__class__._PolyCollection(polylist[in_chart].affine_coords(
+            chart_index=self.chart_index), **default_kwargs)
         self.ax.add_collection(affine_polys)
 
         self.draw_nonaff_polygon(polylist[~in_chart], **default_kwargs)
@@ -343,6 +345,7 @@ class Drawing3D(Drawing):
 
 class ProjectiveDrawing3D(ProjectiveDrawing, Drawing3D):
     _LineCollection = Line3DCollection
+    _PolyCollection = Poly3DCollection
 
     def __init__(self, transform=None, chart_index=0, **kwargs):
         Drawing3D.__init__(self, **kwargs)
