@@ -402,7 +402,7 @@ class Point(HyperbolicObject, projective.Point):
 
         return np.arccosh(np.abs(products))
 
-    def origin_to(self, force_oriented=True, compute_exact=True):
+    def origin_to(self, force_oriented=True):
         """Get an isometry taking an "origin" point to this point
 
         Returns
@@ -419,8 +419,7 @@ class Point(HyperbolicObject, projective.Point):
             axis=-2
         )
         isom = utils.find_isometry(self.minkowski, normed,
-                                   force_oriented,
-                                   compute_exact=compute_exact)
+                                   force_oriented)
 
         return Isometry(isom, column_vectors=False)
 
@@ -575,7 +574,7 @@ class Subspace(IdealPoint):
         #underlying data is different.
         return Point(self.ideal_basis).coords(model)
 
-    def spacelike_complement(self, compute_exact=True):
+    def spacelike_complement(self):
         """Get a spacelike point in the orthogonal complement to this subspace
 
         Returns
@@ -588,10 +587,10 @@ class Subspace(IdealPoint):
 
         """
 
-        orthed = self._data_with_dual(compute_exact=compute_exact)
+        orthed = self._data_with_dual()
         return DualPoint(orthed[..., 0, :])
 
-    def _data_with_dual(self, compute_exact=True):
+    def _data_with_dual(self):
         midpoints = np.sum(self.ideal_basis, axis=-2) / self.ideal_basis.shape[-2]
 
         poincare_ctr, poincare_rad = self.sphere_parameters(model=Model.POINCARE)
@@ -606,8 +605,7 @@ class Subspace(IdealPoint):
             axis=-2)
 
         orthed = utils.indefinite_orthogonalize(self.minkowski,
-                                                to_orthogonalize,
-                                                compute_exact=compute_exact)
+                                                to_orthogonalize)
         return np.concatenate([
             np.expand_dims(orthed[..., -1, :], axis=-2),
             self.ideal_basis], axis=-2)
@@ -663,7 +661,7 @@ class Subspace(IdealPoint):
 
         return center, radius
 
-    def reflection_across(self, compute_exact=True):
+    def reflection_across(self):
         """Get a hyperbolic isometry reflecting across this hyperplane.
 
         Returns
@@ -672,7 +670,7 @@ class Subspace(IdealPoint):
             Isometry reflecting across this hyperplane.
 
         """
-        dual_data = self._data_with_dual(compute_exact=compute_exact)
+        dual_data = self._data_with_dual()
         if self.dimension + 1 != dual_data.shape[-2]:
             raise GeometryError(
                 ("Cannot compute a reflection across a subspace of "
@@ -1220,7 +1218,7 @@ class TangentVector(PointPair):
 
         return TangentVector(self.point, normed_vec)
 
-    def origin_to(self, force_oriented=True, compute_exact=True):
+    def origin_to(self, force_oriented=True):
         """Get an isometry taking the "origin" to this vector.
 
         The "origin" is a tangent vector whose basepoint lies at (0,
@@ -1242,8 +1240,7 @@ class TangentVector(PointPair):
         """
         normed = utils.normalize(self.aux_data, self.minkowski)
         isom = utils.find_isometry(self.minkowski, normed,
-                                   force_oriented,
-                                   compute_exact=compute_exact)
+                                   force_oriented)
 
         return Isometry(isom, column_vectors=False)
 
@@ -1258,10 +1255,6 @@ class TangentVector(PointPair):
         force_oriented : bool
             If `True`, force the computed isometry to be
             orientation-preserving.
-        compute_exact : bool
-            If True, sage is available, and the underlying dtype of
-            both objects supports exact computation, then do
-            computations using sage instead of numpy.
 
         Returns
         -------
@@ -1685,8 +1678,7 @@ class Polygon(Point, projective.Polygon):
         return flat_segments.circle_parameters(short_arc, degrees, model)
 
     @staticmethod
-    def regular_polygon(n, radius=None, angle=None, dimension=2,
-                        base_ring=None, **kwargs):
+    def regular_polygon(n, radius=None, angle=None, dimension=2, **kwargs):
         """Get a regular polygon with n vertices, inscribed on a circle of
         radius hyp_radius.
 
@@ -1698,11 +1690,7 @@ class Polygon(Point, projective.Polygon):
                 "Must provide either an angle or a radius to regular_polygon"
             )
 
-        compute_exact = (utils.SAGE_AVAILABLE and base_ring is not None)
-
-        pi = np.pi
-        if compute_exact:
-            pi = sagewrap.pi
+        pi = utils.pi(**kwargs)
 
         if radius is None:
             radius = regular_polygon_radius(n, angle)
@@ -1710,7 +1698,7 @@ class Polygon(Point, projective.Polygon):
         hyp_radius = np.array(radius)
         tangent = TangentVector.get_base_tangent(dimension,
                                                  hyp_radius.shape,
-                                                 base_ring=base_ring).normalized()
+                                                 **kwargs).normalized()
 
         start_vertex = tangent.point_along(hyp_radius)
 
@@ -1725,19 +1713,17 @@ class Polygon(Point, projective.Polygon):
         return Polygon(vertices, **kwargs)
 
     @staticmethod
-    def regular_surface_polygon(g, base_ring=None, **kwargs):
+    def regular_surface_polygon(g, **kwargs):
         """Get a regular polygon which is the fundamental domain for the
         action of a hyperbolic surface group with genus g.
 
         """
-
-        compute_exact = (utils.SAGE_AVAILABLE and base_ring is not None)
-        radius = genus_g_surface_radius(g, compute_exact=compute_exact)
+        radius = genus_g_surface_radius(g, **kwargs)
 
         if base_ring is not None:
             radius = base_ring(radius)
         return Polygon.regular_polygon(
-            4 * g, radius=radius, base_ring=base_ring, **kwargs
+            4 * g, radius=radius, **kwargs
         )
 
 class Isometry(projective.Transformation, HyperbolicObject):
@@ -1876,6 +1862,7 @@ class Isometry(projective.Transformation, HyperbolicObject):
         affine = utils.identity(
             dimension, like=like, **kwargs
         )
+
         affine[0:2, 0:2] = utils.rotation_matrix(
             angle, like=like, **kwargs
         )
@@ -1887,8 +1874,8 @@ class Isometry(projective.Transformation, HyperbolicObject):
     def from_sl2(matrix, **kwargs):
         return sl2_iso(matrix, **kwargs)
 
-    def to_sl2(self, exact=True):
-        return lie.o_to_pgl(self.proj_data.swapaxes(-1,-2), exact=exact)
+    def to_sl2(self):
+        return lie.o_to_pgl(self.proj_data.swapaxes(-1,-2))
 
 class HyperbolicRepresentation(projective.ProjectiveRepresentation):
     """Model a representation for a finitely generated group
@@ -2063,7 +2050,7 @@ def halfspace_to_poincare(points):
 
     return poincare_coords
 
-def timelike_to(v, force_oriented=False, compute_exact=True):
+def timelike_to(v, force_oriented=False):
     """Find an isometry taking the origin of the Poincare/Klein models to
     the given vector v.
 
@@ -2076,8 +2063,7 @@ def timelike_to(v, force_oriented=False, compute_exact=True):
 
     dim = np.array(v).shape[-1]
     return Isometry(utils.find_isometry(minkowski(dim),
-                                        v, force_oriented,
-                                        compute_exact=compute_exact),
+                                        v, force_oriented),
                     column_vectors=False)
 
 def sl2_iso(matrix, **kwargs):
@@ -2148,17 +2134,16 @@ def polygon_interior_angle(n, hyp_radius):
     denom = np.sqrt(1 + (np.sin(gamma) * np.sinh(hyp_radius))**2)
     return 2 * np.arcsin(np.cos(gamma) / denom)
 
-def genus_g_surface_radius(g, compute_exact=True):
+def genus_g_surface_radius(g, **kwargs):
     """Find the radius of a regular polygon giving the fundamental domain
     for the action of a hyperbolic surface group with genus g.
 
     """
-
-    pi = utils.pi(compute_exact)
+    pi = utils.pi(**kwargs)
 
     return regular_polygon_radius(4 * g, pi / (2*g))
 
-def spacelike_to(v, force_oriented=False, compute_exact=True):
+def spacelike_to(v, force_oriented=False):
     """Find an isometry taking the second standard basis vector (0, 1, 0,
     ...) to the given vector v.
 
@@ -2173,8 +2158,7 @@ def spacelike_to(v, force_oriented=False, compute_exact=True):
         raise GeometryError( "Cannot find isometry taking a"
         " spacelike vector to a non-spacelike vector.")
 
-    iso = utils.find_isometry(minkowski(dim), normed,
-                              compute_exact=compute_exact)
+    iso = utils.find_isometry(minkowski(dim), normed)
 
     #find the index of the timelike basis vector
     lengths = np.expand_dims(utils.normsq(iso, minkowski(dim)), axis=-1)

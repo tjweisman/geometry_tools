@@ -1221,7 +1221,7 @@ class Transformation(ProjectiveObject):
         product = self._apply_to_data(proj_obj, broadcast)
         return self._data_to_object(product)
 
-    def eigenvector(self, eigenvalue=None, compute_exact=False):
+    def eigenvector(self, eigenvalue=None):
         """Get a point corresponding to an eigenvector with the given
         eigenvalue.
 
@@ -1231,13 +1231,6 @@ class Transformation(ProjectiveObject):
             Eigenvalue for the returned eigenvector. If None, return
             an arbitrary eigenvector.
 
-        compute_exact : bool
-            If True, and sage is available, then (if possible) use
-            sage matrix functions to compute exact entries for the
-            eigenvector found. If sage is not available, or the
-            underlying data of this transformation does not support
-            exact computation, then this parameter has no effect.
-
         Returns
         -------
         Point
@@ -1246,9 +1239,8 @@ class Transformation(ProjectiveObject):
             point will be degenerate (i.e. zero) if no nonzero
             eigenvector with this eigenvalue exists.
 
-    """
-        eigvals, eigvecs = utils.eig(self.proj_data.swapaxes(-1, -2),
-                                     compute_exact=compute_exact)
+        """
+        eigvals, eigvecs = utils.eig(self.proj_data.swapaxes(-1, -2))
         eigvec_coords = utils.zeros(self.proj_data.shape[:-1])
 
         ic = np.ones_like(eigvals)

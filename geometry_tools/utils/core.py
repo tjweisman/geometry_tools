@@ -70,7 +70,6 @@ def permutation_matrix(permutation, inverse=False, **kwargs):
 def diagonalize_form(bilinear_form,
                      order_eigenvalues="signed",
                      reverse=False,
-                     compute_exact=False,
                      with_inverse=True):
     r"""Return a matrix conjugating a symmetric real bilinear form to a
     diagonal form.
@@ -108,8 +107,8 @@ def diagonalize_form(bilinear_form,
     """
     n, _ = bilinear_form.shape
 
-    eigs, U = eigh(bilinear_form, compute_exact=compute_exact)
-    Uinv = invert(U, compute_exact=compute_exact)
+    eigs, U = eigh(bilinear_form)
+    Uinv = invert(U)
     Dinv = np.diag(np.sqrt(np.abs(eigs)))
     D = np.diag(1 / np.sqrt(np.abs(eigs)))
 
@@ -446,7 +445,7 @@ def orthogonal_complement(vectors, form=None, normalize="form"):
 
     return kernel_basis
 
-def indefinite_orthogonalize(form, matrices, compute_exact=True):
+def indefinite_orthogonalize(form, matrices):
     """Apply the Gram-Schmidt algorithm, but for a possibly indefinite
     bilinear form.
 
@@ -475,11 +474,9 @@ def indefinite_orthogonalize(form, matrices, compute_exact=True):
 
     n, m = matrices.shape[-2:]
 
-    dtype = np.dtype('float64')
-    if SAGE_AVAILABLE and compute_exact and not types.inexact_type(matrices):
-        dtype = np.dtype('object')
-
-    result = zeros(matrices.shape, dtype=dtype)
+    result = zeros(matrices.shape,
+                   like=matrices,
+                   integer_type=False)
 
     #we're using a python for loop, but only over dimension^2 which
     #is probably small
@@ -492,8 +489,7 @@ def indefinite_orthogonalize(form, matrices, compute_exact=True):
 
     return normalize(result, form)
 
-def find_isometry(form, partial_map, force_oriented=False,
-                  compute_exact=True):
+def find_isometry(form, partial_map, force_oriented=False):
     """find a form-preserving matrix agreeing with a specified map on
     the flag defined by the standard basis.
 
@@ -524,16 +520,14 @@ def find_isometry(form, partial_map, force_oriented=False,
 
     """
 
-    orth_partial = indefinite_orthogonalize(form, partial_map,
-                                            compute_exact=compute_exact)
+    orth_partial = indefinite_orthogonalize(form, partial_map)
 
     if len(orth_partial.shape) < 2:
         orth_partial = np.expand_dims(orth_partial, axis=0)
 
     kernel_basis = kernel(orth_partial @ form).swapaxes(-1, -2)
 
-    orth_kernel = indefinite_orthogonalize(form, kernel_basis,
-                                           compute_exact=compute_exact)
+    orth_kernel = indefinite_orthogonalize(form, kernel_basis)
 
     iso = np.concatenate([orth_partial, orth_kernel], axis=-2)
 
@@ -1017,9 +1011,8 @@ def matrix_func(func):
         sage_func = getattr(sagewrap, func.__name__)
 
     @functools.wraps(func)
-    def wrapped(*args, compute_exact=SAGE_AVAILABLE,
-                **kwargs):
-        if not SAGE_AVAILABLE or not compute_exact:
+    def wrapped(*args, **kwargs):
+        if not SAGE_AVAILABLE:
             return func(*args, **kwargs)
 
         return sage_func(*args, **kwargs)
@@ -1060,7 +1053,7 @@ def check_type(base_ring=None, dtype=None, like=None,
             if dtype is None:
                 dtype = like.dtype
         except AttributeError:
-            if not _numpy_dtype(like):
+            if not types.is_linalg_type(like):
                 dtype = np.dtype('O')
 
     if base_ring is None and dtype == np.dtype('O') and SAGE_AVAILABLE:
@@ -1079,6 +1072,9 @@ def check_type(base_ring=None, dtype=None, like=None,
     elif dtype is None:
         dtype = default_dtype
 
+    if not integer_type and np.can_cast(dtype, int):
+        dtype = np.dtype('float64')
+
     return (base_ring, dtype)
 
 def complex_type(**kwargs):
@@ -1089,14 +1085,6 @@ def complex_type(**kwargs):
 
     return base_ring, dtype
 
-def _numpy_dtype(val):
-    try:
-        return np.can_cast(val, float) or np.can_cast(val, "complex")
-    except TypeError:
-        pass
-
-    return False
-
 def guess_literal_ring(data):
     if not SAGE_AVAILABLE:
         return None
@@ -1105,7 +1093,7 @@ def guess_literal_ring(data):
         if data.dtype == np.dtype('O'):
             return sage.all.QQ
     except AttributeError:
-        if not _numpy_dtype(data):
+        if not types.is_linalg_type(data):
             return sage.all.QQ
 
     # this is maybe not Pythonic, but it's also not a mistake.
@@ -1143,7 +1131,7 @@ def number(val, like=None, dtype=None, base_ring=None):
         try:
             dtype = like.dtype
         except AttributeError:
-            if not _numpy_dtype(like):
+            if not types.is_linalg_type(like):
                 dtype = np.dtype('O')
 
     if dtype == np.dtype('O'):
@@ -1204,7 +1192,7 @@ def conjugate(arg):
     return np.conjugate(arg)
 
 def real(arg):
-    if not SAGE_AVAILABLE or _numpy_dtype(arg):
+    if not SAGE_AVAILABLE or types.is_linalg_type(arg):
         return np.real(arg)
 
     # np.real doesn't work well with sage since it expects the real
@@ -1213,7 +1201,7 @@ def real(arg):
     return sagewrap.real(arg)
 
 def imag(arg):
-    if not SAGE_AVAILABLE or _numpy_dtype(arg):
+    if not SAGE_AVAILABLE or types.is_linalg_type(arg):
         return np.imag(arg)
 
     return sagewrap.imag(arg)
@@ -1233,17 +1221,14 @@ def array_like(array, like=None, base_ring=None, dtype=None,
         return sagewrap.change_base_ring(arr, base_ring)
     return arr
 
-#TODO: probably want to change this so signature matches other
-#sage/numpy compatibility functions
-def pi(exact=False, like=None):
+def pi(**kwargs):
     if not SAGE_AVAILABLE:
         return np.pi
 
-    if exact:
-        return sage.all.pi
+    base_ring, dtype = check_type(**kwargs)
 
-    if like is not None and not _numpy_dtype(like):
-        return sage.all.pi
+    if base_ring is not None:
+        return sagewrap.pi
 
     return np.pi
 
@@ -1251,36 +1236,38 @@ def unit_imag(**kwargs):
     if not SAGE_AVAILABLE:
         return 1j
 
-    base_ring, dtype = complex_type(**kwargs)
-    if np.can_cast(dtype, np.dtype("complex")):
-        return 1j
+    base_ring, dtype = check_type(**kwargs)
 
-    return sagewrap.I
+    if base_ring is not None:
+        return sagewrap.I
+    return 1j
 
 
 def zeros(shape, base_ring=None, dtype=None, like=None,
-          **kwargs):
+          integer_type=True, **kwargs):
 
-    base_ring, dtype = check_type(base_ring, dtype, like)
+    base_ring, dtype = check_type(base_ring, dtype, like,
+                                  integer_type=integer_type)
 
     zero_arr = np.zeros(shape, dtype=dtype, **kwargs)
     if base_ring is not None:
         return sagewrap.change_base_ring(zero_arr, base_ring)
     return zero_arr
 
-def zeros_like(arr, **kwargs):
-    return zeros(arr.shape, like=arr, **kwargs)
-
-def ones(shape, base_ring=None, dtype=None, like=None, **kwargs):
-    base_ring, dtype = check_type(base_ring, dtype, like)
+def ones(shape, base_ring=None, dtype=None, like=None,
+         integer_type=True, **kwargs):
+    base_ring, dtype = check_type(base_ring, dtype, like,
+                                  integer_type=integer_type)
 
     ones_arr = np.ones(shape, dtype=dtype, **kwargs)
     if base_ring is not None:
         return sagewrap.change_base_ring(ones_arr, base_ring)
     return ones_arr
 
-def identity(n, base_ring=None, dtype=None, like=None, **kwargs):
-    base_ring, dtype = check_type(base_ring, dtype, like)
+def identity(n, base_ring=None, dtype=None, like=None,
+             integer_type=True, **kwargs):
+    base_ring, dtype = check_type(base_ring, dtype, like,
+                                  integer_type=integer_type)
 
     identity_arr = np.identity(n, dtype=dtype, **kwargs)
 

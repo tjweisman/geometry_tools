@@ -16,7 +16,7 @@ def surface_rep_I(**kwargs):
             utils.power(sagewrap.SR(2), sagewrap.SR(1 / four))
         )
 
-    pi = utils.pi(exact=(base_ring is not None))
+    pi = utils.pi(**kwargs)
     rot = utils.rotation_matrix(pi / 8, **kwargs)
     invrot = utils.rotation_matrix(-pi / 8, **kwargs)
     cospi8 = utils.cos(pi / 8, **kwargs)

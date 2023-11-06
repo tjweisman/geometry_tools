@@ -53,23 +53,25 @@ class CoxeterGroup:
         elif matrix is not None:
             self.from_coxeter_matrix(matrix)
 
-        #self._compute_bilinear_form()
+    def bilinear_form(self, **kwargs):
 
-    def bilinear_form(self, exact=False, base_ring=None):
-        if base_ring is not None:
-            exact = True
-
-        pi = utils.pi(exact=exact)
+        base_ring, dtype = utils.check_type(**kwargs)
+        pi = utils.pi(**kwargs)
         half = utils.number(0.5, like=pi)
+
         adjusted_cox_matrix = utils.array_like(
-            self.coxeter_matrix, base_ring=base_ring
+            self.coxeter_matrix, like=half
         )
         adjusted_cox_matrix[adjusted_cox_matrix.astype(float) <= 0] = half
 
-        return utils.change_base_ring(
+        result = utils.change_base_ring(
             -1 * np.cos(pi / adjusted_cox_matrix),
             base_ring=base_ring
         )
+        if dtype is None
+            return result
+
+        return result.astype(dtype)
 
     def from_diagram(self, diagram):
         self.generators = defaultdict(dict)
@@ -124,8 +126,7 @@ class CoxeterGroup:
                               rename_generators=False,
                               diagonalize=False,
                               order_eigenvalues="signed",
-                              base_ring=None,
-                              exact=True):
+                              **kwargs):
         """Find a representation of this Coxeter group determined by a Cartan
         matrix.
 
@@ -160,11 +161,10 @@ class CoxeterGroup:
             a name which is not a single character.
 
         """
-        if base_ring is not None:
-            exact = True
-
         num_gens = len(self.generators)
         rep = Representation()
+
+        base_ring, dtype = utils.check_type(**kwargs)
 
         for i, gen in enumerate(self.ordered_gens):
             basis_vec = utils.zeros(num_gens, like=cartan_matrix)
@@ -180,6 +180,9 @@ class CoxeterGroup:
 
             gen_val = utils.change_base_ring(gen_val, base_ring)
 
+            if dtype is not None:
+                gen_val = gen_val.astype(dtype)
+
             rep[g_name] = gen_val
 
         if not diagonalize:
@@ -189,7 +192,6 @@ class CoxeterGroup:
         W, Winv = utils.diagonalize_form(
             cartan_matrix / 2,
             order_eigenvalues=order_eigenvalues,
-            compute_exact=exact,
             with_inverse=True
         )
 
@@ -200,8 +202,7 @@ class CoxeterGroup:
             lambda mat: Winv @ mat @ W
         )
 
-    def geometric_representation(self, base_ring=None, exact=False,
-                                 **kwargs):
+    def geometric_representation(self, **kwargs):
         """Get the geometric representation of the Coxeter group, i.e. the
         dual of the canonical representation.
 
@@ -219,10 +220,8 @@ class CoxeterGroup:
 
         """
         return self.cartan_representation(
-            2 * self.bilinear_form(
-                exact=exact, base_ring=base_ring
-            ), exact=exact, base_ring=base_ring, **kwargs
-        )
+            2 * self.bilinear_form(**kwargs),
+            **kwargs)
 
     def canonical_representation(self, **kwargs):
         """Get the canonical representation of this Coxeter group into PGL(n,

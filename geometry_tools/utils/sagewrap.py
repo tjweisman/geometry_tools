@@ -41,7 +41,7 @@ def _sage_eig(mat):
     #)
 
 def apply_matrix_func(A, numpy_func, sage_func, expected_shape=None):
-    if is_linalg_type(A):
+    if types.is_linalg_type(A):
         return numpy_func(A)
 
     return sage_matrix_func(A, sage_func, expected_shape)
@@ -93,7 +93,7 @@ def kernel(A, assume_full_rank=False, matching_rank=True,
     if assume_full_rank and not matching_rank:
         raise ValueError("matching_rank must be True if assume_full_rank is True")
 
-    if is_linalg_type(A):
+    if types.is_linalg_type(A):
         return numerical.svd_kernel(A, assume_full_rank=assume_full_rank,
                                     matching_rank=matching_rank,
                                     with_dimensions=with_dimensions,
@@ -157,7 +157,7 @@ def kernel(A, assume_full_rank=False, matching_rank=True,
     return (possible_dims, tuple(kernel_bases), tuple(kernel_dim_loc))
 
 def eig(A):
-    if is_linalg_type(A):
+    if types.is_linalg_type(A):
         return np.linalg.eig(A)
 
     mat_flat = list(A.reshape((-1,) + A.shape[-2:]))
@@ -169,7 +169,7 @@ def eig(A):
             ndarray_mat(eigvecs).reshape(A.shape))
 
 def eigh(A):
-    if is_linalg_type(A):
+    if types.is_linalg_type(A):
         return np.linalg.eigh(A)
 
     return eig(A)

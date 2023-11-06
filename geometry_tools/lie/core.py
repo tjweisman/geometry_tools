@@ -243,8 +243,7 @@ def sln_killing_form(n, **kwargs):
                 form[i * n + j, k * n + l] = form_val
     return form
 
-def o_to_pgl(A, bilinear_form=np.diag([-1, 1, 1]),
-             exact=True):
+def o_to_pgl(A, bilinear_form=np.diag([-1, 1, 1])):
     r"""Return the image of an element of \(\mathrm{O}(2, 1)\) under the
     representation \(\mathrm{O}(2,1) \to \mathrm{GL}(2)\).
 
@@ -287,8 +286,7 @@ def o_to_pgl(A, bilinear_form=np.diag([-1, 1, 1]),
             bilinear_form,
             order_eigenvalues="minkowski",
             reverse=True,
-            with_inverse=True,
-            compute_exact=exact
+            with_inverse=True
         )
 
         conj = form_conj @ utils.invert(killing_conj)
@@ -368,8 +366,7 @@ def bilinear_form_differential(form, like=None, **kwargs):
     )
     return diff
 
-def subspace_action(mat, subspace, compute_exact=False,
-                    broadcast="elementwise", **kwargs):
+def subspace_action(mat, subspace, broadcast="elementwise", **kwargs):
     subspace_mats = subspace
 
     #can't use atleast_2d since we want a column vector here
@@ -398,8 +395,7 @@ def subspace_action(mat, subspace, compute_exact=False,
     )
 
     try:
-        kernel = utils.kernel(img_mat, compute_exact=compute_exact,
-                              **kwargs)
+        kernel = utils.kernel(img_mat, **kwargs)
         if (kernel.shape[-2] != 2 * subspace_dim or
             kernel.shape[-1] != subspace_dim):
             raise ValueError
@@ -410,9 +406,7 @@ def subspace_action(mat, subspace, compute_exact=False,
 
     left_coeffs = kernel[..., :subspace_dim, :]
     right_coeffs = -kernel[..., subspace_dim:, :]
-    right_coeffs_inv = utils.invert(right_coeffs,
-                                    compute_exact=compute_exact,
-                                    **kwargs)
+    right_coeffs_inv = utils.invert(right_coeffs, **kwargs)
 
     return utils.matrix_product(left_coeffs, right_coeffs_inv)
 
