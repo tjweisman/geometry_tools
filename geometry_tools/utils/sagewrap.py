@@ -180,3 +180,9 @@ def det(A):
         A, np.linalg.det, lambda M: M.det(),
         expected_shape=A.shape[:-2]
     )
+
+def real(arr):
+    return _vectorize(sage.all.real)(arr)
+
+def imag(arr):
+    return _vectorize(sage.all.imag)(arr)

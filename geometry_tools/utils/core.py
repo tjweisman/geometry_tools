@@ -989,6 +989,18 @@ def indefinite_form(p, q, neg_first=True, **kwargs):
 
     return form_mat
 
+def symplectic_form(n, **kwargs):
+    if n != n % 2:
+        raise ValueError("Cannot construct a symplectic form in odd dimensions.")
+
+    m = n / 2
+
+    form_mat = zeros((n, n), **kwargs)
+    form_mat[:m, m:] = -identity(m, **kwargs)
+    form_mat[m:, :m] = identity(m, **kwargs)
+
+    return form_mat
+
 def symmetric_part(bilinear_form):
     return (bilinear_form + bilinear_form.swapaxes(-1, -2)) / 2
 
@@ -1077,7 +1089,7 @@ def check_type(base_ring=None, dtype=None, like=None,
 
 def _numpy_dtype(val):
     try:
-        return np.can_cast(val, float)
+        return np.can_cast(val, float) or np.can_cast(val, "complex")
     except TypeError:
         pass
 
@@ -1096,6 +1108,12 @@ def guess_literal_ring(data):
 
     # this is maybe not Pythonic, but it's also not a mistake.
     return None
+
+def astype(val, dtype=None):
+    if dtype is None:
+        return val
+
+    return np.array(val).astype(dtype)
 
 def number(val, like=None, dtype=None, base_ring=None):
     if like is not None and dtype is not None:
@@ -1117,7 +1135,7 @@ def number(val, like=None, dtype=None, base_ring=None):
             "available has no effect."  )
 
     if not SAGE_AVAILABLE:
-        return val
+        return astype(val, dtype)
 
     if dtype is None and like is not None:
         try:
@@ -1134,7 +1152,7 @@ def number(val, like=None, dtype=None, base_ring=None):
         if isinstance(val, float):
             return sage.all.SR(sage.all.QQ(val))
 
-    return val
+    return astype(val, dtype)
 
 def wrap_elementary(func):
     @functools.wraps(func)
@@ -1178,6 +1196,21 @@ def cos(arg):
 @wrap_elementary
 def sin(arg):
     return np.sin(arg)
+
+def real(arg):
+    if not SAGE_AVAILABLE or _numpy_dtype(arg):
+        return np.real(arg)
+
+    # np.real doesn't work well with sage since it expects the real
+    # attribute to be a property, not a callable. So we need to wrap
+    # sage's real function explicitly.
+    return sagewrap.real(arg)
+
+def imag(arg):
+    if not SAGE_AVAILABLE or _numpy_dtype(arg):
+        return np.imag(arg)
+
+    return sagewrap.imag(arg)
 
 def array_like(array, like=None, base_ring=None, dtype=None,
                integer_type=False, **kwargs):

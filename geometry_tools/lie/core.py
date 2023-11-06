@@ -351,11 +351,11 @@ def sl2_to_so21(A):
 
 def block_include(A, dimension):
     A_dim = A.shape[-1]
-    arr = utils.zeros((dimension, dimension),
+    arr = utils.zeros(A.shape[:-2] + (dimension, dimension),
                       like=A)
 
-    arr[:A_dim, :A_dim] = A
-    arr[A_dim:, A_dim:] = utils.identity(dimension - A_dim, like=A)
+    arr[..., :A_dim, :A_dim] = A
+    arr[..., A_dim:, A_dim:] = utils.identity(dimension - A_dim, like=A)
     return arr
 
 def bilinear_form_differential(form, like=None, **kwargs):
@@ -423,3 +423,35 @@ def form_adjoint_action(mat, form, inv=None, **kwargs):
     return lie.subspace_action(gln_adjoint_mat,
                                lie_alg_basis,
                                **kwargs)
+
+def slc_to_slr(mat, **kwargs):
+    if mat.shape[-1] != mat.shape[-2]:
+        raise ValueError("Cannot embed non-square matrices into SL(n, R)")
+
+    dim = mat.shape[-1]
+
+    result = utils.zeros(mat.shape[:-2] + (2 * dim, 2 * dim),
+                         like=mat, **kwargs)
+    result[..., :dim, :dim] = utils.real(mat)
+    result[..., :dim, dim:] = -utils.imag(mat)
+    result[..., dim:, :dim] = utils.imag(mat)
+    result[..., dim:, dim:] = utils.real(mat)
+
+    return result
+
+def herm2_bilinear_form(**kwargs):
+    """Return the bilinear form given by the determinant on the vector space
+    of 2x2 Hermitian matrices.
+
+    The space of Hermitian matrices has basis:
+    [[1, 0], [0, 0]],
+
+    [[0, 0], [0, 1]],
+
+    [[0, 1], [1, 0]],
+
+    [[0, i], [-i, i]]
+
+    """
+
+    raise NotImplementedError

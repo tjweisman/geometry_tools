@@ -36,11 +36,18 @@ def sl2_to_so21(**kwargs):
 def so21_to_sl2(**kwargs):
     return _wrap_hom(lie.o_to_pgl, **kwargs)
 
+def slc_to_slr(**kwargs):
+    return _wrap_hom(lie.slc_to_slr, **kwargs)
+
 def block_include(n, **kwargs):
     return _wrap_hom(lie.block_include, n, **kwargs)
 
 def so_adjoint(p, q=0, **kwargs):
     form = utils.indefinite_form(p, q, **kwargs)
+    return form_adjoint(form, **kwargs)
+
+def sp_adjoint(n, **kwargs):
+    form = utils.symplectic_form(n, **kwargs)
     return form_adjoint(form, **kwargs)
 
 def so21_adjoint(**kwargs):
