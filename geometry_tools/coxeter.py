@@ -61,8 +61,8 @@ class CoxeterGroup:
 
         pi = utils.pi(exact=exact)
         half = utils.number(0.5, like=pi)
-        adjusted_cox_matrix = np.array(
-            utils.change_base_ring(self.coxeter_matrix, base_ring)
+        adjusted_cox_matrix = utils.array_like(
+            self.coxeter_matrix, base_ring=base_ring
         )
         adjusted_cox_matrix[adjusted_cox_matrix.astype(float) <= 0] = half
 
