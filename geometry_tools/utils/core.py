@@ -67,6 +67,34 @@ def permutation_matrix(permutation, inverse=False, **kwargs):
 
     return p_mat
 
+def conjugate_by_permutation(matrix, permutation, inverse=False):
+    result = zeros(matrix.shape, like=matrix)
+
+    for i, si in enumerate(np.moveaxis(permutation, -1, 0)):
+        res_col = zeros(matrix.shape[:-1], like=matrix)
+        i_take = np.expand_dims(si, (-2, -1))
+        mat_col = np.take_along_axis(matrix, i_take, axis=-1)
+        for j, sj in enumerate(np.moveaxis(permutation, -1, 0)):
+            j_take = np.expand_dims(sj, (-2, -1))
+            val = np.take_along_axis(mat_col, j_take, axis=-2)
+            res_col[..., j] = np.squeeze(val, (-1, -2))
+        result[..., i] = res_col
+
+    return result
+
+def permute_along_axis(matrix, permutation, axis, inverse=False):
+    result = zeros(matrix.shape, like=matrix).swapaxes(-1, axis)
+    for i, si in enumerate(np.moveaxis(permutation, -1, 0)):
+        p_ind = np.expand_dims(si, (-2, -1))
+        if inverse:
+            values = np.take_along_axis(matrix.swapaxes(-1, axis), p_ind, axis=-1)
+            result[..., i] = values.squeeze(axis=-1)
+        else:
+            values = np.expand_dims(matrix.swapaxes(-1, axis)[..., i], -1)
+            np.put_along_axis(result, p_ind, values, axis=-1)
+
+    return result.swapaxes(-1, axis)
+
 def diagonalize_form(bilinear_form,
                      order_eigenvalues="signed",
                      reverse=False,
@@ -85,11 +113,11 @@ def diagonalize_form(bilinear_form,
         increasing eigenvalue.
 
         If "minkowski", conjugate to a diagonal bilinear form whose
-        basis vectors are ordered so that lightlike basis vectors come
+        basis vectors are ordered so that timelike basis vectors come
         first, followed by spacelike basis vectors, followed by
-        timelike basis vectors. (lightlike vectors pair to a negative
+        lightlike basis vectors. (timelike vectors pair to a negative
         value under the form, spacelike vectors pair to a positive
-        value, and timelike vectors pair to zero).
+        value, and lightlike vectors pair to zero).
     reverse : bool
         if True, reverse the order of the basis vectors for the
         diagonal bilinear form (from the order specified by
@@ -105,6 +133,9 @@ def diagonalize_form(bilinear_form,
         returns a matrix \(M\) such that \(M^TDM = B\).
 
     """
+
+    #TODO: vectorize this
+
     n, _ = bilinear_form.shape
 
     eigs, U = eigh(bilinear_form)
@@ -112,42 +143,36 @@ def diagonalize_form(bilinear_form,
     Dinv = np.diag(np.sqrt(np.abs(eigs)))
     D = np.diag(1 / np.sqrt(np.abs(eigs)))
 
-    perm = identity(n, like=U)
-    iperm = perm
+    #perm = identity(n, like=U)
+    #iperm = perm
 
     n_eigs = eigs.astype('float64')
 
+    W = U @ D
+
     if order_eigenvalues:
         if order_eigenvalues == "signed":
-            order = np.argsort(n_eigs)
+            order = np.argsort(n_eigs, axis=-1)
         if order_eigenvalues == "minkowski":
-            negative = np.count_nonzero(n_eigs < 0)
-            positive = np.count_nonzero(n_eigs > 0)
+            sort_indices = np.zeros_like(eigs)
 
-            if negative <= positive:
-                order = np.concatenate(
-                    ((n_eigs < 0).nonzero()[0],
-                     (n_eigs > 0).nonzero()[0],
-                     (n_eigs == 0).nonzero()[0])
-                )
-            else:
-                order = np.concatenate(
-                    ((n_eigs > 0).nonzero()[0],
-                     (n_eigs < 0).nonzero()[0],
-                     (n_eigs == 0).nonzero()[0])
-                )
+            sort_indices[n_eigs < 0] = 1
+            sort_indices[n_eigs > 0] = 2
+            sort_indices[n_eigs == 0] == 3
+
+            order = np.argsort(sort_indices, axis=-1)
         if reverse:
             order = np.flip(order)
 
-        perm = permutation_matrix(order, like=D)
-        iperm = permutation_matrix(order, like=D, inverse=True)
-
-    W = U @ D @ iperm
+        W = permute_along_axis(W, order, axis=-2, inverse=True)
 
     if not with_inverse:
         return W
 
-    Winv = perm @ Dinv @ Uinv
+    Winv = Dinv @ Uinv
+    if order_eigenvalues:
+        Winv = permute_along_axis(Winv, order, axis=-1)
+
     return (W, Winv)
 
 def circle_angles(center, coords):
