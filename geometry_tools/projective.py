@@ -574,22 +574,21 @@ class ProjectiveObject:
 
     @classmethod
     def combine(cls, to_combine):
-        """Construct a new ProjectiveObject of the same type combining the
-        data of `self` and `other`.
+        """Construct a new ProjectiveObject of combining the
+        data of an array of objects.
 
-        Both `self` and `other` will be flattened to unit dimensions
-        before combining. If dimensions of the underlying data do not
-        match, this will raise an error.
+        All of the objects in the given array will be flattened to
+        unit dimensions before combining. If dimensions of the
+        underlying data do not match, this will raise an error.
 
         Parameters
         ----------
-        other : ProjectiveObject of the same type as `self`.
-            ProjectiveObject to combine with
+        to_combine : array of ProjectiveObjects with a common type
 
         Returns
         -------
         ProjectiveObject
-            Object of the same type as `self` containing (flattened)
+            Object of the appropriate type containing (flattened)
             combined data.
 
         """
@@ -689,6 +688,11 @@ class Point(ProjectiveObject):
 
     def in_affine_chart(self, index):
         return self.proj_data[..., index] != 0
+
+class PointCollection(Point):
+    def __init__(self, *args, unit_ndims=2, **kwargs):
+        Point.__init__(self, *args, **kwargs)
+        self.unit_ndims = unit_ndims
 
 class PointPair(Point):
     """A pair of points (or a composite object consisting of a collection

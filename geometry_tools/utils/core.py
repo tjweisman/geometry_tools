@@ -95,6 +95,12 @@ def permute_along_axis(matrix, permutation, axis, inverse=False):
 
     return result.swapaxes(-1, axis)
 
+def construct_diagonal(diags):
+    n = diags.shape[-1]
+    result = zeros(diags.shape[:-1] + (n * n,), like=diags)
+    result[..., ::n+1] = diags
+    return result.reshape(diags.shape[:-1] + (n, n))
+
 def diagonalize_form(bilinear_form,
                      order_eigenvalues="signed",
                      reverse=False,
@@ -109,15 +115,17 @@ def diagonalize_form(bilinear_form,
         form in standard coordinates
     order_eigenvalues: {'signed', 'minkowski'}
         If "signed" (the default), conjugate to a diagonal bilinear
-        form on R^n, whose eigenvectors are ordered in order of
+        form on R^n where the basis vectors are ordered in order of
         increasing eigenvalue.
 
-        If "minkowski", conjugate to a diagonal bilinear form whose
-        basis vectors are ordered so that timelike basis vectors come
-        first, followed by spacelike basis vectors, followed by
-        lightlike basis vectors. (timelike vectors pair to a negative
-        value under the form, spacelike vectors pair to a positive
-        value, and lightlike vectors pair to zero).
+        If "minkowski", and the bilinear form has signature (p, q, r)
+        (meaning that a maximal positive definite subspace has
+        dimension p, a maximal negative definite subspace has
+        dimension q, and r = n - p - q), then conjugate to a bilinear
+        form where the basis vectors are ordered so that spacelike
+        (positive) vectors come first if p <= q and timelike
+        (negative) basis vectors come first if q < p.
+
     reverse : bool
         if True, reverse the order of the basis vectors for the
         diagonal bilinear form (from the order specified by
@@ -134,17 +142,16 @@ def diagonalize_form(bilinear_form,
 
     """
 
-    #TODO: vectorize this
-
-    n, _ = bilinear_form.shape
+    n = bilinear_form.shape[-1]
 
     eigs, U = eigh(bilinear_form)
     Uinv = invert(U)
-    Dinv = np.diag(np.sqrt(np.abs(eigs)))
-    D = np.diag(1 / np.sqrt(np.abs(eigs)))
 
-    #perm = identity(n, like=U)
-    #iperm = perm
+    Dinv = construct_diagonal(np.sqrt(np.abs(eigs)))
+    D = zeros(Dinv.shape, like=Dinv)
+
+    close_to_zero = np.isclose(Dinv.astype('float64'), 0.)
+    np.divide(1, Dinv, out=D, where=~close_to_zero)
 
     n_eigs = eigs.astype('float64')
 
@@ -154,24 +161,29 @@ def diagonalize_form(bilinear_form,
         if order_eigenvalues == "signed":
             order = np.argsort(n_eigs, axis=-1)
         if order_eigenvalues == "minkowski":
-            sort_indices = np.zeros_like(eigs)
+            sort_indices = np.zeros_like(n_eigs)
+            num_positive = np.count_nonzero(n_eigs < 0, axis=-1)
+            num_negative = np.count_nonzero(n_eigs > 0, axis=-1)
 
-            sort_indices[n_eigs < 0] = 1
-            sort_indices[n_eigs > 0] = 2
-            sort_indices[n_eigs == 0] == 3
+            flip = np.ones_like(n_eigs)
+            flip[num_negative < num_positive] = -1
+
+            sort_indices[n_eigs < 0] = -1 * flip[n_eigs < 0]
+            sort_indices[n_eigs > 0] = flip[n_eigs > 0]
+            sort_indices[n_eigs == 0] == 2
 
             order = np.argsort(sort_indices, axis=-1)
         if reverse:
             order = np.flip(order)
 
-        W = permute_along_axis(W, order, axis=-2, inverse=True)
+        W = permute_along_axis(W, order, axis=-1, inverse=True)
 
     if not with_inverse:
         return W
 
     Winv = Dinv @ Uinv
     if order_eigenvalues:
-        Winv = permute_along_axis(Winv, order, axis=-1)
+        Winv = permute_along_axis(Winv, order, axis=-2)
 
     return (W, Winv)
 
@@ -225,7 +237,7 @@ def apply_bilinear(v1, v2, bilinear_form=None,
     if bilinear_form is not None:
         intermed = matrix_product(
             np.expand_dims(v1, -2), bilinear_form,
-            broadcast="pairwise"
+            broadcast=broadcast
         )
     prod = matrix_product(
         intermed, np.expand_dims(v2, -1)

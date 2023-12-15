@@ -68,7 +68,7 @@ class CoxeterGroup:
             -1 * np.cos(pi / adjusted_cox_matrix),
             base_ring=base_ring
         )
-        if dtype is None
+        if dtype is None:
             return result
 
         return result.astype(dtype)
