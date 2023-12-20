@@ -398,6 +398,63 @@ class FSA:
 
         return H
 
+    def initial_accepted_subword(self, word):
+        """Find an initial subword of a given word which is accepted by the
+        automaton.
+
+        Parameters
+        ----------
+        word : string
+            The word the automaton should try to accept
+
+        Returns
+        -------
+        string
+            An initial subword of `word` which is accepted by the
+            automaton, with maximal length. This may be either the
+            empty word or `word` itself.
+
+    """
+        vertex = self.start_vertices[0]
+        subword = ""
+        for letter in word:
+            try:
+                vertex = self.graph_dict[vertex][letter]
+            except KeyError:
+                return subword
+            subword += letter
+
+        return subword
+
+    def initial_rejected_subword(self, word):
+        """Find an initial subword of a given word which is accepted by the
+        automaton, or None if the given word is accepted.
+
+        Parameters
+        ----------
+        word : string
+            The word the automaton should try to accept.
+
+        Returns
+        -------
+        string
+            An initial subword of `word` which is rejected by the
+            automaton, with minimal length. If the word is accepted,
+            return None.
+
+        """
+        vertex = self.start_vertices[0]
+        subword = ""
+        for letter in word:
+            try:
+                vertex = self.graph_dict[vertex][letter]
+            except KeyError:
+                return subword + letter
+            subword += letter
+
+        return subword
+
+
     def follow_word(self, word, start_vertex=None):
         """Find the final state of the automaton when it tries to accept a word
 

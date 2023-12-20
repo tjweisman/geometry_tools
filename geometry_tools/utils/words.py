@@ -6,8 +6,11 @@ def invert_gen(generator):
         return generator.upper()
     return generator.lower()
 
-def formal_inverse(word):
-    return "".join([invert_gen(g) for g in word[::-1]])
+def formal_inverse(word, simple=True):
+    joinchar = ""
+    if not simple:
+        joinchar = "*"
+    return joinchar.join([invert_gen(g) for g in word[::-1]])
 
 def asym_gens(generators):
     """Get an iterable of semigroup generators from an iterable of group generators.
@@ -27,7 +30,7 @@ def asym_gens(generators):
 
     """
     for gen in generators:
-        if re.match("[a-z]", gen):
+        if gen.lower() == gen:
             yield gen
 
 def simplify_word(word):

@@ -320,6 +320,37 @@ class ProjectiveObject:
         """
         return self.proj_data.shape[:-1 * self.unit_ndims]
 
+    def reshape(self, shape):
+        old_proj_shape = self.proj_data.shape
+        proj_data = self.proj_data.reshape(
+            shape + old_proj_shape[-1*self.unit_ndims:]
+        )
+
+        aux_data = None
+        if self.aux_data is not None:
+            old_aux_shape = self.aux_data.shape
+            aux_data = self.aux_data.reshape(
+                shape + old_aux_shape[-1*self.aux_ndims:]
+            )
+
+        dual_data = None
+        if self.dual_data is not None:
+            old_dual_shape = self.dual_data.shape
+            dual_data = self.dual_data.reshape(
+                shape + old_dual_shape[-1*self.dual_ndims:]
+            )
+
+        new_obj = ProjectiveObject(proj_data,
+                                   aux_data,
+                                   dual_data,
+                                   unit_ndims=self.unit_ndims,
+                                   aux_ndims=self.aux_ndims,
+                                   dual_ndims=self.dual_ndims)
+
+        return self.__class__(new_obj)
+
+
+
     def set(self, proj_data=None, aux_data=None,
             dual_data=None, **kwargs):
         """set the underlying data of the hyperbolic object.
@@ -1270,6 +1301,30 @@ class Transformation(ProjectiveObject):
         ]
 
         return Point(eigvec_coords)
+
+    def commute(self, other, broadcast="elementwise", tol=1e-8):
+
+        s_inv = self.inv()
+        o_inv = other.inv()
+
+        if broadcast == "pairwise":
+            slen = len(s_inv.shape)
+            olen = len(o_inv.shape)
+            s_inv = s_inv.reshape(s_inv.shape + (1,)*olen)
+            o_inv = o_inv.reshape((1,)*slen + o_inv.shape)
+
+        commutator = self.apply(other, broadcast=broadcast)
+        commutator = commutator.apply(s_inv, broadcast="elementwise")
+        commutator = commutator.apply(o_inv, broadcast="elementwise")
+
+        return np.all(
+            np.isclose(commutator.proj_data,
+                       np.identity(self.dimension + 1),
+                       atol=tol),
+            axis=(-1, -2)
+        )
+
+
 
     def diagonalize(self, return_inv=False, **kwargs):
         """Get a matrix diagonalizing this projective transformation.

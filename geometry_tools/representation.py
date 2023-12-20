@@ -200,14 +200,27 @@ class Representation:
     def array_wrap_func(numpy_array):
         return numpy_array
 
+    def parse_word(self, word, simple=None):
+        if simple is None:
+            simple = self.parse_simple
+
+        if simple:
+            return word
+
+        return re.split("[()*]", word)
+
     def __getitem__(self, word):
-        matrix = self._word_value(word)
+        return self.element(word)
+
+    def element(self, word, parse_simple=True):
+        matrix = self._word_value(word, parse_simple)
         return self.__class__.wrap_func(matrix)
 
     def __init__(self, representation=None,
                  generator_names=None,
                  relations=[],
                  base_ring=None,
+                 parse_simple=True,
                  dtype='float64'):
         """
         Parameters
@@ -225,6 +238,7 @@ class Representation:
         self._dim = None
         self._dtype = dtype
         self._base_ring = base_ring
+        self.parse_simple = parse_simple
         self.relations = [r for r in relations]
 
         if representation is not None:
@@ -336,7 +350,7 @@ class Representation:
     def automaton_accepted(self, automaton, length,
                            maxlen=True, with_words=False,
                            start_state=None, end_state=None,
-                           precomputed=None):
+                           precomputed=None, edge_words=False):
         """Return group elements representing words accepted by a
            finite-state automaton.
 
@@ -371,6 +385,10 @@ class Representation:
             the automaton. If `None`, use an empty dictionary. In
             either case, the dictionary will be populated when the
             function is called.
+        edge_words : bool
+            If True, view each label of the given automaton as a word
+            in the generators for this representation. Otherwise,
+            interpret the label as a single generator.
 
         Returns
         -------
@@ -381,7 +399,7 @@ class Representation:
             strings containing the corresponding words. If
             `with_words` is `False`, just return `elements`.
 
-        """
+    """
 
         if start_state is not None and end_state is not None:
             raise ValueError("At most one of start_state and end_state "
@@ -418,8 +436,9 @@ class Representation:
         return wrapped_matrices
 
     def _automaton_accepted(self, automaton, length,
-                           state=None, as_start=True, maxlen=True,
-                           precomputed=None, with_words=False):
+                            state=None, as_start=True, maxlen=True,
+                            precomputed=None, with_words=False,
+                            edge_words=False):
 
         if precomputed is None:
             precomputed = {}
@@ -479,10 +498,14 @@ class Representation:
                 else:
                     matrices = result
 
-                if as_start:
-                    matrices = self._word_value(label) @ matrices
+                if edge_words:
+                    edge_elt = self._word_value(label)
                 else:
-                    matrices = matrices @ self._word_value(label)
+                    edge_elt = self.generators[label]
+                if as_start:
+                    matrices = edge_elt @ matrices
+                else:
+                    matrices = matrices @ edge_elt
                 matrix_list.append(matrices)
 
         accepted_matrices = empty_arr
@@ -554,10 +577,12 @@ class Representation:
             lambda M: utils.invert(M).T
         )
 
-    def _word_value(self, word):
+    def _word_value(self, word, parse_simple=None):
+        gen_list = self.parse_word(word, simple=parse_simple)
+
         matrix = utils.identity(self._dim, dtype=self.dtype)
-        for i, letter in enumerate(word):
-            matrix = matrix @ self.generators[letter]
+        for gen in gen_list:
+            matrix = matrix @ self.generators[gen]
         return matrix
 
     def _set_generator(self, generator, matrix, compute_inverse=True,
@@ -572,6 +597,22 @@ class Representation:
         if shape[0] != self._dim:
             raise ValueError(
                 "Every matrix in the representation must have the same shape"
+            )
+
+        if re.search("[*()]", generator):
+            raise ValueError(
+                "The characters *, (, and ) are reserved and "
+                " cannot be used in generator names."
+            )
+
+        if not re.search("[a-zA-Z]", generator):
+            raise ValueError(
+                "Generator names must contain at least one letter a-z or A-Z"
+            )
+
+        if generator != generator.lower() and generator != generator.upper():
+            raise ValueError(
+                "Generator names cannot be mixed-case"
             )
 
         if base_ring is not None:
@@ -721,8 +762,10 @@ class Representation:
             subrep._set_generator(g, self._word_value(word),
                                   compute_inverse=compute_inverse)
             if not compute_inverse:
-                subrep._set_generator(words.invert_gen(g),
-                                      words.formal_inverse(word))
+                subrep._set_generator(
+                    words.invert_gen(g),
+                    self._word_value(words.formal_inverse(word))
+                )
 
         return subrep
 
