@@ -255,7 +255,7 @@ class CoxeterGroup:
         return self.cartan_representation(
             2 * self.bilinear_form(**kwargs),
             rename_generators=False,
-            diagonalize=False,
+            diagonalize=diagonalize,
             order_eigenvalues="signed",
             **kwargs
         )
