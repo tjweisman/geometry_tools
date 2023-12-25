@@ -27,8 +27,8 @@ def rotation_matrix(angle, like=None, **kwargs):
     -------
     ndarray
         numpy array of shape (2,2) of the form
-        \(\begin{pmatrix}\cos \theta & -\sin \theta\\\sin\theta & \cos \theta
-        \end{pmatrix}\)
+        $\begin{pmatrix}\cos \theta & -\sin \theta\\\sin\theta & \cos \theta
+        \end{pmatrix}$
 
     """
     if like is None:
@@ -135,10 +135,10 @@ def diagonalize_form(bilinear_form,
     -------
     ndarray
         numpy array of shape (n, n), representing a coordinate change
-        taking the given bilinear form to a diagonal form. If \(B\) is
-        the matrix given by bilinear_form, and \(D\) is a diagonal
-        matrix with the same signature as \(B\), then this function
-        returns a matrix \(M\) such that \(M^TDM = B\).
+        taking the given bilinear form to a diagonal form. If $B$ is
+        the matrix given by bilinear_form, and $D$ is a diagonal
+        matrix with the same signature as $B$, then this function
+        returns a matrix $M$ such that $M^TDM = B$.
 
     """
 
@@ -372,7 +372,7 @@ def arc_include(thetas, reference_theta):
 def sphere_inversion(points):
     r"""Apply unit sphere inversion to points in R^n.
 
-    This realizes the map \(v \mapsto v / ||v||^2\).
+    This realizes the map $v \mapsto v / ||v||^2$.
 
     Parameters
     ----------
@@ -416,10 +416,10 @@ def projection(v1, v2, bilinear_form):
     The returned vector `w` is parallel to `v2`, and `v1 - w` is
     orthogonal to `v2` with respect to the given bilinear form.
     `w` is determined by the formula
-    \[
+    $$
     v_2 \cdot \langle v_1, v_2 \rangle / \langle v_2, v_2 \rangle,
-    \]
-    where \(\langle \cdot, \cdot \rangle\) is the pairing determined by
+    $$
+    where $\langle \cdot, \cdot \rangle$ is the pairing determined by
     `bilinear_form`.
 
     Parameters

@@ -1,4 +1,4 @@
 
-- write unit tests
-- finish porting over my old Sage code for various Lie group morphisms
-- update documentation, README.md, and example files for all those good new Sage features
+- write (more) unit tests, especially for Coxeter stuff
+- update documentation, README.md, and example files for all the new Sage features (and new drawtools features)
+- do more testing for the CP^1 stuff

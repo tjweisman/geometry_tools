@@ -901,42 +901,42 @@ class SageMatrixRepresentation(Representation):
 
 def sym_index(i, j, n):
     r"""Return coordinate indices for an isomorphism
-    \(\mathrm{Sym}^2(\mathbb{R}^n) \to \mathbb{R}^{\binom{n}{2} + n}\).
+    $\mathrm{Sym}^2(\mathbb{R}^n) \to \mathbb{R}^{\binom{n}{2} + n}$.
 
-    If \(\{e_1, \ldots, e_n\}\) is the standard basis for \(\mathbb{R}^n\),
-    the isomorphism is realized by giving \(\mathrm{Sym}^2(\mathbb{R}^n)\)
+    If $\{e_1, \ldots, e_n\}$ is the standard basis for $\mathbb{R}^n$,
+    the isomorphism is realized by giving $\mathrm{Sym}^2(\mathbb{R}^n)$
     the ordered basis
-    \[
+    $$
         \{e_ne_n, e_{n-1}e_{n-1}, e_{n-1}e_n,
         e_{n-1}e_{n-1}, e_{n-1}e_{n-2}, e_{n-1}e_{n-3}, \ldots \}.
-    \]
+    $$
     Schematically this is given by the symmetric matrix
 
-    \[\begin{pmatrix} \ddots \\
+    $$\begin{pmatrix} \ddots \\
     & 3 & 4 & 5 \\
     & & 1 & 2 \\
     & & & 0
     \end{pmatrix},
-    \]
+    $$
     where the (i,j) entry of the matrix gives the index of basis
-    element \(e_ie_j\).
+    element $e_ie_j$.
 
     Parameters
     ----------
     i : int
-        index of one of the terms in the basis monomial \(e_ie_j\) for the
+        index of one of the terms in the basis monomial $e_ie_j$ for the
         symmetric square
     j : int
-        index of the other term in the basis monomial \(e_ie_j\) for the
+        index of the other term in the basis monomial $e_ie_j$ for the
         symmetric square
     n : int
-        dimension of the underlying vector space \(\mathbb{R}^n\).
+        dimension of the underlying vector space $\mathbb{R}^n$.
 
     Returns
     -------
     int
         index of the corresponding basis vector in
-        \(\mathbb{R}^{\binom{n}{2} + n}\).
+        $\mathbb{R}^{\binom{n}{2} + n}$.
 
     """
     if i > j:
@@ -945,109 +945,109 @@ def sym_index(i, j, n):
 
 def tensor_pos(i, n):
     r"""Return coordinate indices for an isomorphism
-    \(\mathbb{R}^{n^2} \to \mathbb{R}^n \otimes \mathbb{R}^n\).
+    $\mathbb{R}^{n^2} \to \mathbb{R}^n \otimes \mathbb{R}^n$.
 
-    If \(\{e_1, \ldots, e_n\}\) is the standard basis for
-    \(\mathbb{R}^n\), the isomorphism is realized by giving
-    \(\mathbb{R}^n \otimes \mathbb{R}^n\) the ordered basis
-    \[
+    If $\{e_1, \ldots, e_n\}$ is the standard basis for
+    $\mathbb{R}^n$, the isomorphism is realized by giving
+    $\mathbb{R}^n \otimes \mathbb{R}^n$ the ordered basis
+    $$
     \{e_1 \otimes e_1, e_1 \otimes e_2, \ldots, e_1 \otimes e_n, e_2 \otimes e_1, \ldots, \}
-    \]
+    $$
     represented schematically by the matrix
-    \[
+    $$
         \begin{pmatrix}
             0 & 1 & \ldots \\
             n & n + 1 & \ldots\\
             \vdots
         \end{pmatrix}.
-    \]
+    $$
     Here the (i, j) entry of the matrix gives the index of the basis
-    element \(e_i \otimes e_j\).
+    element $e_i \otimes e_j$.
 
     The inverse of this isomorphism is given by `tensor_index`.
 
     Parameters
     ----------
     i : int
-        index of a basis vector in \(\mathbb{R}^{n^2}\)
+        index of a basis vector in $\mathbb{R}^{n^2}$
     n : int
-        dimension of the underlying vector space \(\mathbb{R}^n\)
+        dimension of the underlying vector space $\mathbb{R}^n$
 
     Returns
     -------
     tuple
-        tuple `(j, k)` determining the monomial \(e_j \otimes e_k\)
-        mapped to by given the basis vector in \(\mathbb{R}^{n^2}\).
+        tuple `(j, k)` determining the monomial $e_j \otimes e_k$
+        mapped to by given the basis vector in $\mathbb{R}^{n^2}$.
 
     """
     return int(i / n), i % n
 
 def tensor_index(i,j,n):
     r"""Return coordinate indices for an isomorphism
-    \(\mathbb{R}^n \otimes \mathbb{R}^n \to \mathbb{R}^{n^2}\).
+    $\mathbb{R}^n \otimes \mathbb{R}^n \to \mathbb{R}^{n^2}$.
 
-    If \(\{e_1, \ldots, e_n\}\) is the standard basis for
-    \(\mathbb{R}^n\), the isomorphism is realized by giving
-    \(\mathbb{R}^n \otimes \mathbb{R}^n\) the ordered basis
-    \[
+    If $\{e_1, \ldots, e_n\}$ is the standard basis for
+    $\mathbb{R}^n$, the isomorphism is realized by giving
+    $\mathbb{R}^n \otimes \mathbb{R}^n$ the ordered basis
+    $$
     \{e_1 \otimes e_1, e_1 \otimes e_2, \ldots, e_1 \otimes e_n, e_2 \otimes e_1, \ldots, \}
-    \]
+    $$
     represented schematically by the matrix
-    \[
+    $$
         \begin{pmatrix}
             0 & 1 & \ldots \\
             n & n + 1 & \ldots\\
             \vdots
         \end{pmatrix}.
-    \]
+    $$
     Here the (i, j) entry of the matrix gives the index of the basis
-    element \(e_i \otimes e_j\).
+    element $e_i \otimes e_j$.
 
     The inverse of this isomorphism is given by `tensor_pos`.
 
     Parameters
     ----------
     i : int
-        index of one of the terms in a basis vector \(e_i \otimes e_j\).
+        index of one of the terms in a basis vector $e_i \otimes e_j$.
     j : int
-        index of the other term in a basis vector \(e_i \times e_j\).
+        index of the other term in a basis vector $e_i \times e_j$.
     n : int
-        dimension of the underlying vector space \(\mathbb{R}^n\)
+        dimension of the underlying vector space $\mathbb{R}^n$
 
     Returns
     -------
     int
-        index of a basis vector in \(\mathbb{R}^{n^2}\) mapped to by
-        \(e_i \otimes e_j\).
+        index of a basis vector in $\mathbb{R}^{n^2}$ mapped to by
+        $e_i \otimes e_j$.
     """
     return i * n + j
 
 def symmetric_inclusion(n):
     r"""Return a matrix representing the linear inclusion
-    \(\mathrm{Sym}^2(\mathbb{R}^n) \to \mathbb{R}^n \otimes
-    \mathbb{R}^n\).
+    $\mathrm{Sym}^2(\mathbb{R}^n) \to \mathbb{R}^n \otimes
+    \mathbb{R}^n$.
 
-    \(\mathrm{Sym}^2(\mathbb{R}^n)\) and
-    \(\mathbb{R}^n \otimes \mathbb{R}^n\)
+    $\mathrm{Sym}^2(\mathbb{R}^n)$ and
+    $\mathbb{R}^n \otimes \mathbb{R}^n$
     are respectively identified with
-    \(\mathbb{R}^{\binom{n}{2} + n}\) and \(\mathbb{R}^{n^2}\) via the
+    $\mathbb{R}^{\binom{n}{2} + n}$ and $\mathbb{R}^{n^2}$ via the
     isomorphisms described in `sym_index`, `tensor_index`, and
     `tensor_pos`.
 
-    If \(\{e_1, \ldots, e_n\}\) is the standard basis for
-    \(\mathbb{R}^n\), the returned matrix gives the linear map taking
-    \(e_ie_j\) to \(\frac{1}{2}(e_i \otimes e_j + e_j \otimes e_i)\),
+    If $\{e_1, \ldots, e_n\}$ is the standard basis for
+    $\mathbb{R}^n$, the returned matrix gives the linear map taking
+    $e_ie_j$ to $\frac{1}{2}(e_i \otimes e_j + e_j \otimes e_i)$,
     with respect to the bases specified above.
 
     Parameters
     ----------
     n : int
-        Dimension of the underlying vector space \(\mathbb{R}^n\).
+        Dimension of the underlying vector space $\mathbb{R}^n$.
 
     Returns
     -------
     matrix : ndarray
-        \(n^2 \times \binom{n}{2} + n\) array defining this linear map.
+        $n^2 \times \binom{n}{2} + n$ array defining this linear map.
 
     """
     incl_matrix = np.zeros((n * n, int(n * (n + 1) / 2)))
@@ -1061,24 +1061,24 @@ def symmetric_inclusion(n):
 
 def symmetric_projection(n):
     r"""Return a matrix representing the linear surjection
-    \(\mathbb{R}^n \otimes \mathbb{R}^n \to \mathrm{Sym}^2(\mathbb{R}^n)\).
+    $\mathbb{R}^n \otimes \mathbb{R}^n \to \mathrm{Sym}^2(\mathbb{R}^n)$.
 
-    If \(\mathbb{R}^n\) is given the standard basis \(\{e_1, \ldots,
-    e_n\}\), then this matrix represents the linear map determined by
-    \(e_i \otimes e_j \mapsto e_ie_j\). The spaces
-    \(\mathbb{R}^n \otimes \mathbb{R}^n\) and \(\mathrm{Sym}^2(\mathbb{R}^n)\)
+    If $\mathbb{R}^n$ is given the standard basis $\{e_1, \ldots,
+    e_n\}$, then this matrix represents the linear map determined by
+    $e_i \otimes e_j \mapsto e_ie_j$. The spaces
+    $\mathbb{R}^n \otimes \mathbb{R}^n$ and $\mathrm{Sym}^2(\mathbb{R}^n)$
     are given the ordered bases determined by the functions
     `sym_index`, `tensor_index`, and `tensor_pos`.
 
     Parameters
     ----------
     n : int
-        Dimension of the underlying vector space \(\mathbb{R}^n\)
+        Dimension of the underlying vector space $\mathbb{R}^n$
 
     Returns
     -------
     ndarray
-        \(\binom{n}{2} + n \times n\) matrix representing the linear map
+        $\binom{n}{2} + n \times n$ matrix representing the linear map
         in the given bases.
 
     """

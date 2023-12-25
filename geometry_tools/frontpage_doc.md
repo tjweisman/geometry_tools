@@ -1,19 +1,24 @@
 `geometry_tools` is a Python package meant to help you work with and visualize group actions on hyperbolic space and projective space.
 
-The package is mostly built on top of [numpy](https://numpy.org/), [matplotlib](https://matplotlib.org/), and [scipy](https://scipy.org/) and provides modules to:
+The package is mostly built on top of [numpy](https://numpy.org/), [matplotlib](https://matplotlib.org/), and [scipy](https://scipy.org/). Optionally, the package can use tools provided by [Sage](https://www.sagemath.org/) to perform (slow) exact computations.
 
-- perform numerical computations with objects in hyperbolic space, in multiple models (namely the Klein, hyperboloid, projective, Poincare, and half-space models)
+`geometry_tools` can help you:
 
-- work (again, numerically) with representations of finitely generated groups into \(\textrm{O}(d, 1)\), \(\textrm{GL}(d, \mathbb{R})\), and \(\textrm{GL}(d, \mathbb{C})\)
-
-- use finite-state automata to do some simple computations in word-hyperbolic groups 
+- perform numerical (or sometimes, exact) computations with objects in hyperbolic space, in multiple models (namely the Klein, hyperboloid, projective, Poincare, and half-space models)
 
 - draw nice pictures in the hyperbolic plane, the real projective plane, and the complex projective line
 
+- work with representations of finitely generated groups into $\textrm{O}(d, 1)$, $\textrm{GL}(d, \mathbb{R})$, and $\textrm{GL}(d, \mathbb{C})$
+
+- do hands-on computations with representations of Coxeter groups into $\textrm{GL}(d, \mathbb{R})$
+
+- use finite-state automata to do some simple computations in word-hyperbolic groups
+
+Some limited support for 3D figures is also provided (via matplotlib).
+
 None of the functionality of this package is (mathematically) very deep.
 Mostly, the package just wraps more sophisticated tools in a way intended to
-make it easy to quickly draw good pictures in \(\mathbb{H}^2\), \(\mathbb
-{H}^3\), and \(\mathbb{R}P^2\) and \(\mathbb{C}P^1\).
+make it easy to quickly draw good pictures in $\mathbb{H}^2$, $\mathbb{H}^3$, and $\mathbb{R}P^2$ and $\mathbb{C}P^1$.
 
 ## A quick example
 
@@ -168,7 +173,6 @@ fig = drawtools.HyperbolicDrawing()
 fig.draw_plane()
 fig.draw_polygon(tiles, facecolor="royalblue", edgecolor="none")
 ```
-
 
 ![png](output_13_0.png)
 

@@ -1053,7 +1053,7 @@ class ConvexPolygon(Polygon):
           `dual_data`), or
 
         - interprets the projective coordinates of the provided points
-          as preferred lifts of those points in \(\mathbb{R}^n\), and
+          as preferred lifts of those points in $\mathbb{R}^n$, and
           computes an affine chart containing the projectivization of
           the convex hull of those lifts.
 
@@ -1414,14 +1414,14 @@ class ProjectiveRepresentation(representation.Representation):
         return self.elements(words)
 
 def hyperplane_coordinate_transform(normal):
-    r"""Find an orthogonal matrix taking the affine chart \(\{\vec{x} :
-       \vec{x} \cdot \vec{n} \ne 0\}\) to the standard affine chart
-       \(\{\vec{x} = (x_0, \ldots, x_n) : x_0 \ne 0\}\).
+    r"""Find an orthogonal matrix taking the affine chart $\{\vec{x} :
+       \vec{x} \cdot \vec{n} \ne 0\}$ to the standard affine chart
+       $\{\vec{x} = (x_0, \ldots, x_n) : x_0 \ne 0\}$.
 
     Parameters
     ----------
     normal : array
-        The vector \(\vec{n}\), normal to some hyperplane in R^n.
+        The vector $\vec{n}$, normal to some hyperplane in R^n.
 
     Returns
     -------

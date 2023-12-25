@@ -2,8 +2,8 @@ r"""Work with finite-state automata.
 
 The `automata` package provides tools meant to manipulate finite-state
 automata, via the `geometry_tools.automata.fsa.FSA` class. Below, we manually
-construct an automaton for the group \((\mathbb{Z}/2) * (\mathbb
-{Z}/3) \simeq \mathrm{PSL}(2, \mathbb{Z})\):
+construct an automaton for the group $(\mathbb{Z}/2) * (\mathbb
+{Z}/3) \simeq \mathrm{PSL}(2, \mathbb{Z})$:
 
 ```python
 from geometry_tools.automata import fsa

@@ -23,8 +23,8 @@ point.coords(model="poincare")
 
 The `Isometry` class models isometries of hyperbolic space. The easiest way to
 obtain an isometry of the hyperbolic plane is to use the isomorphism from
-\(\mathrm{PSL}(2, \mathbb{R})\) to the (orientation-preserving) isometry group
- of \(\mathbb{H}^2\).
+$\mathrm{PSL}(2, \mathbb{R})$ to the (orientation-preserving) isometry group
+ of $\mathbb{H}^2$.
 
 ```python
 from geometry_tools import hyperbolic

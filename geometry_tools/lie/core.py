@@ -190,14 +190,14 @@ def gln_adjoint(mat, inv=None, **kwargs):
     )
 
 def sl2_irrep(A, n):
-    r"""The irreducible representation \(\mathrm{SL}(2) \to
-    \mathrm{SL}(n)\), via the action on homogeneous polynomials.
+    r"""The irreducible representation $\mathrm{SL}(2) \to
+    \mathrm{SL}(n)$, via the action on homogeneous polynomials.
 
-    Given an element of \(\mathrm{SL}(2)\) as a 2x2 array, compute a
+    Given an element of $\mathrm{SL}(2)$ as a 2x2 array, compute a
     matrix giving the action of this matrix on symmetric polynomials
-    in elements of the standard basis \(\{e_1, e_2\}\). The (ordered)
+    in elements of the standard basis $\{e_1, e_2\}$. The (ordered)
     basis for the new matrix is given by the degree-(n-1) monomials
-    \(\{e_1^{0} e_2^{n-1}, e_1^{1} e_2^{n-2}, \ldots, e_1^{n-1}e_2^{0}\}\).
+    $\{e_1^{0} e_2^{n-1}, e_1^{1} e_2^{n-2}, \ldots, e_1^{n-1}e_2^{0}\}$.
 
     Parameters
     ----------
@@ -212,7 +212,7 @@ def sl2_irrep(A, n):
     result : ndarray
         Array of shape `(..., n, n)` giving the representation of
         `A` under the `dim`-dimensional irreducible representation of
-        \(\mathrm{SL}(2)\).
+        $\mathrm{SL}(2)$.
 
     """
 
@@ -244,11 +244,11 @@ def sln_killing_form(n, **kwargs):
     return form
 
 def o_to_pgl(A, bilinear_form=np.diag([-1, 1, 1])):
-    r"""Return the image of an element of \(\mathrm{O}(2, 1)\) under the
-    representation \(\mathrm{O}(2,1) \to \mathrm{GL}(2)\).
+    r"""Return the image of an element of $\mathrm{O}(2, 1)$ under the
+    representation $\mathrm{O}(2,1) \to \mathrm{GL}(2)$.
 
-    On \(\mathrm{SO}(2, 1)\), this restricts to an inverse of the
-    isomorphism \(\mathrm{SL}(2, \mathbb{R}) \to \mathrm{SO}(2, 1)\)
+    On $\mathrm{SO}(2, 1)$, this restricts to an inverse of the
+    isomorphism $\mathrm{SL}(2, \mathbb{R}) \to \mathrm{SO}(2, 1)$
     given by the function `sl2_to_so21`.
 
     Parameters
@@ -311,13 +311,13 @@ def o_to_pgl(A, bilinear_form=np.diag([-1, 1, 1])):
                      [c, d]])
 
 def sl2_to_so21(A):
-    r"""Return the image of an element of \(\mathrm{SL}(2, \mathbb{R})\)
-    under the isomorphism \(\mathrm{SL}(2, \mathbb{R}) \to
-    \mathrm{SO}(2,1)\).
+    r"""Return the image of an element of $\mathrm{SL}(2, \mathbb{R})$
+    under the isomorphism $\mathrm{SL}(2, \mathbb{R}) \to
+    \mathrm{SO}(2,1)$.
 
-    Here \(\mathrm{SO}(2,1)\) preserves the symmetric bilinear form
+    Here $\mathrm{SO}(2,1)$ preserves the symmetric bilinear form
     determined by the matrix `diag(-1, 1, 1)` (in the standard basis on
-    \(\mathbb{R}^3\)).
+    $\mathbb{R}^3$).
 
     An inverse for this representation is given by the function
     `o_to_pgl`.
@@ -326,7 +326,7 @@ def sl2_to_so21(A):
     ----------
     A : ndarray
         Array of shape `(..., 2, 2)` giving a matrix (or array of
-        matrices) in \(\mathrm{SL}(2, \mathbb{R})\).
+        matrices) in $\mathrm{SL}(2, \mathbb{R})$.
 
     Returns
     -------
