@@ -350,7 +350,7 @@ class Representation:
     def automaton_accepted(self, automaton, length,
                            maxlen=True, with_words=False,
                            start_state=None, end_state=None,
-                           precomputed=None, edge_words=False):
+                           precomputed=None, edge_words=True):
         """Return group elements representing words accepted by a
            finite-state automaton.
 
@@ -438,7 +438,7 @@ class Representation:
     def _automaton_accepted(self, automaton, length,
                             state=None, as_start=True, maxlen=True,
                             precomputed=None, with_words=False,
-                            edge_words=False):
+                            edge_words=True):
 
         if precomputed is None:
             precomputed = {}
