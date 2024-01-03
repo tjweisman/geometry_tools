@@ -612,7 +612,7 @@ class Subspace(IdealPoint):
 
     def sphere_parameters(self, model=Model.POINCARE):
         """Get parameters describing a k-sphere corresponding to this subspace
-        in the Poincare model.
+        in the Poincare or Halfspace models.
 
         Parameters
         ----------
@@ -660,6 +660,29 @@ class Subspace(IdealPoint):
             )
 
         return center, radius
+
+    def boundary_sphere_parameters(self):
+        """Get parameters for a (k-1)-sphere corresponding to the ideal
+        boundary of this k-dimensional subspace, viewed as a subset of
+        Euclidean space R^(n-1) via the Halfspace model.
+
+        Returns
+        -------
+        tuple
+            Tuple of the form `(centers, radii)`, where `centers` and
+            `radii` are ndarrays, respectively giving the centers and
+            radii of (k-1)-spheres in R^(n-1). Here, the ambient
+            Euclidean space R^(n-1) is identified with the ideal
+            boundary of n-dimensional hyperbolic space R^(n-1) (minus
+            a point at infinity) via the Halfspace model.
+
+        """
+
+        # boundary corresponds to the hyperplane where last coordinate vanishes
+        sphere_pt_coords = self.ideal_basis_coords(model=Model.HALFSPACE)[..., :-1]
+
+        return utils.sphere_through(sphere_pt_coords)
+
 
     def reflection_across(self):
         """Get a hyperbolic isometry reflecting across this hyperplane.
@@ -1769,7 +1792,7 @@ class Isometry(projective.Transformation, HyperbolicObject):
         return Geodesic(self.fixed_point_pair())
 
     def isometry_type(self):
-        ...
+        raise NotImplementedError
 
     def fixed_point_pair(self, sort_eigvals=True):
         """Find fixed points for this isometry in the closure of hyperbolic space.

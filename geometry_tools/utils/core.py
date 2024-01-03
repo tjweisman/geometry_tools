@@ -7,6 +7,8 @@ from scipy.optimize import linprog
 from . import numerical
 from . import types
 
+from ..base import GeometryError
+
 try:
     import sage.all
     from . import sagewrap
@@ -903,26 +905,49 @@ def circle_through(p1, p2, p3):
         ndarray containing the radius of the determined circle.
 
     """
-    t_p1 = p1 - p3
-    t_p2 = p2 - p3
+    return sphere_through(np.stack([p1, p2, p3], axis=-2))
 
-    x1 = t_p1[..., 0]
-    y1 = t_p1[..., 1]
+def sphere_through(points):
+    """Get the unique k-sphere passing through k+2 points in R^(k+1).
 
-    x2 = t_p2[..., 0]
-    y2 = t_p2[..., 1]
+    This does NOT check for linear dependence, and will just return
+    nans in that case.
 
-    r_sq = np.stack([x1**2 + y1**2, x2**2 + y2**2], axis=-1)
-    r_sq = np.expand_dims(r_sq, axis=-2)
+    Parameters
+    ----------
+    points : ndarray of shape `(..., k)`
+        Euclidean coordinates of k points in R^(k+1)
 
-    mats = np.stack([t_p1, t_p2], axis=-1)
+    Returns
+    -------
+    tuple
+        tuple of the form `(center, radius)`, where `center` is an
+        ndarray containing Euclidean coordinates of the center of the
+        determined spheres, and `radius` is either an ndarray
+        containing the radius of the determined spheres.
+    """
+    k = points.shape[-2]
+    if points.shape[-1] != k - 1:
+        raise GeometryError(
+            f"Cannot construct a unique sphere through {k} points in "
+            f"{points.shape[-1]} dimensions"
+        )
 
-    # we'll act on the right
-    t_ctrs = np.squeeze(r_sq @ invert(mats), axis=-2)/2.
+    # translate so one of the points is at the origin
+    p0 = np.expand_dims(points[..., 0, :], axis=-2)
+    t_pts = points[..., 1:, :] - p0
 
-    radii = np.linalg.norm(t_ctrs, axis=-1)
+    # solve for the translated center
+    r_sq = normsq(t_pts)[..., np.newaxis, :]
 
-    return (t_ctrs + p3, radii)
+    t_ctr = r_sq @ invert(t_pts.swapaxes(-1, -2)) / number(2, like=r_sq)
+    radii = np.linalg.norm(t_ctr, axis=-1)
+
+    center = np.squeeze(t_ctr + p0, axis=-2)
+    radii = np.squeeze(radii, axis=-1)
+
+    return (center, radii)
+
 
 def r_to_c(real_coords):
     return real_coords[..., 0] + real_coords[..., 1]*1.0j
