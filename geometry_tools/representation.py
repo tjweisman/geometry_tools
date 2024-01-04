@@ -421,7 +421,8 @@ class Representation:
                                           with_words=with_words,
                                           state=state,
                                           as_start=as_start,
-                                          precomputed=precomputed)
+                                          precomputed=precomputed,
+                                          edge_words=edge_words)
 
         if with_words:
             matrix_array, words = result
@@ -486,7 +487,8 @@ class Representation:
                     as_start=as_start,
                     maxlen=maxlen,
                     precomputed=precomputed,
-                    with_words=with_words
+                    with_words=with_words,
+                    edge_words=edge_words
                 )
                 if with_words:
                     matrices, words = result
