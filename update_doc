@@ -1,0 +1,16 @@
+#!/bin/bash
+
+SCRIPT_DIR=$(dirname $(realpath $0))
+WEB_DIR=/home/teddy/math/personal_website
+
+WEB_SERVER=tjwei@sftp.itd.umich.edu
+
+$SCRIPT_DIR/make_doc
+cp -r $SCRIPT_DIR/doc/* $WEB_DIR/geometry_tools
+
+mbuildsite
+
+if [ "$1" = "-u" ]
+then
+    rsync -r -F --delete-after --dry-run --verbose $WEB_DIR/geometry_tools/ $WEB_SERVER:~/Public/html/geometry_tools
+fi
