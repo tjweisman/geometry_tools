@@ -1,6 +1,8 @@
 import re
 from collections import defaultdict
 
+SIMPLE_GENERATOR_NAMES = "abcdefghijklmnopqrstuvwxyz"
+
 def invert_gen(generator):
     if generator.lower() == generator:
         return generator.upper()

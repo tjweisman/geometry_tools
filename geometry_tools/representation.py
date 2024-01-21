@@ -166,10 +166,11 @@ import scipy.special
 from .automata import fsa
 from . import lie
 from . import utils
-from .utils import words
 
 if utils.SAGE_AVAILABLE:
     from .utils import sagewrap
+
+from .utils.words import SIMPLE_GENERATOR_NAMES
 
 class Representation:
     """Model a representation for a finitely generated group
@@ -264,7 +265,7 @@ class Representation:
                 generator_names = []
 
             self.generators = {name[0].lower():None
-                               for name in words.asym_gens(generator_names)}
+                               for name in utils.words.asym_gens(generator_names)}
 
             for gen in list(self.generators):
                 self.generators[gen.upper()] = None
@@ -324,7 +325,7 @@ class Representation:
         else:
             for word in self.free_words_of_length(length - 1):
                 for generator in self.generators:
-                    if len(word) == 0 or generator != words.invert_gen(word[-1]):
+                    if len(word) == 0 or generator != utils.words.invert_gen(word[-1]):
                         yield word + generator
 
     def free_words_less_than(self, length):
@@ -570,7 +571,7 @@ class Representation:
             group generator names
 
     """
-        return words.asym_gens(self.generators.keys())
+        return utils.words.asym_gens(self.generators.keys())
 
     def dual(self):
         return self._compose(
@@ -621,7 +622,7 @@ class Representation:
 
         self.generators[generator] = matrix
         if compute_inverse:
-            self.generators[words.invert_gen(generator)] = utils.invert(matrix)
+            self.generators[utils.words.invert_gen(generator)] = utils.invert(matrix)
 
         # always update the dtype (we don't have a hierarchy for this)
         self._dtype = matrix.dtype
@@ -669,7 +670,7 @@ class Representation:
 
     def _conjugate(self, mat, inv_mat=None, **kwargs):
         if inv_mat is None:
-            inv_mat = utils.invert(mat, **kwargs)
+            inv_mat = utils.invert(mat)
 
         return self._compose(lambda M: inv_mat @ M @ mat)
 
@@ -694,7 +695,7 @@ class Representation:
 
         for g in generator_iterator:
             image = self.generators[g]
-            inv_image = self.generators[words.invert_gen(g)]
+            inv_image = self.generators[utils.words.invert_gen(g)]
 
             try:
                 composed = hom(image, inv=inv_image)
@@ -728,7 +729,7 @@ class Representation:
                     "computing differential of '{}' with respect to {}".format(
                         word, generator)
                 )
-            word_diff = words.fox_word_derivative(generator, word)
+            word_diff = utils.words.fox_word_derivative(generator, word)
             matrix_diff = [
                 coeff * self._word_value(word)
                 for word, coeff in word_diff.items()
@@ -752,7 +753,7 @@ class Representation:
         try:
             generator_pairs = generators.items()
         except AttributeError:
-            generator_pairs = zip(GENERATORS[:len(generators)],
+            generator_pairs = zip(SIMPLE_GENERATOR_NAMES[:len(generators)],
                                   generators)
 
         if generator_names is not None:
@@ -763,8 +764,8 @@ class Representation:
                                   compute_inverse=compute_inverse)
             if not compute_inverse:
                 subrep._set_generator(
-                    words.invert_gen(g),
-                    self._word_value(words.formal_inverse(word))
+                    utils.words.invert_gen(g),
+                    self._word_value(utils.words.formal_inverse(word))
                 )
 
         return subrep

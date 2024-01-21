@@ -406,7 +406,7 @@ def subspace_action(mat, subspace, broadcast="elementwise", **kwargs):
 
     left_coeffs = kernel[..., :subspace_dim, :]
     right_coeffs = -kernel[..., subspace_dim:, :]
-    right_coeffs_inv = utils.invert(right_coeffs, **kwargs)
+    right_coeffs_inv = utils.invert(right_coeffs)
 
     return utils.matrix_product(left_coeffs, right_coeffs_inv)
 

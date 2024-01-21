@@ -14,7 +14,7 @@ from geometry_tools.automata import fsa, coxeter_automaton
 if utils.SAGE_AVAILABLE:
     from geometry_tools.utils import sagewrap
 
-SIMPLE_GENERATOR_NAMES = "abcdefghijklmnopqrstuvwxyz"
+from utils.words import SIMPLE_GENERATOR_NAMES
 
 class CoxeterGroup:
     def __init__(self, diagram=None, matrix=None, generator_style="alpha"):
