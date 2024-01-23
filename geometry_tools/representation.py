@@ -735,7 +735,7 @@ class Representation:
                 for word, coeff in word_diff.items()
             ]
             if len(matrix_diff) == 0:
-                return utils.zeros(self.dim, base_ring=self.base_ring)
+                return utils.zeros((self.dim, self.dim), base_ring=self.base_ring)
 
             return np.sum(matrix_diff, axis=0)
 
