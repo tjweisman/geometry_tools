@@ -998,7 +998,7 @@ def affine_disks_contain(cout, rout, cin, rin,
     return np.linalg.norm(cout - cin, axis=-1) < (rout - rin)
 
 
-def disk_containments(c1, r1, c2, r2,
+def disk_containments(cout, rout, cin, rin,
                       broadcast="elementwise"):
     if broadcast == "pairwise":
         pairwise_dists = np.linalg.norm(
@@ -1302,6 +1302,7 @@ def unit_imag(**kwargs):
 
     if base_ring is not None:
         return sagewrap.I
+
     return 1j
 
 

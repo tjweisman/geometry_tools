@@ -243,6 +243,88 @@ def sln_killing_form(n, **kwargs):
                 form[i * n + j, k * n + l] = form_val
     return form
 
+def form_alg_killing_form(form, basis=None, **kwargs):
+    r"""Return a matrix representing the Killing form for a matrix Lie
+    algebra preserving a bilinear form.
+
+    Parameters
+    ----------
+    form : ndarray
+        Array determining the invariant bilinear form
+    basis : ndarray
+        Array of shape (n^2, k) giving a basis for the Lie algebra of
+        the group preserving the given bilinear form. Each basis
+        element is a column vector, viewed as a flattened n*n
+        maatrix. If None (the default), compute a basis using the
+        provided bilinear form.
+
+        WARNING: the default behavior doesn't work properly without
+        forcing exact computation, e.g. by passing base_ring=QQbar as
+        a keyword argument (with Sage available).
+
+    Returns
+    -------
+    ndarray
+        k * k matrix giving the Killing form for this Lie algebra, in
+        either the provided basis or one computed from the form.
+
+    """
+    if basis is None:
+        lie_alg_kernel_mat = bilinear_form_differential(form, **kwargs)
+        basis = utils.kernel(lie_alg_kernel_mat, **kwargs)
+
+    n = np.array(form).shape[-1]
+    liealg_dim = basis.shape[-1]
+
+    res = utils.zeros((liealg_dim, liealg_dim), **kwargs)
+    one = utils.number(1, **kwargs)
+    for i in range(liealg_dim):
+        basis_vector_i = utils.zeros((liealg_dim, 1), **kwargs)
+        basis_vector_i[i] = one
+        mat_i = np.reshape(basis @ basis_vector_i, (n, n))
+        ad_i_gl = linear_matrix_action(lambda A: mat_i @ A - A @ mat_i, n, **kwargs)
+        ad_i = subspace_action(ad_i_gl, basis)
+        for j in range(liealg_dim):
+            basis_vector_j = utils.zeros((liealg_dim, 1), **kwargs)
+            basis_vector_j[j] = one
+            mat_j = np.reshape(basis @ basis_vector_j, (n, n))
+            ad_j_gl = linear_matrix_action(lambda A: mat_j @ A - A @ mat_j, n, **kwargs)
+            ad_j = subspace_action(ad_j_gl, basis)
+
+            res[i,j] = np.trace(ad_i @ ad_j)
+    return res
+
+def so_killing_form(p, q, basis=None, **kwargs):
+    r"""Return a matrix representing the Killing form for a matrix Lie
+    algebra preserving a standard (diagonal) form of signature (p, q).
+
+    Parameters
+    ----------
+    p,q : int
+        Signature of the invariant diagonal form
+    basis : ndarray
+        Array of shape (n^2, k) giving a basis for the Lie algebra of
+        the group preserving the given bilinear form. Each basis
+        element is a column vector, viewed as a flattened n*n
+        maatrix. If None (the default), compute a basis using the
+        diagonal form.
+
+
+        WARNING: the default behavior doesn't work properly without
+        forcing exact computation, e.g. by passing base_ring=QQbar as
+        a keyword argument (with Sage available).
+
+    Returns
+    -------
+    ndarray
+        k * k matrix giving the Killing form for this Lie algebra, in
+        either the provided basis or one computed from the form.
+
+    """
+    form = utils.indefinite_form(p, q, **kwargs)
+    return form_alg_killing_form(form, basis=basis, **kwargs)
+
+
 def o_to_pgl(A, bilinear_form=np.diag([-1, 1, 1])):
     r"""Return the image of an element of $\mathrm{O}(2, 1)$ under the
     representation $\mathrm{O}(2,1) \to \mathrm{GL}(2)$.

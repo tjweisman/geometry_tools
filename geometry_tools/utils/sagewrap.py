@@ -9,10 +9,13 @@ import numpy as np
 from . import numerical
 from . import types
 
-I = sage.all.I
+# wrap this in QQbar because sage sucks
+I = sage.all.QQbar(sage.all.I)
+
 pi = sage.all.pi
 Integer = sage.all.Integer
 SR = sage.all.SR
+QQbar = sage.all.QQbar
 matrix_class = sage.matrix.matrix0.Matrix
 vector_class = sage.structure.element.Vector
 
