@@ -1187,7 +1187,7 @@ def number(val, like=None, dtype=None, base_ring=None):
             "available has no effect."  )
 
     if not SAGE_AVAILABLE:
-        return astype(val, dtype)
+        return astype(val, dtype).item()
 
     if dtype is None and like is not None:
         try:
@@ -1204,7 +1204,7 @@ def number(val, like=None, dtype=None, base_ring=None):
         if isinstance(val, float):
             return sage.all.SR(sage.all.QQ(val))
 
-    return astype(val, dtype)
+    return astype(val, dtype).item()
 
 def wrap_elementary(func):
     @functools.wraps(func)
