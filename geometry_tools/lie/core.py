@@ -69,17 +69,19 @@ def gln_lie_algebra_coords(matrix, dtype=None,
     return _convert_vector(coords, like=matrix,
                            autoconvert=autoconvert)
 
-def coords_to_gln_algebra(coord_vector, dtype=None,
+def coords_to_gln_lie_algebra(coord_vector, dtype=None,
                           autoconvert=True):
     arr = np.array(coord_vector, dtype=dtype)
     d = arr.shape[-1]
 
     n = np.sqrt(d)
-    if d != int(d):
+    if n != int(n):
         raise GeometryError(
             "Cannot interpret a vector with non-square length as "
             "an element in a square matrix space"
         )
+
+    n = int(n)
 
     mats = arr.reshape((-1, n, n))
     return _convert_matrix(mats, like=coord_vector,
