@@ -137,6 +137,9 @@ def coords_to_sln_lie_algebra(coord_vector, dtype=None,
                            autoconvert=autoconvert)
 
 def linear_matrix_action(linear_map, n, **kwargs):
+    if "like" not in kwargs:
+        kwargs["like"] = linear_map
+
     base_ring, dtype = utils.check_type(**kwargs)
     map_matrix = utils.zeros((n*n, n*n), base_ring, dtype)
 
@@ -153,6 +156,9 @@ def linear_matrix_action(linear_map, n, **kwargs):
     return map_matrix
 
 def sln_linear_action(linear_map, n, **kwargs):
+    if "like" not in kwargs:
+        kwargs["like"] = linear_map
+
     base_ring, dtype = utils.check_type(**kwargs)
     map_matrix = utils.zeros((n**2 - 1, n**2 - 1), base_ring, dtype)
 

@@ -189,6 +189,10 @@ class Representation:
     def base_ring(self):
         return self._base_ring
 
+    @property
+    def num_gens(self):
+        return len(list(self.asym_gens()))
+
     @staticmethod
     def wrap_func(numpy_matrix):
         return numpy_matrix
