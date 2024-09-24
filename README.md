@@ -1,13 +1,33 @@
 geometry_tools package
 ----------------------
 
-This package consists of some basic tools for working with hyperbolic
-geometry, projective geometry, and group representations. Everything is done
-numerically, and some of the code is really sensitive to round-off error, so
-don't expect to use this to verify anything deep.
+`geometry_tools` is a Python package meant to help you work with and visualize
+group actions on hyperbolic space and projective space.
 
-Mostly, I use these tools to draw nice-ish pictures with matplotlib (and
-that's probably all they're good for).
+The package is mostly built on top of [numpy](https://numpy.org/), [matplotlib]
+(https://matplotlib.org/), and [scipy](https://scipy.org/). Optionally, the
+package can use tools provided by [Sage](https://www.sagemath.org/) to
+perform (slow) exact computations.
+
+`geometry_tools` can help you:
+
+- perform numerical (or sometimes, exact) computations with objects in
+  hyperbolic space, in multiple models (namely the Klein, hyperboloid,
+  projective, Poincare, and half-space models)
+
+- draw nice pictures in the hyperbolic plane, the real projective plane, and the complex projective line
+
+- work with representations of finitely generated groups into O(d, 1), GL(d, R), and GL(d, C)
+
+- do hands-on computations with representations of Coxeter groups into GL(d, R)
+
+- use finite-state automata to do some simple computations in word-hyperbolic groups
+
+Some limited support for 3D figures is also provided (via matplotlib).
+
+None of the functionality of this package is (mathematically) very deep.
+Mostly, the package just wraps more sophisticated tools in a way intended to
+make it easy to quickly draw good pictures in H^2, H^3, and RP^2 and CP^1.
 
 ## Installation
 
