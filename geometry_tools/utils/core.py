@@ -127,7 +127,12 @@ def diagonalize_form(bilinear_form,
         form where the basis vectors are ordered so that spacelike
         (positive) vectors come first if p <= q and timelike
         (negative) basis vectors come first if q < p.
+    with_inverse : bool
+        If True (default), also return the inverse of the conjugating
+        matrix.
 
+        Computing an inverse matrix with exact algebraic entries in
+        Sage can be slow, so this will often save time.
     reverse : bool
         if True, reverse the order of the basis vectors for the
         diagonal bilinear form (from the order specified by
@@ -135,19 +140,22 @@ def diagonalize_form(bilinear_form,
 
     Returns
     -------
-    ndarray
+    ndarray or (ndarray, ndarray)
         numpy array of shape (n, n), representing a coordinate change
-        taking the given bilinear form to a diagonal form. If $B$ is
-        the matrix given by bilinear_form, and $D$ is a diagonal
-        matrix with the same signature as $B$, then this function
-        returns a matrix $M$ such that $M^TDM = B$.
+        taking the given bilinear form to a diagonal form on which the
+        standard basis vectors have square-norm +-1.
 
+        If $B$ is the matrix given by bilinear_form, and $D$ is a
+        diagonal matrix with the same signature as $B$, then this
+        function returns a matrix $W$ such that $W^TBW = D$. If
+        with_inverse is True, then this function returns the pair (W,
+        inverse(W)).
     """
 
     n = bilinear_form.shape[-1]
 
     eigs, U = eigh(bilinear_form)
-    Uinv = invert(U)
+    Uinv = conjugate(U.swapaxes(-1, -2))
 
     Dinv = construct_diagonal(np.sqrt(np.abs(eigs)))
     D = zeros(Dinv.shape, like=Dinv)
@@ -184,8 +192,9 @@ def diagonalize_form(bilinear_form,
         return W
 
     Winv = Dinv @ Uinv
+
     if order_eigenvalues:
-        Winv = permute_along_axis(Winv, order, axis=-2)
+        Winv = permute_along_axis(Winv, order, axis=-2, inverse=True)
 
     return (W, Winv)
 
@@ -1065,7 +1074,6 @@ def antisymmetric_part(bilinear_form):
     return (bilinear_form - bilinear_form.swapaxes(-1, -2)) / 2
 
 def matrix_func(func):
-
     # get sage_func now, so if there's a name issue we'll throw an
     # error when the wrapped function is defined (rather than when
     # it's called)
@@ -1093,9 +1101,18 @@ def kernel(mat):
 def eig(mat):
     return np.linalg.eig(mat)
 
-@matrix_func
 def eigh(mat):
-    return np.linalg.eigh(mat)
+    if not SAGE_AVAILABLE or types.is_linalg_type(mat):
+        return np.linalg.eigh(mat)
+
+    eigvals, eigvecs = sagewrap.eig(mat)
+    orthogonalized = indefinite_orthogonalize(
+        identity(eigvecs.shape[-1], like=eigvecs),
+        eigvecs.swapaxes(-1, -2)
+    ).swapaxes(-1, -2)
+
+    return (eigvals, orthogonalized)
+
 
 @matrix_func
 def det(mat):
@@ -1163,7 +1180,7 @@ def guess_literal_ring(data):
 
 def astype(val, dtype=None):
     if dtype is None:
-        return val
+        return np.array(val)
 
     return np.array(val).astype(dtype)
 

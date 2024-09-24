@@ -563,7 +563,7 @@ def sl2c_herm_action(mat, like=None, force_real=True, **kwargs):
 
     [[0, 1], [1, 0]],
 
-    [[0, i], [-i, i]]
+    [[0, i], [-i, 0]]
 
     """
     if like is None:
@@ -572,7 +572,7 @@ def sl2c_herm_action(mat, like=None, force_real=True, **kwargs):
     I = utils.unit_imag(like=like, **kwargs)
     base_ring, dtype = utils.complex_type(like=like, **kwargs)
 
-    #action on 4x4 complex matrices
+    #action on 2x2 complex matrices
     mat_map = linear_matrix_action(
         lambda A: mat @ A @ utils.conjugate(mat.swapaxes(-1, -2)), 2,
         base_ring=base_ring, dtype=dtype
