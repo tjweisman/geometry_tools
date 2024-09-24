@@ -218,10 +218,11 @@ class Representation:
         return self.__class__.wrap_func(matrix)
 
     def __init__(self, representation=None,
-                 generator_names=None,
                  relations=[],
+                 generator_names=None,
                  base_ring=None,
-                 parse_simple=True,
+                 parse_simple=None,
+                 invert_gen=None,
                  dtype='float64'):
         """
         Parameters
@@ -239,7 +240,6 @@ class Representation:
         self._dim = None
         self._dtype = dtype
         self._base_ring = base_ring
-        self.parse_simple = parse_simple
         self.relations = [r for r in relations]
 
         if representation is not None:
@@ -257,18 +257,26 @@ class Representation:
                                    compute_inverse=False)
 
             self._dim = representation._dim
-
             self.relations += [r for r in representation.relations]
 
+            if invert_gen is None:
+                invert_gen = representation.invert_gen
+            if parse_simple is None:
+                parse_simple = representation.parse_simple
         else:
-            if generator_names is None:
-                generator_names = []
+            self.generators = dict({})
 
-            self.generators = {name[0].lower():None
-                               for name in utils.words.asym_gens(generator_names)}
+        if invert_gen is None:
+            invert_gen = utils.words.invert_gen
 
-            for gen in list(self.generators):
-                self.generators[gen.upper()] = None
+        if parse_simple is None:
+            parse_simple = True
+
+        self.invert_gen = invert_gen
+        self.parse_simple = parse_simple
+
+
+
 
     def freely_reduced_elements(self, length, maxlen=True,
                                 with_words=False):
@@ -624,7 +632,7 @@ class Representation:
 
         self.generators[generator] = matrix
         if compute_inverse:
-            self.generators[utils.words.invert_gen(generator)] = utils.invert(matrix)
+            self.generators[self.invert_gen(generator)] = utils.invert(matrix)
 
         # always update the dtype (we don't have a hierarchy for this)
         self._dtype = matrix.dtype
@@ -687,8 +695,15 @@ class Representation:
         if base_ring is None:
             base_ring = self.base_ring
 
-        composed_rep = self.__class__(dtype=dtype, base_ring=base_ring,
-                                      relations=self.relations, **kwargs)
+        # make a rep with no matrix data, solely for the purpose of
+        # copying all the (non-matrix) data
+        empty = Representation(self, **kwargs)
+        empty.generators = {}
+        empty._dim = None
+
+        composed_rep = self.__class__(empty, dtype=dtype,
+                                      base_ring=base_ring,
+                                      **kwargs)
 
         if compute_inverses:
             generator_iterator = self.asym_gens()
@@ -697,7 +712,7 @@ class Representation:
 
         for g in generator_iterator:
             image = self.generators[g]
-            inv_image = self.generators[utils.words.invert_gen(g)]
+            inv_image = self.generators[self.invert_gen(g)]
 
             try:
                 composed = hom(image, inv=inv_image)
@@ -766,8 +781,11 @@ class Representation:
                                   compute_inverse=compute_inverse)
             if not compute_inverse:
                 subrep._set_generator(
-                    utils.words.invert_gen(g),
-                    self._word_value(utils.words.formal_inverse(word))
+                    self.invert_gen(g),
+                    self._word_value(
+                        utils.words.formal_inverse(
+                            word, inverse_map=self.invert_gen)
+                    )
                 )
 
         return subrep
