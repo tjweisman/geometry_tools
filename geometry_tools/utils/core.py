@@ -824,7 +824,7 @@ def matrix_product(array1, array2, unit_axis_1=2, unit_axis_2=2,
         excess2 = reshape2.ndim - large_axes
 
         if excess1 > 0:
-            if broadcast == "pairwise_reversed":
+            if broadcast == "pairwise":
                 reshape1 = np.expand_dims(reshape1,
                                           axis=tuple(range(excess1, excess1 + excess2)))
             else:
@@ -832,7 +832,7 @@ def matrix_product(array1, array2, unit_axis_1=2, unit_axis_2=2,
                                           axis=tuple(range(excess2)))
 
         if excess2 > 0:
-            if broadcast == "pairwise_reversed":
+            if broadcast == "pairwise":
                 reshape2 = np.expand_dims(reshape2, axis=tuple(range(excess1)))
             else:
                 reshape2 = np.expand_dims(reshape2,
@@ -1178,6 +1178,12 @@ def guess_literal_ring(data):
     # this is maybe not Pythonic, but it's also not a mistake.
     return None
 
+def scalar(val):
+    try:
+        return val.item()
+    except AttributeError:
+        return val
+
 def astype(val, dtype=None):
     if dtype is None:
         return np.array(val)
@@ -1204,7 +1210,7 @@ def number(val, like=None, dtype=None, base_ring=None):
             "available has no effect."  )
 
     if not SAGE_AVAILABLE:
-        return astype(val, dtype).item()
+        return scalar(astype(val, dtype))
 
     if dtype is None and like is not None:
         try:
@@ -1221,7 +1227,7 @@ def number(val, like=None, dtype=None, base_ring=None):
         if isinstance(val, float):
             return sage.all.SR(sage.all.QQ(val))
 
-    return astype(val, dtype).item()
+    return scalar(astype(val, dtype))
 
 def wrap_elementary(func):
     @functools.wraps(func)

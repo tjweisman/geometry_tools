@@ -1307,6 +1307,9 @@ class Transformation(ProjectiveObject):
         s_inv = self.inv()
         o_inv = other.inv()
 
+        # TODO: there was a bug in the "pairwise" vs
+        # "pairwise_reversed" convention, check this to see if it's
+        # broken
         if broadcast == "pairwise":
             slen = len(s_inv.shape)
             olen = len(o_inv.shape)

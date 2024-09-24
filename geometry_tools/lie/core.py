@@ -69,17 +69,19 @@ def gln_lie_algebra_coords(matrix, dtype=None,
     return _convert_vector(coords, like=matrix,
                            autoconvert=autoconvert)
 
-def coords_to_gln_algebra(coord_vector, dtype=None,
+def coords_to_gln_lie_algebra(coord_vector, dtype=None,
                           autoconvert=True):
     arr = np.array(coord_vector, dtype=dtype)
     d = arr.shape[-1]
 
     n = np.sqrt(d)
-    if d != int(d):
+    if n != int(n):
         raise GeometryError(
             "Cannot interpret a vector with non-square length as "
             "an element in a square matrix space"
         )
+
+    n = int(n)
 
     mats = arr.reshape((-1, n, n))
     return _convert_matrix(mats, like=coord_vector,
@@ -135,6 +137,9 @@ def coords_to_sln_lie_algebra(coord_vector, dtype=None,
                            autoconvert=autoconvert)
 
 def linear_matrix_action(linear_map, n, **kwargs):
+    if "like" not in kwargs:
+        kwargs["like"] = linear_map
+
     base_ring, dtype = utils.check_type(**kwargs)
     map_matrix = utils.zeros((n*n, n*n), base_ring, dtype)
 
@@ -151,6 +156,9 @@ def linear_matrix_action(linear_map, n, **kwargs):
     return map_matrix
 
 def sln_linear_action(linear_map, n, **kwargs):
+    if "like" not in kwargs:
+        kwargs["like"] = linear_map
+
     base_ring, dtype = utils.check_type(**kwargs)
     map_matrix = utils.zeros((n**2 - 1, n**2 - 1), base_ring, dtype)
 

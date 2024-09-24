@@ -1095,7 +1095,7 @@ class Hyperplane(Subspace):
 
 
         ideal_basis = transform.apply(standard_ideal_basis.T,
-                                      broadcast="pairwise").proj_data
+                                      broadcast="pairwise_reversed").proj_data
         proj_data = np.concatenate([spacelike_vector, ideal_basis],
                                   axis=-2)
         self.set(proj_data)
@@ -1731,7 +1731,7 @@ class Polygon(Point, projective.Polygon):
         words = ["a" * i for i in range(n)]
         mats = cyclic_rep.isometries(words)
 
-        vertices = mats.apply(start_vertex, "pairwise_reversed")
+        vertices = mats.apply(start_vertex, "pairwise")
 
         return Polygon(vertices, **kwargs)
 
