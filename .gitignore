@@ -5,4 +5,5 @@ dist
 doc
 tmp
 testing/old
+testing/geometry_tools_test_env
 *.ipynb_checkpoints

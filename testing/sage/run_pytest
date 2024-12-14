@@ -2,5 +2,5 @@
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
-$SCRIPT_DIR/../build_sage_tests.py
+$SCRIPT_DIR/../build_sage_tests
 sage --python -m pytest -v --pdb preparsed

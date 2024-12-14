@@ -1,5 +1,3 @@
-#!/usr/local/bin/sage --python
-
 import os
 import re
 

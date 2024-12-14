@@ -239,6 +239,29 @@ def test_apply_fail(transform_array, points):
 
 def test_apply_pairwise(transform_array, points):
     transformed = transform_array.apply(points, broadcast="pairwise")
+    assert transformed.shape == (3, 4)
+    assert np.allclose(
+        transformed.proj_data,
+        np.array([[[ 1.00000000e+00,  2.00000000e+00,  5.25000000e+00],
+                   [ 1.00000000e+00,  3.00000000e+00,  1.83750000e+01],
+                   [ 1.00000000e+00,  0.00000000e+00,  4.28571429e-01],
+                   [ 1.00000000e+00,  1.00000000e+00,  1.50000000e+00]],
+
+                  [[ 2.00000000e+00,  2.20000000e+00, -1.05000000e+00],
+                   [ 2.00000000e+00,  4.20000000e+00, -3.67500000e+00],
+                   [ 2.00000000e+00, -1.80000000e+00, -8.57142857e-02],
+                   [ 2.00000000e+00,  2.00000000e-01, -3.00000000e-01]],
+
+                  [[ 1.00000000e+00,  1.00000000e+00,  2.62500000e+01],
+                   [ 1.00000000e+00,  2.00000000e+00,  9.18750000e+01],
+                   [ 1.00000000e+00, -1.00000000e+00,  2.14285714e+00],
+                   [ 1.00000000e+00,  0.00000000e+00,  7.50000000e+00]]])
+        )
+
+
+def test_apply_pairwise_reversed(transform_array, points):
+    transformed = transform_array.apply(points,
+                                        broadcast="pairwise_reversed")
     assert transformed.shape == (4, 3)
     assert np.allclose(
         transformed.proj_data,
@@ -267,7 +290,7 @@ def test_apply_polygon(transform, polygon):
 
 def test_apply_pairwise_polygon(transform_array, polygons):
     t_polys = transform_array.apply(polygons, broadcast="pairwise")
-    assert t_polys.shape == (len(transform_array), len(polygons))
+    assert t_polys.shape == (len(polygons), len(transform_array))
     assert t_polys.proj_data.dtype == np.dtype('float64')
 
 def test_projective_representation(representation, transform):

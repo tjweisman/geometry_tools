@@ -1,0 +1,27 @@
+#!/bin/bash
+
+TEST_ENV="geometry_tools_test_env"
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
+while getopts ":cs" OPTION; do
+    case "$OPTION" in
+        c)
+            echo "deleting old test environment..."
+            rm -rf $SCRIPT_DIR/$TEST_ENV
+
+            echo "creating new test environment..."
+            python3 -m venv $SCRIPT_DIR/$TEST_ENV
+            source $SCRIPT_DIR/$TEST_ENV/bin/activate
+
+            echo "setting up new test environment..."
+            pip install pytest
+            pip install $SCRIPT_DIR/..
+            
+           ;;
+
+        s) echo "s flag specified"
+           ;;
+    esac
+done
+
+pytest

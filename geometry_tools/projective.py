@@ -847,6 +847,13 @@ class PointPair(Point):
         """
         return self.get_endpoints().projective_coords()
 
+class Segment(PointPair):
+    """alias for PointPair; provides no new functionality.
+
+    TODO: add reasonable functionality
+    """
+    pass
+
 class Polygon(Point):
     """A finite-sided polygon in projective space.
     """
