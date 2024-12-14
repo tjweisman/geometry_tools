@@ -47,6 +47,7 @@ import os
 import copy
 import importlib.resources
 from collections import deque, defaultdict
+from itertools import chain
 
 
 from . import kbmag_utils, gap_parse
@@ -810,6 +811,40 @@ def free_automaton(generating_set):
         for g in [''] + generators
     }
     fsa = FSA(graph, start_vertices=[''])
+    return fsa
+
+def free_abelian_automaton(generating_set, inverses=None):
+    """Return an automaton accepting shortlex geodesic words in a free
+    abelian group
+
+    Parameters
+    ----------
+    generating_set : iterable of strings
+        Names of the generators for this free abelian group
+
+    Returns
+    -------
+    FSA
+        Automaton accepting reduced words in the generators
+        (and their inverses)
+
+    """
+    if inverses is None:
+        inverses = [words.invert_gen(g) for g in generating_set]
+    collated_gens = list(chain(*zip(generating_set, inverses)))
+    partial_order = {g:int(i/2) + 1 for i, g in enumerate(collated_gens)}
+
+    vertices = [(0, '')] + [
+        (partial_order[g], g) for g in collated_gens
+    ]
+    graph = {
+         (i,g): {
+            h:(j, h) for j, h in vertices
+             if j > i or ((i,g) == (j, h) and i != 0)
+        }
+        for i, g in vertices
+    }
+    fsa = FSA(graph, start_vertices=[(0, '')])
     return fsa
 
 def _hidden_vertices(graph_dict):

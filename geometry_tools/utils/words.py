@@ -1,5 +1,6 @@
 import re
 from collections import defaultdict
+from itertools import product
 
 SIMPLE_GENERATOR_NAMES = "abcdefghijklmnopqrstuvwxyz"
 
@@ -34,6 +35,23 @@ def asym_gens(generators):
     for gen in generators:
         if gen.lower() == gen:
             yield gen
+
+def free_abelian_words(generators, length,
+                       metric="sup", inverses=None):
+    if inverses is None:
+        inverses = [invert_gen(g) for g in generators]
+
+    if metric == "sup":
+        g_list = list(generators)
+        n = len(g_list)
+        for counts in product(range(-length, length + 1), repeat=n):
+            word = ""
+            for i, count in enumerate(counts):
+                if count < 0:
+                    word += inverses[i] * abs(count)
+                elif count > 0:
+                    word += g_list[i] * count
+            yield word
 
 def simplify_word(word, inverse_map=invert_gen,
                   as_string=True):
