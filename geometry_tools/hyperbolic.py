@@ -1743,8 +1743,10 @@ class Polygon(Point, projective.Polygon):
         """
         radius = genus_g_surface_radius(g, **kwargs)
 
+        base_ring = kwargs.get("base_ring", None)
         if base_ring is not None:
             radius = base_ring(radius)
+
         return Polygon.regular_polygon(
             4 * g, radius=radius, **kwargs
         )
