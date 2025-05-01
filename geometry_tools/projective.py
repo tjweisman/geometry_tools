@@ -1317,11 +1317,16 @@ class Transformation(ProjectiveObject):
         # TODO: there was a bug in the "pairwise" vs
         # "pairwise_reversed" convention, check this to see if it's
         # broken
-        if broadcast == "pairwise":
+        if broadcast == "pairwise_reversed":
             slen = len(s_inv.shape)
             olen = len(o_inv.shape)
             s_inv = s_inv.reshape(s_inv.shape + (1,)*olen)
             o_inv = o_inv.reshape((1,)*slen + o_inv.shape)
+        elif broadcast == "pairwise":
+            slen = len(s_inv.shape)
+            olen = len(o_inv.shape)
+            s_inv = s_inv.reshape((1,)*olen + s_inv.shape)
+            o_inv = o_inv.reshape(o_inv.shape + (1,)*slen)
 
         commutator = self.apply(other, broadcast=broadcast)
         commutator = commutator.apply(s_inv, broadcast="elementwise")

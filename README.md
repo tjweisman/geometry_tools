@@ -12,8 +12,8 @@ perform (slow) exact computations.
 `geometry_tools` can help you:
 
 - perform numerical (or sometimes, exact) computations with objects in
-  hyperbolic space, in multiple models (namely the Klein, hyperboloid,
-  projective, Poincare, and half-space models)
+  hyperbolic space, in multiple models (namely the hyperboloid, projective,
+  Poincare, and half-space models)
 
 - draw nice pictures in the hyperbolic plane, the real projective plane, and the complex projective line
 
