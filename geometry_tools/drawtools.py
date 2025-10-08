@@ -286,7 +286,7 @@ class ProjectiveDrawing(Drawing):
         )
 
         default_kwargs = {
-            "facecolor": "none",
+            "facecolor": "gray",
             "edgecolor": "black"
         }
         for key, value in kwargs.items():
@@ -387,6 +387,18 @@ class ProjectiveDrawing3D(ProjectiveDrawing, Drawing3D):
 
         x, y, z = pointlist.affine_coords().T
         self.ax.plot(x, y, z, **default_kwargs)
+
+    def draw_polygon(self, polygons, **kwargs):
+
+        # infuriating mpl quirk
+        if (("facecolor" in kwargs and kwargs["facecolor"].lower() == "none") or
+            ("facecolors" in kwargs and kwargs["facecolors"].lower() == "none")):
+            raise ValueError(
+                "drawing 3D polygons with no facecolor is unsupported, "
+                "use lines instead."
+            )
+
+        ProjectiveDrawing.draw_polygon(self, polygons, **kwargs)
 
 
 class HyperbolicDrawing(Drawing):
