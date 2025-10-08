@@ -501,9 +501,9 @@ def subspace_action(mat, subspace, broadcast="elementwise", **kwargs):
     return utils.matrix_product(left_coeffs, right_coeffs_inv)
 
 def form_adjoint_action(mat, form, inv=None, **kwargs):
-    lie_alg_kernel_mat = lie.bilinear_form_differential(form, **kwargs)
+    lie_alg_kernel_mat = bilinear_form_differential(form, **kwargs)
     lie_alg_basis = utils.kernel(lie_alg_kernel_mat, **kwargs)
-    gln_adjoint_mat = lie.gln_adjoint(mat, inv=inv, **kwargs)
+    gln_adjoint_mat = gln_adjoint(mat, inv=inv, **kwargs)
     return lie.subspace_action(gln_adjoint_mat,
                                lie_alg_basis,
                                **kwargs)
